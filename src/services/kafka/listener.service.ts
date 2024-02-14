@@ -1,16 +1,19 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { KafkaService } from './kafka.service';
-import { Consumer, ConsumerRunConfig, ConsumerSubscribeTopics } from 'kafkajs';
-import { partition } from 'rxjs';
+import { Consumer } from 'kafkajs';
 
 @Injectable()
 export class ListenerService implements OnApplicationShutdown, OnModuleInit {
 
-  consumer : Consumer;
+  consumer: Consumer;
 
-  constructor(protected ks: KafkaService) {}
-  
+  constructor(protected ks: KafkaService) { }
+
   async onModuleInit() {
+    // await this.initKafkaListener();
+  }
+
+  async initKafkaListener() {
     this.consumer = this.ks.kafka.consumer({
       groupId: 'nestjs-client',
     })
@@ -19,16 +22,15 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
       topic: 'tb_newOpusImportedTopic'
     });
     await this.consumer.run({
-      eachMessage: (async ({topic, partition, message}) => {
-        // const json = JSON.parse(message.value.toJSON())
+      eachMessage: (async ({ topic, partition, message }) => {
         const obj = JSON.parse(message.value.toString())
-        console.log(obj); 
+        console.log(obj);
       }),
-    });    
+    });
   }
 
   onApplicationShutdown(_signal?: string) {
-    this.consumer.disconnect();    
+    this.consumer.disconnect();
   }
 
 }

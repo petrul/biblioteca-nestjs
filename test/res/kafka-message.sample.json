@@ -1,0 +1,40 @@
+[
+  {
+    "id": 607938,
+    "path": "krudy/a_voros_postakocsi",
+    "urlFragment": "a_voros_postakocsi",
+    "head": "A vörös postakocsi",
+    "url": "http://localhost:8080/krudy/a_voros_postakocsi",
+    "depth": 0,
+    "size": 329304,
+    "wordSize": 47608,
+    "author": {
+      "strId": "krudy",
+      "lastName": "Krúdy",
+      "firstName": "Gyula",
+      "originalNameInTeiFile": "Krúdy,Gyula",
+      "displayName": "Gyula Krúdy"
+    },
+    "leaf": false,
+    "opus": true
+  },
+  {
+    "id": 607955,
+    "path": "krudy/kanaan_konyve",
+    "urlFragment": "kanaan_konyve",
+    "head": "Kánaán könyve",
+    "url": "http://localhost:8080/krudy/kanaan_konyve",
+    "depth": 0,
+    "size": 139551,
+    "wordSize": 19421,
+    "author": {
+      "strId": "krudy",
+      "lastName": "Krúdy",
+      "firstName": "Gyula",
+      "originalNameInTeiFile": "Krúdy,Gyula",
+      "displayName": "Gyula Krúdy"
+    },
+    "leaf": false,
+    "opus": true
+  }
+]

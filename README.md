@@ -2,6 +2,8 @@ Textbase Nest is part of the Textbase server.
 
 - kafka listener
 
+Works with node 18.
+
 ## Description
 
 
