@@ -4,7 +4,7 @@
   "description": "",
   "author": "Petru Dimulescu",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "my license",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -25,6 +25,7 @@
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^7.3.0",
+    "@zilliz/milvus2-sdk-node": "^2.3.5",
     "kafkajs": "^2.2.4",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"

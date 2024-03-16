@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { IndexerService } from './services/indexer.service';
+import { TextbaseClient } from './services/textbase_client.service';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -8,15 +9,15 @@ describe('AppController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [IndexerService, TextbaseClient],
     }).compile();
 
     appController = app.get<AppController>(AppController);
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('controller should work"', async () => {
+      await appController.doTheIndexing() ; ///.toBe('Hello World!');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
-import { KafkaService } from './services/kafka/kafka.service';
+import { KafkaService } from './kafka.service';
 import { Producer } from 'kafkajs';
 
 @Injectable()
