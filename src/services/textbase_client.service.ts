@@ -26,17 +26,37 @@ export class TextbaseClient {
         return authors;
     }
 
-    async getOpera(strId: string) {
-        const opera = (await this.tb.api.getOpera(strId)).data
-        return opera;
+    async getOperaForAuthor(strId: string) {
+        const opera = await this.tb.api.getOpera(strId);
+        return opera.data;
     }
 
-    async getParagraphs(opId: number) {
-        const paras = (await this.tb.api.getIdParas(opId, {
-            page: 0, 
-            size: 100, 
-            withContent: 'true'
-          })).data
-          return paras;
+    async getAllOpera(pageNr = 0, pageSize = 20) {
+      const resp = await this.tb.api.executeSearchTeidivGet6({ page: pageNr, size: pageSize});
+      return resp.data._embedded.teiDivs;
+    }
+
+    async *getParagraphs(opId: number, pageSize = 2000) {
+      
+      var hasMore = true;
+      var pageNr = 0;
+
+      while (hasMore) {
+
+        // call /api/div/id/paras
+        const resp = await this.tb.api.getIdParas(opId, {
+          page: pageNr++,
+          size: pageSize,
+          withContent: 'true'
+        });
+
+        const paras = resp.data
+
+        hasMore = (paras.length == pageSize);
+
+        for (const p of paras) {
+          yield p;
+        }
+      }        
     }
 }

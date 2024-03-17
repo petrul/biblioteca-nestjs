@@ -1,47 +1,45 @@
-/*
-https://docs.nestjs.com/fundamentals/testing#unit-testing
-*/
-
 import { Test } from '@nestjs/testing';
 import { TextbaseClient } from './textbase_client.service';
-import exp from 'constants';
+import { Util } from '../util';
 
 describe('Textbase_clientService', () => {
     let tbc: TextbaseClient;
 
     beforeEach(async () => {
-        const moduleRef = await Test.createTestingModule({
+        const module = await Test.createTestingModule({
             imports: [], // Add
             controllers: [], // Add
             providers: [TextbaseClient],   // Add
         }).compile();
 
-        tbc = moduleRef.get<TextbaseClient>(TextbaseClient);
+        tbc = module.get<TextbaseClient>(TextbaseClient);
     });
 
-    it('test a few methods', async () => {
+    it('generator paragraphs()',  async () => {
         expect(tbc).toBeDefined();
-
-        const authors = await tbc.getAuthors()
-        expect(authors).not.toBeNull()
-        expect(authors.length).toBeGreaterThan(0)
-    
-        const a = authors[0];
-        console.log(a.strId);
         
-        
-        const opera = await tbc.getOpera(a.strId);
-        
+        const opera = await tbc.getAllOpera(0, 5);
     
         const op = opera[0]
-        console.log(op.head);
-        
+        expect(op).not.toBeNull()
+        expect(op.head).not.toBeNull()
+        expect(op.id).toBeGreaterThan(0)
+        expect(op.leaf).toBeFalsy()
     
-        const paras = await tbc.getParagraphs(op.id)
-        console.log(paras);
-        
-        // return paras;
-    });
-
-
+        const gen = tbc.getParagraphs(op.id, 500)
+        console.log(gen);
+        var i = 0
+        for await (let elem of gen) {
+            expect(elem).not.toBeNull()
+            expect(elem.name).not.toBeNull()
+            expect(elem.url).not.toBeNull()
+            expect(elem.text).not.toBeNull()
+            expect(elem.text_sha256).not.toBeNull()
+            expect(elem.text_sha256).toEqual(Util.sha256AsHex(elem.text))
+            i++;
+        }
+        expect(i).toBeGreaterThan(10);    
+    }, 
+    60 * 1000 // 1 min
+    );
 });
