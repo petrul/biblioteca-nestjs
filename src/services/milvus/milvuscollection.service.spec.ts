@@ -40,13 +40,13 @@ describe('MilvuscollectionService', () => {
             await col.createIndex();
             await col.insert(data.map( ({ text, ...rest }) => rest));
 
-            log.info( await col.getCollectionStatistics())
-            log.info('load', await col.load());
+            await col.getCollectionStatistics();
+            await col.load();
 
             const inShas = inData.map(it => it.sha256);
             const alreadyPresent = await col.getIdsPresentInDb(inShas)
             
-            log.info(alreadyPresent);
+            // log.info(alreadyPresent);
 
             expect(alreadyPresent.length).toBe(dataLen / 2)
             expect(alreadyPresent.sort()).toEqual(inShas.sort())
