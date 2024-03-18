@@ -10,4 +10,4 @@ USER 10001
 EXPOSE 3000
 
 WORKDIR /app
-RUN node /app/dist/main
+ENTRYPOINT [ "node", "/app/dist/main" ]
