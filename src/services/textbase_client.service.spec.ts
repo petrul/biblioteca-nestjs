@@ -27,7 +27,8 @@ describe('Textbase_clientService', () => {
         expect(op.leaf).toBeFalsy()
     
         const gen = tbc.getParagraphs(op.id, 500)
-        console.log(gen);
+        expect(gen).not.toBeNull()
+        
         var i = 0
         for await (let elem of gen) {
             expect(elem).not.toBeNull()

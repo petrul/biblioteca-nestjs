@@ -14,15 +14,4 @@ export class Util {
         return Buffer.from(str, "hex")
     }
 
-    static logger() {
-        var winston = require('winston');
-        // return winston.logger
-        
-        const logger = winston.createLogger({
-            level: 'info',
-            format: winston.format.cli(),
-            transports: [new winston.transports.Console()],
-          });
-          return logger;
-    }
 }

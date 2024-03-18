@@ -4,6 +4,6 @@ import { Injectable } from "@nestjs/common";
 export class IndexerService {
 
     index() {
-        console.log(4)
+        // console.log(4)
     }
 }

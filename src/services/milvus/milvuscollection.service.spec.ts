@@ -4,15 +4,15 @@ import { Util } from '../../util';
 
 describe('MilvuscollectionService', () => {
 
-    const log = Util.logger();
-
     it('milvus collection create/drop', async () => {
         // expect(col).toBeDefined();
         const colname = "test_" + TestUtils.randomAlphanumeric()
         let col: MilvusCollection = new MilvusCollection(colname);
-        log.info(await col.create())
-        log.info(await col.drop())
-    });
+        await col.create();
+        await col.drop()
+    }, 
+    60 * 1000 // 1 min timeout 
+    );
 
     it ('insert data into milvus', async() => {
 
