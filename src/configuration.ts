@@ -1,3 +1,5 @@
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 export default () => chooseConf();
 
@@ -19,4 +21,14 @@ function chooseConf() {
     if ('yoga' == hostname.toLowerCase())
         return yogaConf;
     return prodConf;
+}
+
+@Injectable()
+export class AppConfService implements TextbaseNestjsConfiguration {
+    constructor (private conf: ConfigService) {}
+
+    get kafkaServers(): string {
+        return this.conf.get<string>('kafkaServers');
+    }
+
 }
