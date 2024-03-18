@@ -23,7 +23,7 @@ describe('MilvuscollectionService', () => {
                 text: text,
                 url: TestUtils.randomAlphanumeric(),
                 sha256: Util.sha256AsHex(text),
-                embeddings: Array.from( { length: 384}, () => Math.random() )
+                embedding: Array.from( { length: 384}, () => Math.random() )
             }
         });
 

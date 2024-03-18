@@ -4,7 +4,7 @@ export class MilvusCollection {
 
     public milvus : MilvusClient
 
-    static readonly EMBEDDINGS = 'embeddings';
+    static readonly EMBEDDING = 'embedding';
     static readonly SHA256 = 'sha256';
     static readonly URL: string = 'url';
 
@@ -15,7 +15,10 @@ export class MilvusCollection {
           });
     }
 
-    async create() {
+    /**
+     * @param vectorDim 384 is the dim for all_mini model embeddings dim
+     */
+    async create(vectorDim = 384) {
       
         return await this.milvus.createCollection({collection_name: this.colname,
             consistency_level: 'Eventually',
@@ -37,10 +40,10 @@ export class MilvusCollection {
                 },
                 
                 {
-                  name: MilvusCollection.EMBEDDINGS,
-                  description: 'VarChar field',
+                  name: MilvusCollection.EMBEDDING,
+                  description: 'the actual vector',
                   data_type: DataType.FloatVector,
-                  dim: 384,
+                  dim: vectorDim,
                 },
               ],
             });
@@ -91,7 +94,7 @@ export class MilvusCollection {
       await this.milvus.createIndex({
         collection_name: this.colname,
         index_name:'index',
-        field_name: MilvusCollection.EMBEDDINGS,
+        field_name: MilvusCollection.EMBEDDING,
         extra_params: {
         "index_type": "IVF_SQ8",
         "metric_type": "L2",

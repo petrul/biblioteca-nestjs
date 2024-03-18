@@ -3,12 +3,12 @@ import { ConfigService } from "@nestjs/config";
 
 export default () => chooseConf();
 
-interface TextbaseNestjsConfiguration {
+export interface TextbaseNestjsConfiguration {
     kafkaServers: string;
     sentenceTransformersServer: string;
 }
 
-const commonConf : Partial<TextbaseNestjsConfiguration> = {
+export const commonConf : Partial<TextbaseNestjsConfiguration> = {
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200"
 }
 

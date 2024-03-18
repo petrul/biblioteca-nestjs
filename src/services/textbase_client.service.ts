@@ -17,7 +17,7 @@ export class TextbaseClient {
                 Accept: 'application/json',
               }
             }
-          })
+          });
     }
 
     async getAuthors() : Promise<AuthorDto[]> {
