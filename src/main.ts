@@ -3,12 +3,14 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: console,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Textbase NestJS')
     .setDescription('Textbase NestJS complements the main Spring Boot Java Textbase server in the Typescript world')
-    .setVersion('1.0')
+    .setVersion('0.1')
     .addTag('textbase')
     .build();
   const document = SwaggerModule.createDocument(app, config);
