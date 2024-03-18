@@ -1,4 +1,3 @@
-import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { ProducerService } from './services/kafka/producer.service';
@@ -15,15 +14,18 @@ import configuration, { AppConfService } from './configuration';
       load: [ configuration ]
     })
   ],
-  controllers: [AppController],
+
+  controllers: [
+    AppController
+  ],
+
   providers: [
-    MilvusCollection, 
+    AppConfService,
     ProducerService,
     ListenerService,
     KafkaService,
     IndexerService,
-    TextbaseClient,
-    AppConfService,
+    TextbaseClient,    
   ],
 })
 export class AppModule { }

@@ -1,3 +1,4 @@
+
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -11,7 +12,7 @@ export interface TextbaseNestjsConfiguration {
 
 export const commonConf : Partial<TextbaseNestjsConfiguration> = {
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
-    miniMilvus: 'mini:19530'
+    miniMilvus: process.env.MINI_MILVUS  || 'mini:19530'
 }
 
 const prodConf: TextbaseNestjsConfiguration = {
@@ -26,6 +27,9 @@ const yogaConf: TextbaseNestjsConfiguration = {
     miniMilvus: commonConf.miniMilvus
 }
 
+/**
+ * @returns 
+ */
 function chooseConf() {
     var os = require('os');
     const hostname: string = os.hostname();

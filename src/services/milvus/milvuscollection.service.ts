@@ -9,7 +9,9 @@ export class MilvusCollection {
     static readonly SHA256 = 'sha256';
     static readonly URL: string = 'url';
 
-    constructor(public colname: string, protected conf: TextbaseNestjsConfiguration) {
+    constructor(
+      public colname: string, 
+      protected conf: TextbaseNestjsConfiguration) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
             address: conf.miniMilvus,
