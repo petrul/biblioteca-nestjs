@@ -6,20 +6,24 @@ export default () => chooseConf();
 export interface TextbaseNestjsConfiguration {
     kafkaServers: string;
     sentenceTransformersServer: string;
+    miniMilvus: string;
 }
 
 export const commonConf : Partial<TextbaseNestjsConfiguration> = {
-    sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200"
+    sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
+    miniMilvus: 'mini:19530'
 }
 
 const prodConf: TextbaseNestjsConfiguration = {
     kafkaServers: process.env.KAFKA_SERVERS || "kafka:9052",
-    sentenceTransformersServer: commonConf.sentenceTransformersServer
+    sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    miniMilvus: commonConf.miniMilvus
 }
 
 const yogaConf: TextbaseNestjsConfiguration = {
     kafkaServers: 'localhost:30115',
-    sentenceTransformersServer: commonConf.sentenceTransformersServer
+    sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    miniMilvus: commonConf.miniMilvus
 }
 
 function chooseConf() {
@@ -30,6 +34,9 @@ function chooseConf() {
     return prodConf;
 }
 
+/**
+ * typed extension to ConfigService for our properties.
+ */
 @Injectable()
 export class AppConfService implements TextbaseNestjsConfiguration {
     constructor (private conf: ConfigService) {}
@@ -41,5 +48,8 @@ export class AppConfService implements TextbaseNestjsConfiguration {
     get sentenceTransformersServer(): string {
         return this.conf.get<string>('sentenceTransformersServer');
     }
-    
+
+    get miniMilvus(): string {
+        return this.conf.get<string>('miniMilvus');
+    }
 }

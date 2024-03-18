@@ -1,4 +1,5 @@
 import { DataType, MilvusClient } from '@zilliz/milvus2-sdk-node';
+import { AppConfService, TextbaseNestjsConfiguration } from 'src/configuration';
 
 export class MilvusCollection {
 
@@ -8,10 +9,10 @@ export class MilvusCollection {
     static readonly SHA256 = 'sha256';
     static readonly URL: string = 'url';
 
-    constructor(public colname: string) {
+    constructor(public colname: string, protected conf: TextbaseNestjsConfiguration) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
-            address: 'mini:19530',
+            address: conf.miniMilvus,
           });
     }
 
