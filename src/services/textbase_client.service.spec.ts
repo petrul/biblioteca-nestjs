@@ -40,6 +40,6 @@ describe('Textbase_clientService', () => {
         }
         expect(i).toBeGreaterThan(10);    
     }, 
-    60 * 1000 // 1 min
+        60 * 1000 // max 1 min timeout
     );
 });

@@ -50,47 +50,6 @@ export interface Author {
   anonymous?: boolean;
 }
 
-export interface EntityModelAuthor {
-  /** @format int64 */
-  id?: number;
-  strId?: string;
-  lastName?: string;
-  firstName?: string;
-  displayName?: string;
-  avatar?: {
-    binaryStream?: object;
-  };
-  visualName?: string;
-  anonymous?: boolean;
-  _links?: Links;
-}
-
-export interface PageMetadata {
-  /** @format int64 */
-  size?: number;
-  /** @format int64 */
-  totalElements?: number;
-  /** @format int64 */
-  totalPages?: number;
-  /** @format int64 */
-  number?: number;
-}
-
-export interface PagedModelEntityModelAuthor {
-  _embedded?: {
-    authors?: EntityModelAuthor[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelAuthor {
-  _embedded?: {
-    authors?: EntityModelAuthor[];
-  };
-  _links?: Links;
-}
-
 export interface EntityModelTeiDiv {
   /** @format int64 */
   id?: number;
@@ -141,6 +100,17 @@ export interface EntityModelTeiDiv {
   completePath?: string;
   author?: Author;
   _links?: Links;
+}
+
+export interface PageMetadata {
+  /** @format int64 */
+  size?: number;
+  /** @format int64 */
+  totalElements?: number;
+  /** @format int64 */
+  totalPages?: number;
+  /** @format int64 */
+  number?: number;
 }
 
 export interface PagedModelEntityModelTeiDiv {
@@ -222,6 +192,36 @@ export interface TeiFile {
   /** @format date-time */
   timestamp?: string;
   author?: Author;
+}
+
+export interface EntityModelAuthor {
+  /** @format int64 */
+  id?: number;
+  strId?: string;
+  lastName?: string;
+  firstName?: string;
+  displayName?: string;
+  avatar?: {
+    binaryStream?: object;
+  };
+  visualName?: string;
+  anonymous?: boolean;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
 }
 
 export interface EntityModelTeiElem {
@@ -1540,10 +1540,26 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * @name GetIdToc
      * @request GET:/api/divs/{id}/toc
      */
-    getIdToc: (id: number, params: RequestParams = {}) =>
+    getIdToc: (
+      id: number,
+      query?: {
+        /**
+         * @format int32
+         * @default 0
+         */
+        page?: number;
+        /**
+         * @format int32
+         * @default 20
+         */
+        size?: number;
+      },
+      params: RequestParams = {},
+    ) =>
       this.request<TeiDivDto[], any>({
         path: `/api/divs/${id}/toc`,
         method: 'GET',
+        query: query,
         format: 'json',
         ...params,
       }),
