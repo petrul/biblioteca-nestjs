@@ -1,15 +1,24 @@
 import { Test } from '@nestjs/testing';
 import { TextbaseClient } from './textbase_client.service';
 import { Util } from '../util';
+import { AppConfService } from '../configuration';
+import { TestUtils } from '../../test/testutils'
 
 describe('Textbase_clientService', () => {
     let tbc: TextbaseClient;
+    const conf = TestUtils.testConf;
 
     beforeEach(async () => {
         const module = await Test.createTestingModule({
-            imports: [], // Add
-            controllers: [], // Add
-            providers: [TextbaseClient],   // Add
+            imports: [],
+            controllers: [],
+            providers: [
+                {
+                    provide: AppConfService,
+                    useValue: conf
+                },
+                TextbaseClient
+            ],  
         }).compile();
 
         tbc = module.get<TextbaseClient>(TextbaseClient);

@@ -11,7 +11,7 @@ export class AppController {
   constructor(protected tbc: TextbaseClient) {}
 
   @Get('index')
-  async doTheIndexing(): Promise<any> {
+  async doTheVectorizing(): Promise<any> {
 
 
 

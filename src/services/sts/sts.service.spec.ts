@@ -38,19 +38,33 @@ describe('StsService', () => {
         const names = await stsService.getModelNames();
         expect(names.length).toEqual(2);
 
-        const allmini_vects = await stsService.encode(SentenceTransformersService.NAME_ALL_MINILM_L6_V2, [
-            "scrieti", 
-            "ce vreti",
-            "dvs"]);
-        expect(allmini_vects.length).toEqual(3);
-        allmini_vects.forEach(it => expect(it.length).toEqual(384));
+        {
+            const sentences_1 = [
+                "scrieti",
+                "ce vreti",
+                "dvs"
+            ];
+            const allmini_vects = await stsService.encode(SentenceTransformersService.NAME_ALL_MINILM_L6_V2, sentences_1);
+            expect(allmini_vects.length).toEqual(3);
+            allmini_vects.forEach(it => expect(it.length).toEqual(384));
 
-        const allmpnetv2_vects = await all_mpnet_base_v2.encode([
-            "foaie verde", 
-            "la 5eme republique vous remercie ce que vous faite pentru ea"
-        ]);
-        expect(allmpnetv2_vects.length).toEqual(2);
-        allmpnetv2_vects.forEach(it => expect(it.length).toEqual(768));
+            // again to make sure idempotent
+            expect(await stsService.encode(SentenceTransformersService.NAME_ALL_MINILM_L6_V2, sentences_1)).toEqual(allmini_vects);
+        }
         
+
+        {
+            const sentences_2 = [
+                "foaie verde",
+                "la 5eme republique vous remercie ce que vous faite pentru ea"
+            ];
+            const allmpnetv2_vects = await all_mpnet_base_v2.encode(sentences_2);
+            expect(allmpnetv2_vects.length).toEqual(2);
+            allmpnetv2_vects.forEach(it => expect(it.length).toEqual(768));
+
+            // again to make sure idempotent
+            expect(await all_mpnet_base_v2.encode(sentences_2)).toEqual(allmpnetv2_vects);
+        }
+
     });
 });

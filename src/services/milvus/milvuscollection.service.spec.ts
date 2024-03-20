@@ -4,9 +4,7 @@ import { Util } from '../../util';
 import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
 
 describe('MilvuscollectionService', () => {
-    const conf = {
-        miniMilvus: commonConf.miniMilvus
-    }
+    const conf = TestUtils.testConf;
 
     it('milvus collection create/drop', async () => {
         // expect(col).toBeDefined();
