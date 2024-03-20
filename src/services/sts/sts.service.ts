@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { AppConfService, TextbaseNestjsConfiguration } from "../../configuration";
+import { AppConfService, VectorizerConfiguration } from "../../configuration";
 import { Api as StsApi } from "../../sts.api";
 
 @Injectable()
@@ -10,7 +10,7 @@ export class SentenceTransformersService {
     static readonly NAME_ALL_MINILM_L6_V2 = 'all-MiniLM-L6-v2';
     static readonly NAME_ALL_MPNET_BASE_V2 = 'all-mpnet-base-v2';
 
-    constructor(private conf: AppConfService) {
+    constructor(protected conf: AppConfService) {
         const baseUrl = this.conf.sentenceTransformersServer
         this.sts = new StsApi({
             baseUrl: baseUrl,
@@ -38,7 +38,7 @@ export interface StsEncoder {
 }
 
 @Injectable() 
-export class All_mpnet_base_v2_StsService  implements StsEncoder {
+export class AllMpnetBaseV2_StsService implements StsEncoder {
 
     readonly modelName = SentenceTransformersService.NAME_ALL_MPNET_BASE_V2;
 

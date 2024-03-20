@@ -1,14 +1,16 @@
 
 import { Test } from '@nestjs/testing';
-import { AppConfService, TextbaseNestjsConfiguration, commonConf } from '../../configuration';
-import { All_mpnet_base_v2_StsService, SentenceTransformersService } from './sts.service';
+import {  AppConfService, VectorizerConfiguration, commonConf } from '../../configuration';
+import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
 
 describe('StsService', () => {
-    const conf : Partial<TextbaseNestjsConfiguration> = {
-        sentenceTransformersServer: commonConf.sentenceTransformersServer
+
+    const conf : Partial<VectorizerConfiguration> = {
+        sentenceTransformersServer: commonConf.sentenceTransformersServer,
     }
+
     let stsService: SentenceTransformersService;
-    let all_mpnet_base_v2: All_mpnet_base_v2_StsService;
+    let all_mpnet_base_v2: AllMpnetBaseV2_StsService;
 
     beforeEach(async () => {
         
@@ -18,15 +20,15 @@ describe('StsService', () => {
             providers: [ 
                 {
                     provide: AppConfService,
-                    useValue: conf,
-                },
+                    useValue: conf
+                }, 
                 SentenceTransformersService,
-                All_mpnet_base_v2_StsService,
+                AllMpnetBaseV2_StsService,
             ],
         }).compile();
 
         stsService = moduleRef.get<SentenceTransformersService>(SentenceTransformersService);
-        all_mpnet_base_v2 = moduleRef.get<All_mpnet_base_v2_StsService>(All_mpnet_base_v2_StsService);
+        all_mpnet_base_v2 = moduleRef.get<AllMpnetBaseV2_StsService>(AllMpnetBaseV2_StsService);
     });
 
     it('generic call to embeddings', async () => {

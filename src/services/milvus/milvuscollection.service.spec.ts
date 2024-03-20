@@ -1,7 +1,7 @@
 import { MilvusCollection } from './milvuscollection.service';
 import { TestUtils } from '../../../test/testutils';
 import { Util } from '../../util';
-import { TextbaseNestjsConfiguration, commonConf } from '../../configuration';
+import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
 
 describe('MilvuscollectionService', () => {
     const conf = {
@@ -11,7 +11,7 @@ describe('MilvuscollectionService', () => {
     it('milvus collection create/drop', async () => {
         // expect(col).toBeDefined();
         const colname = "test_" + TestUtils.randomAlphanumeric()
-        let col: MilvusCollection = new MilvusCollection(colname, commonConf as TextbaseNestjsConfiguration);
+        let col: MilvusCollection = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
         await col.create();
         await col.drop()
     }, 
@@ -37,7 +37,7 @@ describe('MilvuscollectionService', () => {
         expect(inData.length).toBe(dataLen / 2)
         expect(outData.length).toBe(dataLen / 2)
         
-        let col: MilvusCollection = new MilvusCollection(colname, commonConf as TextbaseNestjsConfiguration);
+        let col: MilvusCollection = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
         try {
 
             await col.create();
@@ -48,7 +48,7 @@ describe('MilvuscollectionService', () => {
             await col.load();
 
             const inShas = inData.map(it => it.sha256);
-            const alreadyPresent = await col.getIdsPresentInDb(inShas)
+            const alreadyPresent = await col.findById(inShas)
 
             expect(alreadyPresent.length).toBe(dataLen / 2)
             expect(alreadyPresent.sort()).toEqual(inShas.sort())

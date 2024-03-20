@@ -4,24 +4,25 @@ import { ConfigService } from "@nestjs/config";
 
 export default () => chooseConf();
 
-export interface TextbaseNestjsConfiguration {
+export interface VectorizerConfiguration {
     kafkaServers: string;
     sentenceTransformersServer: string;
     miniMilvus: string;
 }
 
-export const commonConf : Partial<TextbaseNestjsConfiguration> = {
+export const commonConf : Partial<VectorizerConfiguration> = {
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
     miniMilvus: process.env.MINI_MILVUS  || 'mini:19530'
 }
 
-const prodConf: TextbaseNestjsConfiguration = {
+const prodConf: VectorizerConfiguration = {
     kafkaServers: process.env.KAFKA_SERVERS || "kafka:9052",
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus
 }
 
-const yogaConf: TextbaseNestjsConfiguration = {
+// local dev conf for yoga laptop workstation
+const yogaConf: VectorizerConfiguration = {
     kafkaServers: 'localhost:30115',
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus
@@ -42,7 +43,7 @@ function chooseConf() {
  * typed extension to ConfigService for our properties.
  */
 @Injectable()
-export class AppConfService implements TextbaseNestjsConfiguration {
+export class AppConfService implements VectorizerConfiguration {
     constructor (private conf: ConfigService) {}
     
     get kafkaServers(): string {

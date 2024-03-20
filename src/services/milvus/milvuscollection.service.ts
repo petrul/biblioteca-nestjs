@@ -1,5 +1,5 @@
-import { DataType, MilvusClient } from '@zilliz/milvus2-sdk-node';
-import { AppConfService, TextbaseNestjsConfiguration } from 'src/configuration';
+import { CreateIndexParam, DataType, MilvusClient } from '@zilliz/milvus2-sdk-node';
+import { VectorizerConfiguration } from 'src/configuration';
 
 export class MilvusCollection {
 
@@ -11,7 +11,7 @@ export class MilvusCollection {
 
     constructor(
       public colname: string, 
-      protected conf: TextbaseNestjsConfiguration) {
+      protected conf: VectorizerConfiguration) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
             address: conf.miniMilvus,
@@ -81,13 +81,13 @@ export class MilvusCollection {
       } );
     }
 
-    async getIdsPresentInDb(ids: string[]) : Promise<string[]> {
+    async findById(ids: string[]) : Promise<string[]> {
       const asTxt = ids.map(it => `'${it}'`).join(",");
       const expr = `${MilvusCollection.SHA256} in [ ${asTxt} ] `
       const resp = await this.milvus.query({ 
         collection_name: this.colname,
         expr: expr,
-        output_fields:  [ MilvusCollection.SHA256 ]
+        output_fields: [ MilvusCollection.SHA256 ]
       })
 
       return resp.data.map(it => it.sha256);
@@ -98,13 +98,17 @@ export class MilvusCollection {
         collection_name: this.colname,
         index_name:'index',
         field_name: MilvusCollection.EMBEDDING,
-        extra_params: {
-        "index_type": "IVF_SQ8",
-        "metric_type": "L2",
-        "params": '{"nlist": "256"}'
-      },
+        extra_params: MilvusCollection.idx_ivfsq8_l2_256(),
       });
     }
+
+  protected static idx_ivfsq8_l2_256() : CreateIndexParam {
+    return {
+      "index_type": "IVF_SQ8",
+      "metric_type": "L2",
+      "params": '{"nlist": "256"}'
+    };
+  }
 
   async getCollectionStatistics() {
       return this.milvus.getCollectionStatistics({ collection_name:  this.colname })
