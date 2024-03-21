@@ -1,8 +1,9 @@
 import { Test } from '@nestjs/testing';
 import { TextbaseClient } from './textbase_client.service';
-import { Util } from '../util';
+import { PROVIDER_LOGGER, Util } from '../util';
 import { PROVIDER_CONF } from '../configuration';
 import { TestUtils } from '../../test/testutils'
+import { ConsoleLogger } from '@nestjs/common';
 
 describe('Textbase_clientService', () => {
     let tbc: TextbaseClient;
@@ -13,6 +14,11 @@ describe('Textbase_clientService', () => {
             imports: [],
             controllers: [],
             providers: [
+                {
+                    provide: PROVIDER_LOGGER,
+                    useClass: ConsoleLogger
+                  },
+        
                 {
                     provide: PROVIDER_CONF,
                     useValue: conf

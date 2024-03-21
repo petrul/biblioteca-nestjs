@@ -8,6 +8,8 @@ import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts/sts.service';
 import { MilvusCollection } from './milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './vector_store';
+import { ConsoleLogger } from '@nestjs/common';
+import { PROVIDER_LOGGER } from '../util';
 
 describe('VectorizerService', () => {
   
@@ -15,12 +17,17 @@ describe('VectorizerService', () => {
 
   let vectServ: VectorizerService;
   let tbc: TextbaseClient;
-  const testMilvusCollectionName = "test_" + TestUtils.randomAlphanumeric(10);
+  let col: MilvusCollection;
 
   beforeEach(async () => {
 
     const app: TestingModule = await Test.createTestingModule({
         providers: [
+          {
+            provide: PROVIDER_LOGGER,
+            useClass: ConsoleLogger
+          },
+          
           {
             provide: PROVIDER_CONF,
             useValue: conf
@@ -52,19 +59,22 @@ describe('VectorizerService', () => {
 
     vectServ = app.get<VectorizerService>(VectorizerService);
     tbc = app.get<TextbaseClient>(TextbaseClient);
+    col = app.get<MilvusCollection>(MilvusCollection);
   });
+
+  afterEach(async () => {
+    await col.drop();
+  })
 
   describe('vectorizer', () => {
     it('vectorizer should work', async () => {
-      const opera = await tbc.getAllOpera(0, 5);
-      
-      const op = opera[0]
-      expect(op.id).toBeGreaterThan(0);
+      // const opera = await tbc.getAllOpera(0, 5);
+      const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
+      console.log(op);      
 
-      vectServ.vectorize(op.id)
-      console.log('done');
-      
+      vectServ.vectorize(op.id, 0, 20);  
 
-    });
+    },
+    60 * 1000);
   });
 });

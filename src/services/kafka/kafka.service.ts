@@ -1,6 +1,6 @@
-import { Injectable, Logger} from '@nestjs/common';
+import { Inject, Injectable, Logger} from '@nestjs/common';
 import { Kafka } from 'kafkajs';
-import { AppConfService } from 'src/configuration';
+import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 
 @Injectable()
 export class KafkaService {
@@ -8,7 +8,7 @@ export class KafkaService {
   public readonly kafka: Kafka; 
   private readonly logger = new Logger(KafkaService.name);
 
-  constructor(private config: AppConfService) {
+  constructor(@Inject(PROVIDER_CONF) private config: VectorizerConfiguration) {
     const kafkaBrokers = this.config.kafkaServers;
     console.log('kafkaBrokers', kafkaBrokers);
     this.logger.log(kafkaBrokers)

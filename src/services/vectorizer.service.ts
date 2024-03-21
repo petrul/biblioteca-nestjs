@@ -68,7 +68,7 @@ export class VectorizerService {
 
             await this.vecstore.store(contentArr);
 
-        } while(hasMore && i < offset + limit)
+        } while(hasMore && i < (offset + limit))
 
 
     }

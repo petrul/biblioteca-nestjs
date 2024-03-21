@@ -1,6 +1,10 @@
 const { createHash } = require('crypto');
 
+export const PROVIDER_LOGGER=Symbol('LoggerService')
+
 export class Util {
+
+
 
     static sha256(str: string ) : Buffer {
         return createHash('sha256').update(str).digest();
