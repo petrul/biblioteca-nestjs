@@ -1,6 +1,6 @@
 
 import { Test } from '@nestjs/testing';
-import {  AppConfService, VectorizerConfiguration, commonConf } from '../../configuration';
+import {  AppConfService, PROVIDER_CONF, VectorizerConfiguration, commonConf } from '../../configuration';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
 
 describe('StsService', () => {
@@ -19,7 +19,7 @@ describe('StsService', () => {
             controllers: [],
             providers: [ 
                 {
-                    provide: AppConfService,
+                    provide: PROVIDER_CONF,
                     useValue: conf
                 }, 
                 SentenceTransformersService,

@@ -3,7 +3,9 @@ import { AppController } from './app.controller';
 import { VectorizerService } from './services/vectorizer.service';
 import { TextbaseClient } from './services/textbase_client.service';
 import { TestUtils } from '../test/testutils';
-import { AppConfService } from './configuration';
+import { PROVIDER_CONF } from './configuration';
+import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
+import { PROVIDER_EMBEDDER } from './model/model';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -14,11 +16,17 @@ describe('AppController', () => {
       controllers: [AppController],
       providers: [
         {
-          provide: AppConfService,
+          provide: PROVIDER_CONF,
           useValue: conf 
         },
-        VectorizerService, 
-        TextbaseClient],
+        {
+          provide: PROVIDER_EMBEDDER,
+          useClass: AllMpnetBaseV2_StsService,
+        },
+        SentenceTransformersService,
+        // VectorizerService, 
+        TextbaseClient
+      ],
     }).compile();
 
     appController = app.get<AppController>(AppController);

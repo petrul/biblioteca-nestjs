@@ -10,6 +10,7 @@ export interface VectorizerConfiguration {
     miniMilvus: string;
     textbaseUrl: string;
 }
+export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 
 export const commonConf : Partial<VectorizerConfiguration> = {
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",

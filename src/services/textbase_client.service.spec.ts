@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { TextbaseClient } from './textbase_client.service';
 import { Util } from '../util';
-import { AppConfService } from '../configuration';
+import { PROVIDER_CONF } from '../configuration';
 import { TestUtils } from '../../test/testutils'
 
 describe('Textbase_clientService', () => {
@@ -14,7 +14,7 @@ describe('Textbase_clientService', () => {
             controllers: [],
             providers: [
                 {
-                    provide: AppConfService,
+                    provide: PROVIDER_CONF,
                     useValue: conf
                 },
                 TextbaseClient

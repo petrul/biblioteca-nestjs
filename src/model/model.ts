@@ -14,9 +14,15 @@ export interface ContentProvider {
     iterator(): AsyncGenerator<Content>;
 }
 
-export interface EmbeddingModel {
-    embed(content: Content[]): Promise<Content>
+export interface ContentEmbedder {
+
+    /**
+     * @returns the content param, enriched with the embedding field.
+     */
+    embeddings(content: Content[]): Promise<Content[]>
 }
+
+export const PROVIDER_EMBEDDER = Symbol('ContentEmbedder');
 
 export interface VectorStore {
     store(content: Content[])
