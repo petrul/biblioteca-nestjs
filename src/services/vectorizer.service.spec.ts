@@ -2,10 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { VectorizerService } from './vectorizer.service';
 import { TextbaseClient } from './textbase_client.service';
-import { AppConfService, PROVIDER_CONF } from '../configuration';
+import { PROVIDER_CONF, VectorizerConfiguration } from '../configuration';
 import { TestUtils } from '../../test/testutils';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts/sts.service';
+import { MilvusCollection } from './milvus/milvuscollection.service';
+import { MilvusColVectorStore } from './vector_store';
 
 describe('VectorizerService', () => {
   
@@ -13,8 +15,10 @@ describe('VectorizerService', () => {
 
   let vectServ: VectorizerService;
   let tbc: TextbaseClient;
+  const testMilvusCollectionName = "test_" + TestUtils.randomAlphanumeric(10);
 
   beforeEach(async () => {
+
     const app: TestingModule = await Test.createTestingModule({
         providers: [
           {
@@ -26,13 +30,22 @@ describe('VectorizerService', () => {
             provide: PROVIDER_EMBEDDER,
             useClass: AllMpnetBaseV2_StsService
           },
+          {
+            provide: MilvusCollection,
+            useFactory: (conf: VectorizerConfiguration) => {
+              const name = "test_" + TestUtils.randomAlphanumeric(10)
+              return new MilvusCollection(name, conf);
+            },
+            inject: [PROVIDER_CONF]
+          },
+          MilvusColVectorStore,
           TextbaseClient,
           {
             provide: VectorizerService,
-            useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder  ) => {
-              return new VectorizerService(tbc, embedder, 2000);
+            useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore ) => {
+              return new VectorizerService(tbc, embedder, vecstore);
             },
-            inject: [TextbaseClient, PROVIDER_EMBEDDER]
+            inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
           }          
         ],
     }).compile();
@@ -49,6 +62,8 @@ describe('VectorizerService', () => {
       expect(op.id).toBeGreaterThan(0);
 
       vectServ.vectorize(op.id)
+      console.log('done');
+      
 
     });
   });

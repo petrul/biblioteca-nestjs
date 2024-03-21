@@ -1,5 +1,13 @@
-import { CreateIndexParam, DataType, MilvusClient } from '@zilliz/milvus2-sdk-node';
+import { CreateIndexParam, DataType, MilvusClient, RowData } from '@zilliz/milvus2-sdk-node';
 import { VectorizerConfiguration } from 'src/configuration';
+import { Content } from 'src/model/model';
+
+// // resembles Content
+// export interface MilvusRecord {
+//   sha256: string ; // primary key
+//   url: string ;
+//   embedding: number[];
+// }
 
 export class MilvusCollection {
 
@@ -58,16 +66,29 @@ export class MilvusCollection {
         });
     }
 
-    async insert(data) {
-      this.milvus.insert({
+    async insert(content: Content[]) {
+      const data: RowData[] = content.map(it => { return {
+        sha256: it.sha256,
+        url: it.url,
+        embedding: it.embedding
+      }});
+
+      return await this.milvus.insert({
         collection_name: this.colname,
         data: data
-      })
+      });
     }
 
-    async upsert() {
-      this.milvus.upsert({
+    async upsert(content: Content[]) {
+      const data: RowData[] = content.map(it => { return {
+        sha256: it.sha256,
+        url: it.url,
+        embedding: it.embedding
+      }});
+
+      return await this.milvus.upsert({
         collection_name: this.colname,
+        data: data
       })
     }
 

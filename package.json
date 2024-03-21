@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "clean": "rm -rf dist/",
+    "superclean": "rm -rf dist/ && rm -rf node_modules/",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

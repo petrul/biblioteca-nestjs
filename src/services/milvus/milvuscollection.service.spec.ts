@@ -2,12 +2,12 @@ import { MilvusCollection } from './milvuscollection.service';
 import { TestUtils } from '../../../test/testutils';
 import { Util } from '../../util';
 import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
+import { Content } from 'src/model/model';
 
 describe('MilvuscollectionService', () => {
     const conf = TestUtils.testConf;
 
     it('milvus collection create/drop', async () => {
-        // expect(col).toBeDefined();
         const colname = "test_" + TestUtils.randomAlphanumeric()
         let col: MilvusCollection = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
         await col.create();
@@ -40,13 +40,13 @@ describe('MilvuscollectionService', () => {
 
             await col.create();
             await col.createIndex();
-            await col.insert(data.map( ({ text, ...rest }) => rest));
+            await col.insert(data.map( ({ text, ...rest }) => rest as Content));
 
             await col.getCollectionStatistics();
             await col.load();
 
             const inShas = inData.map(it => it.sha256);
-            const alreadyPresent = await col.findById(inShas)
+            const alreadyPresent = await col.findById(inShas);
 
             expect(alreadyPresent.length).toBe(dataLen / 2)
             expect(alreadyPresent.sort()).toEqual(inShas.sort())
@@ -55,5 +55,6 @@ describe('MilvuscollectionService', () => {
             await col.drop();
         }
             
-    })
+    }, 
+    60 * 1000)
 });

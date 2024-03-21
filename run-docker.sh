@@ -5,7 +5,7 @@ if test -z "$VERSION" ; then
     exit -1
 fi
 
-imagelabel="editii/textbase-nestjs:$VERSION"
+imagelabel="editii/textbase-vectorizer:$VERSION"
 registry="mini.local:5000"
 remoteimagelabel="$registry/$imagelabel"
 

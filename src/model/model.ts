@@ -10,9 +10,9 @@ export interface Content {
     embedding?: number[]
 }
 
-export interface ContentProvider {
-    iterator(): AsyncGenerator<Content>;
-}
+// export interface ContentProvider {
+//     iterator(): AsyncGenerator<Content>;
+// }
 
 export interface ContentEmbedder {
 
@@ -23,10 +23,6 @@ export interface ContentEmbedder {
 }
 
 export const PROVIDER_EMBEDDER = Symbol('ContentEmbedder');
-
-export interface VectorStore {
-    store(content: Content[])
-}
 
 type VectorizerEvent = 'event1' | 'event2'; 
 export interface EventReporter {
