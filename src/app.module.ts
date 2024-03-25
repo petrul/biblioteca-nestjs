@@ -12,6 +12,7 @@ import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
 import { PROVIDER_LOGGER } from './util';
+import { log } from 'console';
 
 @Module({
   imports: [
@@ -54,9 +55,11 @@ import { PROVIDER_LOGGER } from './util';
     {
       provide: VectorizerService,
       useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, conf: VectorizerConfiguration ) => {
-        return new VectorizerService(tbc, embedder, vecstore, conf.tb_getParas_pageSize);
+        log(conf);
+        const tb_getParas_pageSize = conf.tb_getParas_pageSize;
+        return new VectorizerService(tbc, embedder, vecstore, tb_getParas_pageSize);
       },
-      inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
+      inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF]
     },
     
   ],
