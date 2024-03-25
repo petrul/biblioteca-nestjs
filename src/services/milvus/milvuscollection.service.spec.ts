@@ -8,13 +8,18 @@ import exp from 'constants';
 describe('MilvuscollectionService', () => {
     
     const conf = TestUtils.testConf;
-    let col: MilvusCollection
+    let col: MilvusCollection;
 
     beforeEach(async () => {
         const colname = "test_" + TestUtils.randomAlphanumeric()
         col = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
-        await col.create();
-        await col.createIndex();
+        expect(await col.exists()).toBe(false);
+        
+        await col.createIfNotExists();
+        // await col.create();
+        // await col.createIndex();
+        expect(await col.exists()).toBe(true);
+        // expect(true).toBe(false);
         log(`created collection ${col.name}`)
     })
 

@@ -153,17 +153,21 @@ export class MilvusCollection {
     return resp.value;
   }
 
+  async createIfNotExists() {
+        // if not created, create
+        if (! await this.exists()) {
+          await this.create();
+          await this.createIndex();
+        }    
+  }
+
   async createAndLoadIfNotExists() {
-    // if not created, create
-    if (!this.exists()) {
-      await this.create();
-      await this.createIndex();
-    }
+    await this.createIfNotExists();
 
     // if not loaded, load
     const state = await this.milvus.getLoadState({collection_name: this.name});
     if (state.state == LoadState.LoadStateNotLoad || state.state == LoadState.LoadStateNotExist) {
-      await this.load();
+      return await this.load();
     }
     
   }

@@ -54,7 +54,8 @@ const yoga2ProdConf: VectorizerConfiguration = { ...commonConf,
 const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'mini.local:10106', // kafka tb int
     textbaseUrl: 'http://mini.local:10101',
-    milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras'
+    milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras',
+    tb_getParas_pageSize: 200
 }
 
 function chooseConf() {
