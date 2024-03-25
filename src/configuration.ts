@@ -50,6 +50,14 @@ const yoga2ProdConf: VectorizerConfiguration = {
     milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
+const yoga2IntConf: VectorizerConfiguration = {
+    kafkaServers: 'mini.local:10106', // kafka tb int
+    sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    miniMilvus: commonConf.miniMilvus,
+    textbaseUrl: 'http://mini.local:10101',
+    milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras'
+}
+
 /**
  * @returns 
  */
@@ -59,7 +67,8 @@ function chooseConf() {
     log(`==> hostname: ` + hostname);
     if ('yoga' == hostname.toLowerCase())
         // return yogaConf;
-        return yoga2ProdConf;
+        // return yoga2ProdConf;
+        return yoga2IntConf;
     return prodConf;
 }
 

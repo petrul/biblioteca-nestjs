@@ -13,6 +13,7 @@ export class TextbaseClient {
 
     constructor(@Inject(PROVIDER_CONF) protected conf: AppConfService, 
       @Inject(PROVIDER_LOGGER) protected log: LoggerService) {
+        log.log(`will connect to textbase url: ${conf.textbaseUrl}`)
         this.tb = new Api({
             baseUrl:  conf.textbaseUrl,
             baseApiParams: {

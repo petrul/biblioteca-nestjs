@@ -23,7 +23,7 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
     await this.consumer.connect();
     await this.consumer.subscribe({
       topic: 'tb_newOpusImportedTopic', 
-      fromBeginning: true,
+      fromBeginning: false,
     });
     await this.consumer.run({
       eachMessage: (async ({ topic, partition, message }) => {
