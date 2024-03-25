@@ -2,16 +2,9 @@ import { CreateIndexParam, DataType, MilvusClient, RowData } from '@zilliz/milvu
 import { VectorizerConfiguration } from 'src/configuration';
 import { Content } from 'src/model/model';
 
-// // resembles Content
-// export interface MilvusRecord {
-//   sha256: string ; // primary key
-//   url: string ;
-//   embedding: number[];
-// }
-
 export class MilvusCollection {
 
-    public milvus : MilvusClient
+    public milvus : MilvusClient;
 
     static readonly EMBEDDING = 'embedding';
     static readonly SHA256 = 'sha256';
@@ -79,7 +72,10 @@ export class MilvusCollection {
       });
     }
 
-    async upsert(content: Content[]) {
+    async upsert(content: Content[]) : Promise<any> {
+      if (!content)
+        return;
+
       const data: RowData[] = content.map(it => { return {
         sha256: it.sha256,
         url: it.url,
@@ -92,8 +88,8 @@ export class MilvusCollection {
       })
     }
 
-    async count() {
-      return this.milvus.count({collection_name: this.colname});
+    async count(): Promise<number> {
+      return (await this.milvus.count({collection_name: this.colname})).data;
     }
 
     async load() {
@@ -102,13 +98,22 @@ export class MilvusCollection {
       } );
     }
 
-    async findById(ids: string[]) : Promise<string[]> {
-      const asTxt = ids.map(it => `'${it}'`).join(",");
-      const expr = `${MilvusCollection.SHA256} in [ ${asTxt} ] `
+    async findAll(output_fields = [MilvusCollection.SHA256]): Promise<any> {
+      const resp = await this.milvus.query({ 
+        collection_name: this.colname,
+        expr: `${MilvusCollection.SHA256} like '%'`,
+        output_fields: output_fields
+      });
+      return resp.data;
+  }
+
+    async findById(ids: string[], outputFields = [ MilvusCollection.SHA256 ]) : Promise<string[]> {
+      const idListAsTxt = ids.map(it => `'${it}'`).join(",");
+      const expr = `${MilvusCollection.SHA256} in [ ${idListAsTxt} ] `
       const resp = await this.milvus.query({ 
         collection_name: this.colname,
         expr: expr,
-        output_fields: [ MilvusCollection.SHA256 ]
+        output_fields: outputFields
       })
 
       return resp.data.map(it => it.sha256);
@@ -133,6 +138,10 @@ export class MilvusCollection {
 
   async getCollectionStatistics() {
       return this.milvus.getCollectionStatistics({ collection_name:  this.colname })
+  }
+
+  async flush() {
+    return await this.milvus.flush({collection_names: [this.colname]})
   }
 
 }

@@ -27,11 +27,14 @@ export class VectorizerService {
         }
 
     /**
-     * @param offset do not vectoize all paragraphs of the given divId but only
-     * after skipping the initial offset
-     * @param limit 
+     * @param offset skipping the initial offset elements (usable for paging)
+     * @param limit only process a maximum of limit (usable for paging)
+     * @param divId this should be the id of an opus, but it can be really any div id (even smaller).
+     * @returns the nr of processed elements 
      */
-    async vectorize(divId: number, offset = 0, limit = Number.POSITIVE_INFINITY) {
+    async vectorize(divId: number, offset = 0, limit = Number.POSITIVE_INFINITY) : Promise<number> {
+
+        var processed = 0;
 
         var hasMore = true;
         const gen = this.tbc.getParagraphs(divId, this.pageSize, offset, limit);
@@ -57,19 +60,31 @@ export class VectorizerService {
             }
 
             const contentArr = crtPage.map<Content>(it => { return {
-                text: it.text,
+                text:   it.text,
                 sha256: it.text_sha256,
-                url: it.url,
+                url:    it.url,
             }});
+            const filtered = contentArr.filter(it =>    
+                    it.text != null 
+                    && it.sha256 != null
+                    && it.url != null
+                    && it.text.length > 10 
+                    && it.text.length < 3000
+            );
 
-            assert (contentArr.length <= this.pageSize);
+            assert (filtered.length <= this.pageSize);
             
-            await this.embedder.embeddings(contentArr);
+            await this.embedder.embeddings(filtered);
+            await this.vecstore.store(filtered);
 
-            await this.vecstore.store(contentArr);
+            processed += filtered.length;
 
         } while(hasMore && i < (offset + limit))
 
 
+        // flush at the end of the opus
+        this.vecstore.flush();
+
+        return processed;
     }
 }

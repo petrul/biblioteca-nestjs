@@ -1,60 +1,67 @@
 import { MilvusCollection } from './milvuscollection.service';
 import { TestUtils } from '../../../test/testutils';
-import { Util } from '../../util';
 import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
 import { Content } from 'src/model/model';
+import { log } from 'console';
+import exp from 'constants';
 
 describe('MilvuscollectionService', () => {
+    
     const conf = TestUtils.testConf;
+    let col: MilvusCollection
 
-    it('milvus collection create/drop', async () => {
+    beforeEach(async () => {
         const colname = "test_" + TestUtils.randomAlphanumeric()
-        let col: MilvusCollection = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
+        col = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
         await col.create();
-        await col.drop()
-    }, 
-    60 * 1000 // 1 min timeout 
-    );
+        await col.createIndex();
+        log(`created collection ${col.colname}`)
+    })
 
-    it ('insert data into milvus', async() => {
+    afterEach(async () => {
+        await col.drop();
+        log(`dropped collection ${col.colname}`)
+    })
 
-        const colname = "test_" + TestUtils.randomAlphanumeric()
-        const data = Array.from( {length: 10}, (_, __) => {
-            const text = TestUtils.randomAlphanumeric(200);
-            return {
-                text: text,
-                url: TestUtils.randomAlphanumeric(),
-                sha256: Util.sha256AsHex(text),
-                embedding: Array.from( { length: 384}, () => Math.random() )
-            }
-        });
+    it ('upsert data into milvus', async() => {
+            const data = TestUtils.randomContent(10, 384, 200);
 
-        const dataLen = data.length;
-        const inData = data.slice(0, 5)
-        const outData = data.slice(5, 10)
-        expect(inData.length).toBe(dataLen / 2)
-        expect(outData.length).toBe(dataLen / 2)
-        
-        let col: MilvusCollection = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
-        try {
+            // const dataLen = data.length;
+            const firstHalf = data.slice(0, 5);
+            const secondHalf = data.slice(5, 10);
 
-            await col.create();
-            await col.createIndex();
-            await col.insert(data.map( ({ text, ...rest }) => rest as Content));
-
+            expect(firstHalf.length).toBe(5);
+            expect(secondHalf.length).toBe(5);
+            
+            await col.upsert(firstHalf); // .map( ({ text, ...rest }) => rest as Content));
+            await col.flush();
+            
             await col.getCollectionStatistics();
             await col.load();
 
-            const inShas = inData.map(it => it.sha256);
+            expect(await col.count()).toEqual(5);
+
+            const inShas = firstHalf.map(it => it.sha256);
             const alreadyPresent = await col.findById(inShas);
 
-            expect(alreadyPresent.length).toBe(dataLen / 2)
+            expect(alreadyPresent.length).toBe(5)
             expect(alreadyPresent.sort()).toEqual(inShas.sort())
-                        
-        } finally {
-            await col.drop();
-        }
+
+            const allRows = (await col.findAll()).map(it => it.sha256);
+            expect(allRows.sort()).toEqual(inShas.sort());
+            expect(await col.count()).toEqual(5);
+
+            // again 
+            await col.upsert(firstHalf);
+            await col.flush();
+            expect(await col.count()).toEqual(5);  
             
-    }, 
-    60 * 1000)
+            // now upsert all 10, there should be a total of ten
+            await col.upsert(data);
+            await col.flush();
+            expect(await col.count()).toEqual(10);  
+                                            
+        }, 
+        TestUtils.TIMEOUT_TWO_MINUTES
+    )
 });

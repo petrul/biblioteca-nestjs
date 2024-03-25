@@ -10,6 +10,7 @@ import { MilvusCollection } from './milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './vector_store';
 import { ConsoleLogger } from '@nestjs/common';
 import { PROVIDER_LOGGER } from '../util';
+import { log } from 'console';
 
 describe('VectorizerService', () => {
   
@@ -27,7 +28,6 @@ describe('VectorizerService', () => {
             provide: PROVIDER_LOGGER,
             useClass: ConsoleLogger
           },
-          
           {
             provide: PROVIDER_CONF,
             useValue: conf
@@ -60,6 +60,9 @@ describe('VectorizerService', () => {
     vectServ = app.get<VectorizerService>(VectorizerService);
     tbc = app.get<TextbaseClient>(TextbaseClient);
     col = app.get<MilvusCollection>(MilvusCollection);
+    await col.create();
+    await col.createIndex();
+    await col.load();
   });
 
   afterEach(async () => {
@@ -70,9 +73,14 @@ describe('VectorizerService', () => {
     it('vectorizer should work', async () => {
       // const opera = await tbc.getAllOpera(0, 5);
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
-      console.log(op);      
+      expect(op.path).toEqual('stoker/the_snake_s_pass');
 
-      vectServ.vectorize(op.id, 0, 20);  
+      const maxElems = 20;
+      const nrElems = await vectServ.vectorize(op.id, 0, maxElems);
+
+      log('nr processed elems', nrElems);
+      expect(nrElems).toBeGreaterThan(0);
+      expect(nrElems).toBeLessThanOrEqual(maxElems);
 
     },
     60 * 1000);

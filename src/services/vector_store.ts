@@ -1,19 +1,30 @@
 import { assert } from "console";
 import { Content } from "../model/model"
 import { MilvusCollection } from "./milvus/milvuscollection.service";
+import { Injectable } from "@nestjs/common";
 
-export interface VectorStore {
-    store(data: Content[]): Promise<void>;
+export interface VectorStore {    
+    store(data: Content[]): Promise<any>;
+    flush(): unknown;
 }
 
+@Injectable()
 export class MilvusColVectorStore implements VectorStore {
     constructor(protected col: MilvusCollection) {}
 
+    get collection() { return this.col; }
+
     async store(data: Content[]): Promise<any> {
         data.forEach(it => {
+            assert(it.sha256 != null);
+            assert(it.url != null);
             assert(it.embedding != null);
         })
         return await this.col.upsert(data);
+    }
+
+    async flush() {
+        this.col.flush();
     }
 }
 
