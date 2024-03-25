@@ -1,6 +1,7 @@
 
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { log } from "console";
 
 export default () => chooseConf();
 
@@ -24,7 +25,7 @@ export const commonConf : Partial<VectorizerConfiguration> = {
 }
 
 const prodConf: VectorizerConfiguration = {
-    kafkaServers: process.env.KAFKA_SERVERS || "kafka:9052",
+    kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus,
     textbaseUrl: commonConf.textbaseUrl,
@@ -40,14 +41,24 @@ const yogaConf: VectorizerConfiguration = {
     milvus_collection_name_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_name_tb_all_mpnet_base_v2_paras
 }
 
+const yoga2ProdConf: VectorizerConfiguration = {
+    kafkaServers: 'srv2.local:9028', // kafka prod
+    sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    miniMilvus: commonConf.miniMilvus,
+    textbaseUrl: commonConf.textbaseUrl,
+    milvus_collection_name_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_name_tb_all_mpnet_base_v2_paras
+}
+
 /**
  * @returns 
  */
 function chooseConf() {
     var os = require('os');
     const hostname: string = os.hostname();
+    log(`==> hostname: ` + hostname);
     if ('yoga' == hostname.toLowerCase())
-        return yogaConf;
+        // return yogaConf;
+        return yoga2ProdConf;
     return prodConf;
 }
 
