@@ -40,9 +40,11 @@ import { log } from 'console';
     TextbaseClient,
     {
       provide: MilvusCollection,
-      useFactory: (conf: VectorizerConfiguration) => {
+      useFactory: async (conf: VectorizerConfiguration) => {
         const name = conf.milvus_collection_tb_all_mpnet_base_v2_paras;
-        return new MilvusCollection(name, conf);
+        const col = new MilvusCollection(name, conf);
+        await col.createAndLoadIfNotExists();
+        return col;
       },
       inject: [PROVIDER_CONF]
     },

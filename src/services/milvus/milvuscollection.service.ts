@@ -1,4 +1,4 @@
-import { CreateIndexParam, DataType, MilvusClient, RowData } from '@zilliz/milvus2-sdk-node';
+import { CreateIndexParam, DataType, LoadState, MilvusClient, RowData } from '@zilliz/milvus2-sdk-node';
 import { VectorizerConfiguration } from 'src/configuration';
 import { Content } from 'src/model/model';
 
@@ -145,6 +145,29 @@ export class MilvusCollection {
   async flush() {
     return await this.milvus.flush({collection_names: [this.name]})
   }
+
+  async exists() {
+    const resp = await this.milvus.hasCollection({
+      collection_name: this.name,
+    });
+    return resp.value;
+  }
+
+  async createAndLoadIfNotExists() {
+    // if not created, create
+    if (!this.exists()) {
+      await this.create();
+      await this.createIndex();
+    }
+
+    // if not loaded, load
+    const state = await this.milvus.getLoadState({collection_name: this.name});
+    if (state.state == LoadState.LoadStateNotLoad || state.state == LoadState.LoadStateNotExist) {
+      await this.load();
+    }
+    
+  }
+
 
 }
 
