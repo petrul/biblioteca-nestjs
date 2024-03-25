@@ -53,7 +53,7 @@ describe('VectorizerService', () => {
               return new VectorizerService(tbc, embedder, vecstore);
             },
             inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
-          }          
+          }
         ],
     }).compile();
 
