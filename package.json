@@ -4,7 +4,7 @@
   "description": "",
   "author": "Petru Dimulescu",
   "private": true,
-  "license": "my license",
+  "license": "Code is not open source, ask Editii Scriptorium srl for licensing terms.",
   "scripts": {
     "build": "nest build",
     "clean": "rm -rf dist/",
