@@ -10,9 +10,13 @@ export class MilvusCollection {
     static readonly SHA256 = 'sha256';
     static readonly URL: string = 'url';
 
+    static readonly DIM_384 = 384;
+    static readonly DIM_768 = 768;
+
     constructor(
       public name: string, 
-      protected conf: VectorizerConfiguration) {
+      protected conf: VectorizerConfiguration,
+      protected vectorDim: number = MilvusCollection.DIM_384) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
             address: conf.miniMilvus,
@@ -24,7 +28,7 @@ export class MilvusCollection {
      *  384 is the dim for all_mini model embeddings dim
      *  768 is the dim for the all_mpnet
      */
-    async create(vectorDim = 384) {
+    async create() {
       
         return await this.milvus.createCollection({collection_name: this.name,
             consistency_level: 'Eventually',
@@ -49,7 +53,7 @@ export class MilvusCollection {
                   name: MilvusCollection.EMBEDDING,
                   description: 'the actual vector',
                   data_type: DataType.FloatVector,
-                  dim: vectorDim,
+                  dim: this.vectorDim,
                 },
               ],
             });
@@ -171,7 +175,6 @@ export class MilvusCollection {
     }
     
   }
-
 
 }
 

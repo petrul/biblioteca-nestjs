@@ -2,6 +2,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { log } from "console";
+import { MilvusCollection } from "./services/milvus/milvuscollection.service";
 
 export default () => chooseConf();
 
@@ -12,6 +13,7 @@ export interface VectorizerConfiguration {
      * i.e. tb_paras_all_mpnet_base_v2
      */
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
+    milvus_collection_tb_all_mpnet_base_v2_paras_dim: number;
 
     //the address of kafka 
     kafkaServers: string;
@@ -37,6 +39,7 @@ export const commonConf : VectorizerConfiguration = {
     miniMilvus: process.env.MINI_MILVUS  || 'mini:19530',
     textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
     milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
+    milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
     tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
 }
 
@@ -98,5 +101,9 @@ export class AppConfService implements VectorizerConfiguration {
 
     get tb_getParas_pageSize(): number {
         return this.conf.get<number>('tb_getParas_pageSize');
+    }
+
+    get milvus_collection_tb_all_mpnet_base_v2_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_tb_all_mpnet_base_v2_paras_dim');
     }
 }

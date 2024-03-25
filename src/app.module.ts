@@ -42,7 +42,8 @@ import { log } from 'console';
       provide: MilvusCollection,
       useFactory: async (conf: VectorizerConfiguration) => {
         const name = conf.milvus_collection_tb_all_mpnet_base_v2_paras;
-        const col = new MilvusCollection(name, conf);
+        const vectorDim = conf.milvus_collection_tb_all_mpnet_base_v2_paras_dim;
+        const col = new MilvusCollection(name, conf, vectorDim);
         await col.createAndLoadIfNotExists();
         return col;
       },
