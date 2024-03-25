@@ -1,10 +1,6 @@
-import { Controller, Get, Post } from '@nestjs/common';
-import { Api } from './textbase.api';
-import { log } from 'console';
+import { Controller, Post } from '@nestjs/common';
 import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
-// import { AppService } from './app.service';
-// import {Api as TextbaseApi} from './textbase.api' 
 
 @Controller()
 export class AppController {

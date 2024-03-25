@@ -39,4 +39,6 @@ export class TestUtils {
         });
     }
 
+static PROVIDERS = 
+
 }

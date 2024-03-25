@@ -53,8 +53,8 @@ import { PROVIDER_LOGGER } from './util';
     MilvusColVectorStore,
     {
       provide: VectorizerService,
-      useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore ) => {
-        return new VectorizerService(tbc, embedder, vecstore);
+      useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, conf: VectorizerConfiguration ) => {
+        return new VectorizerService(tbc, embedder, vecstore, conf.tb_getParas_pageSize);
       },
       inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
     },

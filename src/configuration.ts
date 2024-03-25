@@ -6,54 +6,65 @@ import { log } from "console";
 export default () => chooseConf();
 
 export interface VectorizerConfiguration {
+    
     /**
      * collection name for vectorizing textbase paragraphs using the ALL_MPNET_BASE_V2 SentenceTransformers model.
      */
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
     kafkaServers: string;
     sentenceTransformersServer: string;
+
+    // this is the mini milvus server: mini.local:xxx
     miniMilvus: string;
+
+    // this is the textbase url (i.e. https://textbase.scriptorium.ro)
     textbaseUrl: string;
+
+    // this is the page size of the call to get paragraphs, it is also the number of page for the nr o paragraphs
+    // sent to the sts
+    tb_getParas_pageSize: number;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 
-export const commonConf : Partial<VectorizerConfiguration> = {
+export const commonConf : VectorizerConfiguration = {
     kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
     miniMilvus: process.env.MINI_MILVUS  || 'mini:19530',
     textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
-    milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2'
+    milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
+    tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
 }
 
-const prodConf: VectorizerConfiguration = {
-    kafkaServers: commonConf.kafkaServers,
-    sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    miniMilvus: commonConf.miniMilvus,
-    textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
+const prodConf: VectorizerConfiguration = { ...commonConf,
+    // kafkaServers: commonConf.kafkaServers,
+    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    // miniMilvus: commonConf.miniMilvus,
+    // textbaseUrl: commonConf.textbaseUrl,
+    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras,
+    // tb_getParas_pageSize: commonConf.tb_getParas_pageSize
 }
 
 // local dev conf for yoga laptop workstation
-const yogaConf: VectorizerConfiguration = {
+const yogaConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'localhost:30115',
-    sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    miniMilvus: commonConf.miniMilvus,
-    textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
+    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    // miniMilvus: commonConf.miniMilvus,
+    // textbaseUrl: commonConf.textbaseUrl,
+    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
-const yoga2ProdConf: VectorizerConfiguration = {
+const yoga2ProdConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'srv2.local:9028', // kafka prod
-    sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    miniMilvus: commonConf.miniMilvus,
-    textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
+    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    // miniMilvus: commonConf.miniMilvus,
+    // textbaseUrl: commonConf.textbaseUrl,
+    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
-const yoga2IntConf: VectorizerConfiguration = {
+const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'mini.local:10106', // kafka tb int
-    sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    miniMilvus: commonConf.miniMilvus,
+    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
+    // miniMilvus: commonConf.miniMilvus,
     textbaseUrl: 'http://mini.local:10101',
     milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras'
 }
@@ -97,5 +108,9 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_all_mpnet_base_v2_paras(): string {
         return this.conf.get<string>('milvus_collection_tb_all_mpnet_base_v2_paras');
+    }
+
+    get tb_getParas_pageSize(): number {
+        return this.conf.get<number>('tb_getParas_pageSize');
     }
 }
