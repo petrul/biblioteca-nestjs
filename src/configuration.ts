@@ -9,9 +9,14 @@ export interface VectorizerConfiguration {
     
     /**
      * collection name for vectorizing textbase paragraphs using the ALL_MPNET_BASE_V2 SentenceTransformers model.
+     * i.e. tb_paras_all_mpnet_base_v2
      */
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
+
+    //the address of kafka 
     kafkaServers: string;
+
+    // this is the address of the STS server, i.e. mini.local:xxx
     sentenceTransformersServer: string;
 
     // this is the mini milvus server: mini.local:xxx
@@ -35,43 +40,23 @@ export const commonConf : VectorizerConfiguration = {
     tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
 }
 
-const prodConf: VectorizerConfiguration = { ...commonConf,
-    // kafkaServers: commonConf.kafkaServers,
-    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    // miniMilvus: commonConf.miniMilvus,
-    // textbaseUrl: commonConf.textbaseUrl,
-    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras,
-    // tb_getParas_pageSize: commonConf.tb_getParas_pageSize
-}
+const prodConf: VectorizerConfiguration = { ...commonConf,}
 
 // local dev conf for yoga laptop workstation
-const yogaConf: VectorizerConfiguration = { ...commonConf,
-    kafkaServers: 'localhost:30115',
-    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    // miniMilvus: commonConf.miniMilvus,
-    // textbaseUrl: commonConf.textbaseUrl,
-    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
+const yogaConf: VectorizerConfiguration = { ...commonConf, 
+    kafkaServers: 'localhost:30115', 
 }
 
 const yoga2ProdConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'srv2.local:9028', // kafka prod
-    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    // miniMilvus: commonConf.miniMilvus,
-    // textbaseUrl: commonConf.textbaseUrl,
-    // milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
 const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'mini.local:10106', // kafka tb int
-    // sentenceTransformersServer: commonConf.sentenceTransformersServer,
-    // miniMilvus: commonConf.miniMilvus,
     textbaseUrl: 'http://mini.local:10101',
     milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras'
 }
 
-/**
- * @returns 
- */
 function chooseConf() {
     var os = require('os');
     const hostname: string = os.hostname();
