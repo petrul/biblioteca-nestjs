@@ -83,6 +83,6 @@ describe('VectorizerService', () => {
       expect(nrElems).toBeLessThanOrEqual(maxElems);
 
     },
-    60 * 1000);
+    TestUtils.TIMEOUT_TWO_MINUTES);
   });
 });
