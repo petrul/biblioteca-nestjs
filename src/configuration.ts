@@ -9,7 +9,7 @@ export interface VectorizerConfiguration {
     /**
      * collection name for vectorizing textbase paragraphs using the ALL_MPNET_BASE_V2 SentenceTransformers model.
      */
-    milvus_collection_name_tb_all_mpnet_base_v2_paras: string;
+    milvus_collection_tb_all_mpnet_base_v2_paras: string;
     kafkaServers: string;
     sentenceTransformersServer: string;
     miniMilvus: string;
@@ -18,18 +18,19 @@ export interface VectorizerConfiguration {
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 
 export const commonConf : Partial<VectorizerConfiguration> = {
+    kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
     miniMilvus: process.env.MINI_MILVUS  || 'mini:19530',
-    textbaseUrl: "https://textbase.scriptorium.ro",
-    milvus_collection_name_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2'
+    textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
+    milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2'
 }
 
 const prodConf: VectorizerConfiguration = {
-    kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
+    kafkaServers: commonConf.kafkaServers,
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus,
     textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_name_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_name_tb_all_mpnet_base_v2_paras
+    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
 // local dev conf for yoga laptop workstation
@@ -38,7 +39,7 @@ const yogaConf: VectorizerConfiguration = {
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus,
     textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_name_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_name_tb_all_mpnet_base_v2_paras
+    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
 const yoga2ProdConf: VectorizerConfiguration = {
@@ -46,7 +47,7 @@ const yoga2ProdConf: VectorizerConfiguration = {
     sentenceTransformersServer: commonConf.sentenceTransformersServer,
     miniMilvus: commonConf.miniMilvus,
     textbaseUrl: commonConf.textbaseUrl,
-    milvus_collection_name_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_name_tb_all_mpnet_base_v2_paras
+    milvus_collection_tb_all_mpnet_base_v2_paras: commonConf.milvus_collection_tb_all_mpnet_base_v2_paras
 }
 
 /**
@@ -85,7 +86,7 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('textbaseUrl');
     }
 
-    get milvus_collection_name_tb_all_mpnet_base_v2_paras(): string {
-        return this.conf.get<string>('milvus_collection_name_tb_all_mpnet_base_v2_paras');
+    get milvus_collection_tb_all_mpnet_base_v2_paras(): string {
+        return this.conf.get<string>('milvus_collection_tb_all_mpnet_base_v2_paras');
     }
 }

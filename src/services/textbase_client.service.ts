@@ -14,7 +14,7 @@ export class TextbaseClient {
     constructor(@Inject(PROVIDER_CONF) protected conf: AppConfService, 
       @Inject(PROVIDER_LOGGER) protected log: LoggerService) {
         this.tb = new Api({
-            baseUrl:  conf.textbaseUrl, // 'http://textbase.scriptorium.ro',
+            baseUrl:  conf.textbaseUrl,
             baseApiParams: {
               headers: {
                 Accept: 'application/json',

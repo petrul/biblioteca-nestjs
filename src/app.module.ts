@@ -40,7 +40,7 @@ import { PROVIDER_LOGGER } from './util';
     {
       provide: MilvusCollection,
       useFactory: (conf: VectorizerConfiguration) => {
-        const name = conf.milvus_collection_name_tb_all_mpnet_base_v2_paras;
+        const name = conf.milvus_collection_tb_all_mpnet_base_v2_paras;
         return new MilvusCollection(name, conf);
       },
       inject: [PROVIDER_CONF]
