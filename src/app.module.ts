@@ -6,7 +6,7 @@ import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
 import { TextbaseClient } from './services/textbase_client.service';
-import configuration, { AppConfService } from './configuration';
+import configuration, { AppConfService, PROVIDER_CONF } from './configuration';
 
 @Module({
   imports: [
@@ -20,7 +20,11 @@ import configuration, { AppConfService } from './configuration';
   ],
 
   providers: [
-    AppConfService,
+    {
+      provide: PROVIDER_CONF,
+      useClass: AppConfService,
+    },
+    
     ProducerService,
     ListenerService,
     KafkaService,

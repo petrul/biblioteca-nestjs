@@ -76,6 +76,7 @@ export class VectorizerService {
             
             await this.embedder.embeddings(filtered);
             await this.vecstore.store(filtered);
+            await this.vecstore.flush();
 
             processed += filtered.length;
 

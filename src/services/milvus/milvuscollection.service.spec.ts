@@ -15,12 +15,12 @@ describe('MilvuscollectionService', () => {
         col = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
         await col.create();
         await col.createIndex();
-        log(`created collection ${col.colname}`)
+        log(`created collection ${col.name}`)
     })
 
     afterEach(async () => {
         await col.drop();
-        log(`dropped collection ${col.colname}`)
+        log(`dropped collection ${col.name}`)
     })
 
     it ('upsert data into milvus', async() => {

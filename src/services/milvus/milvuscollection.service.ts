@@ -11,7 +11,7 @@ export class MilvusCollection {
     static readonly URL: string = 'url';
 
     constructor(
-      public colname: string, 
+      public name: string, 
       protected conf: VectorizerConfiguration) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
@@ -20,11 +20,13 @@ export class MilvusCollection {
     }
 
     /**
-     * @param vectorDim 384 is the dim for all_mini model embeddings dim
+     * @param vectorDim 
+     *  384 is the dim for all_mini model embeddings dim
+     *  768 is the dim for the all_mpnet
      */
     async create(vectorDim = 384) {
       
-        return await this.milvus.createCollection({collection_name: this.colname,
+        return await this.milvus.createCollection({collection_name: this.name,
             consistency_level: 'Eventually',
 
             fields: [
@@ -55,7 +57,7 @@ export class MilvusCollection {
 
     async drop() {
         return await this.milvus.dropCollection({
-          collection_name: this.colname
+          collection_name: this.name
         });
     }
 
@@ -67,7 +69,7 @@ export class MilvusCollection {
       }});
 
       return await this.milvus.insert({
-        collection_name: this.colname,
+        collection_name: this.name,
         data: data
       });
     }
@@ -83,24 +85,24 @@ export class MilvusCollection {
       }});
 
       return await this.milvus.upsert({
-        collection_name: this.colname,
+        collection_name: this.name,
         data: data
       })
     }
 
     async count(): Promise<number> {
-      return (await this.milvus.count({collection_name: this.colname})).data;
+      return (await this.milvus.count({collection_name: this.name})).data;
     }
 
     async load() {
       return this.milvus.loadCollection({ 
-        collection_name: this.colname,
+        collection_name: this.name,
       } );
     }
 
-    async findAll(output_fields = [MilvusCollection.SHA256]): Promise<any> {
+    async findAll(output_fields = [MilvusCollection.SHA256]): Promise<any[]> {
       const resp = await this.milvus.query({ 
-        collection_name: this.colname,
+        collection_name: this.name,
         expr: `${MilvusCollection.SHA256} like '%'`,
         output_fields: output_fields
       });
@@ -111,7 +113,7 @@ export class MilvusCollection {
       const idListAsTxt = ids.map(it => `'${it}'`).join(",");
       const expr = `${MilvusCollection.SHA256} in [ ${idListAsTxt} ] `
       const resp = await this.milvus.query({ 
-        collection_name: this.colname,
+        collection_name: this.name,
         expr: expr,
         output_fields: outputFields
       })
@@ -121,7 +123,7 @@ export class MilvusCollection {
 
     async createIndex() {
       await this.milvus.createIndex({
-        collection_name: this.colname,
+        collection_name: this.name,
         index_name:'index',
         field_name: MilvusCollection.EMBEDDING,
         extra_params: MilvusCollection.idx_ivfsq8_l2_256(),
@@ -137,11 +139,11 @@ export class MilvusCollection {
   }
 
   async getCollectionStatistics() {
-      return this.milvus.getCollectionStatistics({ collection_name:  this.colname })
+      return this.milvus.getCollectionStatistics({ collection_name:  this.name })
   }
 
   async flush() {
-    return await this.milvus.flush({collection_names: [this.colname]})
+    return await this.milvus.flush({collection_names: [this.name]})
   }
 
 }

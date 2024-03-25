@@ -6,6 +6,7 @@ import { ConsoleLogger } from '@nestjs/common';
 import { TestUtils } from '../../test/testutils';
 import { MilvusCollection } from './milvus/milvuscollection.service';
 import { log } from 'console';
+import { Content } from 'src/model/model';
 
 describe('VectorStore', () => {
     const conf = TestUtils.testConf;
@@ -21,8 +22,7 @@ describe('VectorStore', () => {
                 {
                     provide: PROVIDER_LOGGER,
                     useClass: ConsoleLogger
-                },
-                
+                },                
                 {
                     provide: PROVIDER_CONF,
                     useValue: conf
@@ -43,14 +43,17 @@ describe('VectorStore', () => {
         vectorStore = moduleRef.get<MilvusColVectorStore>(MilvusColVectorStore);
         col = moduleRef.get<MilvusCollection>(MilvusCollection);
         await col.create();
-        // await col.load();
+        await col.createIndex();
+        await col.load();
+        log(`created and loaded col ${col.name}`)
     });
 
     afterEach(async () => {
         await col.drop();
+        log(`dropped col ${col.name}`);
       })
 
-    it('should be defined', async () => {
+    it('basic store', async () => {
         expect(vectorStore).toBeDefined();
         expect(col).toBeDefined();
         expect(col).toBe(vectorStore.collection)
@@ -58,19 +61,65 @@ describe('VectorStore', () => {
         const nrElems = 10
         const content = TestUtils.randomContent(nrElems);
         expect(content.length).toBeGreaterThan(0)
-        // log(content);
 
         const nr = await vectorStore.store(content);
         console.log(nr);
 
-        const call2Resp = await vectorStore.store(content); // again
-        log(call2Resp);
+        await vectorStore.store(content); // again
+        // log(call2Resp);
 
-        log(await col.findById(content.map(it => it.sha256)));
+        await col.findById(content.map(it => it.sha256));
         expect(col.milvus).toBeDefined();
         await col.createIndex();
         await col.load();
         expect(await col.count()).toEqual(nrElems);
 
     });
+
+    it('modify url', async () => {
+        const nrElems = 10
+        const content = TestUtils.randomContent(nrElems);
+        content.forEach ((it) => {expect(it.sha256).toBeTruthy()}); // non-empty urls
+        content.forEach ((it) => {expect(it.url).toBeTruthy()}); // non-empty urls
+        content.forEach ((it) => {expect(it.embedding).toBeTruthy()}); // non-empty urls
+
+        let originalUrls: string[];
+
+        {
+            // 1
+            await vectorStore.store(content);
+
+            const all = await col.findAll(['sha256', 'url']);
+            originalUrls = all.map(it => it.url)
+            originalUrls.forEach ((it) => {expect(it).toBeTruthy()}); // non-empty urls
+            expect(new Set(originalUrls)).toEqual(new Set(content.map(it => it.url)));
+            expect(all.length).toEqual(nrElems);
+        }
+
+
+        {
+            // 2
+            const contentWithChangedUrls: Content[] = content.map((it, idx) => { return {
+                sha256: it.sha256,
+                url: 'http://' + idx, // changed the initial random value with idx
+                embedding: it.embedding,
+                text: null
+            }});
+            // log(contentWithChangedUrls);
+            await vectorStore.store(contentWithChangedUrls);
+            const all = await col.findAll(['sha256', 'url', 'embedding']);
+            const newUrls: String[] = all.map(it => it.url)
+            const embs = all.map(it => it.embedding)
+            // log(newUrls);
+            newUrls.forEach(it => { 
+                expect(it).toBeTruthy(); 
+                expect(it.startsWith('http:'));
+            })
+            embs.forEach(it => { expect(it).toBeTruthy();});
+
+            expect(new Set(originalUrls)).not.toEqual(new Set(newUrls));
+        }
+
+    }, 
+    TestUtils.TIMEOUT_TWO_MINUTES)
 });
