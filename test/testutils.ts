@@ -8,8 +8,10 @@ export class TestUtils {
     protected static randomPossibleAlphanum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     static readonly TIMEOUT_TWO_MINUTES = 2 * 60 * 1000;
 
+    static readonly PROD_TEXTBASE_URL = 'https://textbase.scriptorium.ro';
+
     static readonly testConf: Partial<VectorizerConfiguration> = {
-        textbaseUrl: commonConf.textbaseUrl,
+        textbaseUrl: this.PROD_TEXTBASE_URL,
         miniMilvus: commonConf.miniMilvus,
         sentenceTransformersServer: commonConf.sentenceTransformersServer,
     }

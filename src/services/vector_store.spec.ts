@@ -62,8 +62,8 @@ describe('VectorStore', () => {
         const content = TestUtils.randomContent(nrElems);
         expect(content.length).toBeGreaterThan(0)
 
-        const nr = await vectorStore.store(content);
-        console.log(nr);
+        await vectorStore.store(content);
+        // console.log(nr);
 
         await vectorStore.store(content); // again
         // log(call2Resp);
