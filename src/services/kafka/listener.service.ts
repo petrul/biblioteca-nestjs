@@ -18,12 +18,12 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
 
   async initKafkaListener() {
     this.consumer = this.ks.kafka.consumer({
-      groupId: 'nestjs-client',
+      groupId: 'textbase-vectorizer',
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
       topic: 'tb_newOpusImportedTopic', 
-      fromBeginning: false,
+      fromBeginning: true,
     });
     await this.consumer.run({
       eachMessage: (async ({ topic, partition, message }) => {
