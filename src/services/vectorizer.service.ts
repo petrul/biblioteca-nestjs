@@ -84,7 +84,7 @@ export class VectorizerService {
 
 
         // flush at the end of the opus
-        this.vecstore.flush();
+        await this.vecstore.flush();
 
         return processed;
     }

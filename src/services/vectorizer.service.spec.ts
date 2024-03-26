@@ -69,9 +69,8 @@ describe('VectorizerService', () => {
     await col.drop();
   })
 
-  describe('vectorizer', () => {
+  // describe('vectorizer', () => {
     it('vectorizer should work', async () => {
-      // const opera = await tbc.getAllOpera(0, 5);
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
       expect(op.path).toEqual('stoker/the_snake_s_pass');
 
@@ -84,5 +83,5 @@ describe('VectorizerService', () => {
 
     },
     TestUtils.TIMEOUT_TWO_MINUTES);
-  });
 });
+// });

@@ -5,7 +5,7 @@ import { Injectable } from "@nestjs/common";
 
 export interface VectorStore {    
     store(data: Content[]): Promise<any>;
-    flush(): unknown;
+    flush(): Promise<any>;
 }
 
 @Injectable()
@@ -24,7 +24,7 @@ export class MilvusColVectorStore implements VectorStore {
     }
 
     async flush() {
-        this.col.flush();
+        return await this.col.flush();
     }
 }
 

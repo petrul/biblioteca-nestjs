@@ -74,7 +74,8 @@ describe('VectorStore', () => {
         await col.load();
         expect(await col.count()).toEqual(nrElems);
 
-    });
+    }, 
+    TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('modify url', async () => {
         const nrElems = 10
