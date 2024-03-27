@@ -4,7 +4,7 @@ import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { TeiElemDto } from "../textbase.api";
 import { assert } from "console";
 import { PROVIDER_VECTOR_STORE, VectorStore } from "./vector_store";
-import { StopWatch } from "src/util";
+import { StopWatch } from "../util";
 
 /**
  * central service that  coordinates calling sub-services to get paragraphs, ask for their
