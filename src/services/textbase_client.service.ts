@@ -36,8 +36,11 @@ export class TextbaseClient {
     }
 
     async getAllOpera(pageNr = 0, pageSize = 20) {
+      const watch = new StopWatch();      
       const resp = await this.tb.api.executeSearchTeidivGet6({ page: pageNr, size: pageSize});
-      return resp.data._embedded.teiDivs;
+      const divs = resp.data._embedded.teiDivs;
+      this.log.log(`GET ${this.conf.textbaseUrl}/api/drest/teiDivs/search/findOpera?page=${pageNr}&size=${pageSize}&withContent=true : done, got ${divs.length} paras, took ${watch}`);
+      return divs;
     }
 
     async getElemByPath(path: string) {
@@ -66,13 +69,15 @@ export class TextbaseClient {
         const watch = new StopWatch();
         
         const resp = await this.tb.api.getIdParas(opId, {
-          page: pageNr++,
+          page: pageNr,
           size: pageSize,
           withContent: 'true'
         });
         const paras = resp.data;
                 
         this.log.log(`GET ${this.conf.textbaseUrl}/api/divs/${opId}/paras?page=${pageNr}&size=${pageSize}&withContent=true : done, got ${paras.length} paras, took ${watch}`);
+        
+        pageNr++;
 
         // if we got precisely the page size, maybe there's more.
         hasMore = (paras.length == pageSize);

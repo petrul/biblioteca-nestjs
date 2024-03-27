@@ -9,7 +9,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Textbase NestJS')
-    .setDescription('Textbase NestJS complements the main Spring Boot Java Textbase server in the Typescript world')
+    .setDescription('Textbase Vectorizer computes embeddings of text excerpts')
     .setVersion('0.1')
     .addTag('textbase')
     .build();
