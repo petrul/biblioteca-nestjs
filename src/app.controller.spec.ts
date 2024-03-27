@@ -6,7 +6,7 @@ import { PROVIDER_CONF, VectorizerConfiguration } from './configuration';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
 import { PROVIDER_LOGGER } from './util';
-import { ConsoleLogger } from '@nestjs/common';
+import { ConsoleLogger, LoggerService } from '@nestjs/common';
 import { VectorizerService } from './services/vectorizer.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
@@ -43,10 +43,11 @@ describe('AppController', () => {
         MilvusColVectorStore,
         {
           provide: VectorizerService,
-          useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore ) => {
-            return new VectorizerService(tbc, embedder, vecstore);
+          useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
+            logger: LoggerService) => {
+            return new VectorizerService(tbc, embedder, vecstore, logger);
           },
-          inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
+          inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_LOGGER]
         },
         TextbaseClient
       ],

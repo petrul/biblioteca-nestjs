@@ -8,7 +8,7 @@ import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts/sts.service';
 import { MilvusCollection } from './milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './vector_store';
-import { ConsoleLogger } from '@nestjs/common';
+import { ConsoleLogger, LoggerService } from '@nestjs/common';
 import { PROVIDER_LOGGER } from '../util';
 import { log } from 'console';
 
@@ -49,10 +49,10 @@ describe('VectorizerService', () => {
           TextbaseClient,
           {
             provide: VectorizerService,
-            useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore ) => {
-              return new VectorizerService(tbc, embedder, vecstore);
+            useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, logger: LoggerService) => {
+              return new VectorizerService(tbc, embedder, vecstore, logger);
             },
-            inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore]
+            inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_LOGGER]
           }
         ],
     }).compile();
@@ -69,7 +69,6 @@ describe('VectorizerService', () => {
     await col.drop();
   })
 
-  // describe('vectorizer', () => {
     it('vectorizer should work', async () => {
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
       expect(op.path).toEqual('stoker/the_snake_s_pass');
@@ -84,4 +83,3 @@ describe('VectorizerService', () => {
     },
     TestUtils.TIMEOUT_TWO_MINUTES);
 });
-// });

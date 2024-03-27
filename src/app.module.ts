@@ -1,4 +1,4 @@
-import { ConsoleLogger, Module } from '@nestjs/common';
+import { ConsoleLogger, LoggerService, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { ProducerService } from './services/kafka/producer.service';
 import { ListenerService } from './services/kafka/listener.service';
@@ -57,12 +57,13 @@ import { log } from 'console';
     MilvusColVectorStore,
     {
       provide: VectorizerService,
-      useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, conf: VectorizerConfiguration ) => {
+      useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
+        conf: VectorizerConfiguration, logger: LoggerService ) => {
         log(conf);
         const tb_getParas_pageSize = conf.tb_getParas_pageSize;
-        return new VectorizerService(tbc, embedder, vecstore, tb_getParas_pageSize);
+        return new VectorizerService(tbc, embedder, vecstore, logger, tb_getParas_pageSize);
       },
-      inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF]
+      inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
     },
     
   ],
