@@ -1,4 +1,5 @@
-import { Util } from './util';
+import { log } from 'console';
+import { StopWatch, Util } from './util';
 
 describe('UtilSpec', () => {
     it('sha256', () => {
@@ -11,4 +12,16 @@ describe('UtilSpec', () => {
         expect(Buffer.from(hex, "hex")).toEqual(bytes);
          
     });
+
+    it('stopwatch', async () => {
+        const watch = new StopWatch();
+        expect(watch.toString().startsWith('00:00:')).toBeTruthy()
+    })
 });
+
+
+function delay(milliseconds){
+    return new Promise(resolve => {
+        setTimeout(resolve, milliseconds);
+    });
+}

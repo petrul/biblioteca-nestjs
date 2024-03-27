@@ -36,6 +36,7 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
           await this.vectorizer.vectorize(opId);
           log(`done vectorizing for ${obj.id}`, asJson);  
         } catch(err: any) {
+          // ignore so that kafka message does not go back 
           console.error('will ignore exception', err);
         }
       }),

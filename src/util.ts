@@ -19,3 +19,25 @@ export class Util {
     }
 
 }
+
+export class StopWatch {
+
+    private start: number;
+
+    constructor() {
+        this.start = Date.now();
+    }
+
+    toString() : string {
+        const end = Date.now();
+        return this.formatTime(end - this.start);
+    }
+
+    private formatTime(ms) {
+        const minutes = Math.floor(ms / (1000 * 60));
+        const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+        const milliseconds = Math.floor(ms % 1000);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
+    }
+    
+}
