@@ -28,6 +28,12 @@ export class Util {
             array[j] = temp;
         }
     }
+
+    static delay(milliseconds: number) {
+        return new Promise(resolve => {
+            setTimeout(resolve, milliseconds);
+        });
+    }
 }
 
 export class StopWatch {

@@ -1,4 +1,3 @@
-import { log } from 'console';
 import { StopWatch, Util } from './util';
 
 describe('UtilSpec', () => {
@@ -15,13 +14,6 @@ describe('UtilSpec', () => {
 
     it('stopwatch', async () => {
         const watch = new StopWatch();
-        expect(watch.toString().startsWith('00:00:')).toBeTruthy()
+        expect(watch.toString().startsWith('00:00:')).toBeTruthy()        
     })
 });
-
-
-function delay(milliseconds){
-    return new Promise(resolve => {
-        setTimeout(resolve, milliseconds);
-    });
-}

@@ -4,6 +4,7 @@ import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
 import { log } from 'console';
 import { TextbaseClient } from '../textbase_client.service';
+import { Util } from 'src/util';
 
 @Injectable()
 export class ListenerService implements OnApplicationShutdown, OnModuleInit {
@@ -30,6 +31,7 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
     await this.consumer.run({
       eachMessage: (async ({ topic, partition, message }) => {
         try {
+          await Util.delay(2 * 1000); // for some reason, on new import the opus is not yet ready
           const asJson = message.value.toString();
           var obj = JSON.parse(message.value.toString())
           if (obj.path) {
