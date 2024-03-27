@@ -60,8 +60,8 @@ import { log } from 'console';
       useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
         conf: VectorizerConfiguration, logger: LoggerService ) => {
         log(conf);
-        const tb_getParas_pageSize = conf.tb_getParas_pageSize;
-        return new VectorizerService(tbc, embedder, vecstore, logger, tb_getParas_pageSize);
+        const pageSize = conf.tb_getParas_pageSize;
+        return new VectorizerService(tbc, embedder, vecstore, logger, pageSize);
       },
       inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
     },

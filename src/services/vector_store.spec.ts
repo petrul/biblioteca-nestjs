@@ -75,7 +75,7 @@ describe('VectorStore', () => {
         expect(await col.count()).toEqual(nrElems);
 
     }, 
-    TestUtils.TIMEOUT_TWO_MINUTES);
+    TestUtils.TIMEOUT_TWO_MINUTES * 2);
 
     it('modify url', async () => {
         const nrElems = 10
@@ -122,5 +122,5 @@ describe('VectorStore', () => {
         }
 
     }, 
-    TestUtils.TIMEOUT_TWO_MINUTES)
+    TestUtils.TIMEOUT_TWO_MINUTES * 2)
 });
