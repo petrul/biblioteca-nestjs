@@ -176,5 +176,11 @@ export class MilvusCollection {
     
   }
 
+  async compact() {
+    return await this.milvus.compact({
+      collection_name: this.name
+    });
+  }
+
 }
 
