@@ -4,6 +4,7 @@ import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { TeiElemDto } from "../textbase.api";
 import { assert } from "console";
 import { PROVIDER_VECTOR_STORE, VectorStore } from "./vector_store";
+import { StopWatch } from "src/util";
 
 /**
  * central service that  coordinates calling sub-services to get paragraphs, ask for their
@@ -72,13 +73,19 @@ export class VectorizerService {
                     && it.text.length > 10 
                     && it.text.length < 3000
             );
-            this.log.log(`filtered ${filtered.length} (10 < text.length < 3000)`);
 
             assert (filtered.length <= this.pageSize);
 
             if (filtered.length > 0) {
+
+                var watch = new StopWatch();
                 await this.embedder.embeddings(filtered);
+                this.log.log(`embedding ${filtered.length} paras took ${watch}`);
+
+                watch = new StopWatch();
                 await this.vecstore.store(filtered);
+                this.log.log(`storing ${filtered.length} vectors took ${watch}`);
+
                 await this.vecstore.flush();    
             }
 
