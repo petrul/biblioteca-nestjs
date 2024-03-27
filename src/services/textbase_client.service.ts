@@ -63,7 +63,7 @@ export class TextbaseClient {
       while (hasMore) {
 
         // call /api/div/id/paras
-        this.log.log(`GET /api/divs/${opId}/paras?page=${pageNr}&size=${pageSize}`);
+        this.log.log(`GET ${this.conf.textbaseUrl}/api/divs/${opId}/paras?page=${pageNr}&size=${pageSize}&withContent=true`);
         const resp = await this.tb.api.getIdParas(opId, {
           page: pageNr++,
           size: pageSize,

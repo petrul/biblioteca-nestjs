@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, LoggerService } from "@nestjs/common";
 import { TextbaseClient } from "./textbase_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { TeiElemDto } from "../textbase.api";
@@ -22,6 +22,7 @@ export class VectorizerService {
         protected tbc: TextbaseClient, 
         @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder, 
         @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
+        protected log: LoggerService,
         pageSize = 2000) {
             this.pageSize = pageSize;
         }
@@ -71,12 +72,15 @@ export class VectorizerService {
                     && it.text.length > 10 
                     && it.text.length < 3000
             );
+            this.log.log(`filtered ${filtered.length} (10 < text.length < 3000)`);
 
             assert (filtered.length <= this.pageSize);
-            
-            await this.embedder.embeddings(filtered);
-            await this.vecstore.store(filtered);
-            await this.vecstore.flush();
+
+            if (filtered.length > 0) {
+                await this.embedder.embeddings(filtered);
+                await this.vecstore.store(filtered);
+                await this.vecstore.flush();    
+            }
 
             processed += filtered.length;
 
