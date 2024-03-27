@@ -3,13 +3,15 @@ import { KafkaService } from './kafka.service';
 import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
 import { log } from 'console';
+import { TextbaseClient } from '../textbase_client.service';
 
 @Injectable()
 export class ListenerService implements OnApplicationShutdown, OnModuleInit {
 
   consumer: Consumer;
 
-  constructor(protected ks: KafkaService, 
+  constructor(protected ks: KafkaService,
+    protected tbc: TextbaseClient, 
     protected vectorizer: VectorizerService) { }
 
   async onModuleInit() {
@@ -29,7 +31,12 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
       eachMessage: (async ({ topic, partition, message }) => {
         try {
           const asJson = message.value.toString();
-          const obj = JSON.parse(message.value.toString())
+          var obj = JSON.parse(message.value.toString())
+          if (obj.path) {
+            // some older kafka messages have the id already obsolete.
+            // so get the div again just to make sure.
+            obj = await this.tbc.getElemByPath(obj.path);
+          }
           console.log(obj);
           const opId = obj.id;
           log(`starting vectorizing for ${obj.id}`, asJson);
