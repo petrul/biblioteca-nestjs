@@ -1,12 +1,10 @@
-import { Controller, Param, Post, Query } from '@nestjs/common';
+import { Controller, Post, Query } from '@nestjs/common';
 import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { StopWatch, Util } from './util';
 import { EntityModelTeiDiv } from './textbase.api';
-import { log } from 'console';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 
-// type lang = EntityModelTeiDiv.lang;
 
 function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
   if (o1.lang == o2.lang) return 0;
