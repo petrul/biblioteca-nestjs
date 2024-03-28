@@ -83,6 +83,7 @@ describe('MilvuscollectionService', () => {
 
                 const mresp = await col.upsertNewOrModified(data);
                 expect(parseInt(mresp.insert_cnt)).toEqual(3);
+                expect(await col.count()).toEqual(11);
             }
                                             
         }, 
