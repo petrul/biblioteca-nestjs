@@ -58,4 +58,14 @@ describe('Textbase_clientService', () => {
     }, 
         60 * 1000 // max 1 min timeout
     );
+
+    it('generator allopera', async () => {
+        var counter = 0;
+        for await (const o of tbc.allOperaGen()) {
+            counter++;
+        }
+        expect(counter).toBeGreaterThan(1001);
+        
+    }, 
+    TestUtils.TIMEOUT_TWO_MINUTES);
 });

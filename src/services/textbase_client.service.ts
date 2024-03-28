@@ -1,5 +1,5 @@
 import { Inject, Injectable, LoggerService } from "@nestjs/common";
-import { Api, AuthorDto } from "../textbase.api";
+import { Api, AuthorDto, EntityModelTeiDiv } from "../textbase.api";
 import { AppConfService, PROVIDER_CONF } from "../configuration";
 import { assert } from "console";
 import { PROVIDER_LOGGER, StopWatch } from "../util";
@@ -55,7 +55,7 @@ export class TextbaseClient {
      * @param limit  only keep limit from what remains
      */
 
-    async *getParagraphs(opId: number, pageSize = 2000, offset = 0, limit = Number.POSITIVE_INFINITY ) {
+    async *getParagraphs(opId: number, pageSize = 1000, offset = 0, limit = Number.POSITIVE_INFINITY ) {
       assert(pageSize > 0);
 
       var hasMore = true;
@@ -91,4 +91,71 @@ export class TextbaseClient {
         }
       }        
     }
+
+    /**
+     * transforms a paged API call into a async generator
+     * @param provider  the api call
+     * @param pageNr    page number
+     * @param pageSize  the page size
+     * @param limit do not yield more than limit items
+     */
+    protected async *gen<T>(
+      provider: (pageNr: number, pageSize: number) => Promise<Array<T>>,
+      pageNr = 0, 
+      pageSize = 1000, 
+      limit = Number.POSITIVE_INFINITY, 
+      ) :  AsyncGenerator<T, void, unknown> {
+        var hasMore = true;
+        let totalYielded = 0;
+  
+        while (hasMore) {
+            
+          const arr = await provider(pageNr, pageSize);
+     
+          pageNr++;
+  
+          // if we got precisely the page size, maybe there's more.
+          hasMore = (arr.length == pageSize);
+
+          for (const obj of arr) {
+  
+            if (totalYielded++ >= limit)
+              return;
+  
+            yield obj;
+          }
+        }
+    }
+
+    allOperaGen(pageNr = 0, pageSize = 1000, limit = Number.POSITIVE_INFINITY ) {
+
+      return this.gen<EntityModelTeiDiv>((pageNr, pageSize) => {
+        return this.getAllOpera(pageNr, pageSize);
+      })
+
+      // var hasMore = true;
+      // var pageNr = Math.floor(offset / pageSize);
+      // let totalYielded = 0;
+
+      // while (hasMore) {
+
+      //   // call /api/div/id/paras
+      //   const watch = new StopWatch();
+        
+      //   const opera = await this.getAllOpera(pageNr, pageSize);
+   
+      //   pageNr++;
+
+      //   // if we got precisely the page size, maybe there's more.
+      //   hasMore = (opera.length == pageSize);
+      //   for (const o of opera) {
+
+      //     if (totalYielded++ >= limit)
+      //       return;
+
+      //     yield o;
+      //   }
+      // }
+  }
+
 }

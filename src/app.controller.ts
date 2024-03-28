@@ -26,17 +26,19 @@ export class AppController {
   @Post('/revectorize_all')
   async revectorizeAll(@Query('shuffle') shuffle: boolean = false): Promise<any> {
 
-    const opera = await this.tbc.getAllOpera(0, 20000);
-    console.log(opera.length);
+    const opera = [];
+    for await(const i of this.tbc.allOperaGen()) {
+      opera.push(i); 
+    }
+
     if (shuffle) {
       Util.shuffleArray(opera);
     }
-    console.log(opera.length);
+    console.log('opera length', opera.length);
 
     for (const op of opera) {
       try {
         const watch = new StopWatch();
-        console.log
         console.log(`COTROLLER will vectorize: `, op);
         const opid = op.id;
   
