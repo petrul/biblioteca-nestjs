@@ -83,11 +83,13 @@ export class VectorizerService {
             if (filtered.length > 0) {
 
                 var watch = new StopWatch();
+
                 await this.embedder.embeddings(filtered);
                 this.log.log(`embedding ${filtered.length} paras took ${watch}`);
 
                 watch = new StopWatch();
-                await this.vecstore.store(filtered);
+                // await this.vecstore.store(filtered);
+                await this.vecstore.storeNewOrUpdated(filtered);
                 this.log.log(`storing ${filtered.length} vectors took ${watch}`);
 
                 await this.vecstore.flush();    
@@ -95,7 +97,7 @@ export class VectorizerService {
 
             processed += filtered.length;
 
-            await interPageJob(); // do not await
+            await interPageJob();
 
         } while(hasMore && i < (offset + limit))
 

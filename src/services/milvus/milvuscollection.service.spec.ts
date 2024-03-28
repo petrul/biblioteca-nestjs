@@ -24,21 +24,22 @@ describe('MilvuscollectionService', () => {
     })
 
     afterEach(async () => {
+        log(`will drop ${col.name}...`);
+        await col.unload();
         await col.drop();
         log(`dropped collection ${col.name}`)
-    })
+    }, TestUtils.TIMEOUT_TWO_MINUTES)
 
     it ('upsert data into milvus', async() => {
-            const data = TestUtils.randomContent(10, 384, 200);
+            const data = TestUtils.randomContent(10, MilvusCollection.DIM_384, 200);
 
-            // const dataLen = data.length;
             const firstHalf = data.slice(0, 5);
             const secondHalf = data.slice(5, 10);
 
             expect(firstHalf.length).toBe(5);
             expect(secondHalf.length).toBe(5);
             
-            await col.upsert(firstHalf); // .map( ({ text, ...rest }) => rest as Content));
+            await col.upsert(firstHalf);
             await col.flush();
             
             await col.getCollectionStatistics();
@@ -47,7 +48,7 @@ describe('MilvuscollectionService', () => {
             expect(await col.count()).toEqual(5);
 
             const inShas = firstHalf.map(it => it.sha256);
-            const alreadyPresent = await col.findById(inShas);
+            const alreadyPresent = (await col.findById(inShas)).map(it => it.sha256);
 
             expect(alreadyPresent.length).toBe(5)
             expect(alreadyPresent.sort()).toEqual(inShas.sort())
@@ -62,9 +63,27 @@ describe('MilvuscollectionService', () => {
             expect(await col.count()).toEqual(5);  
             
             // now upsert all 10, there should be a total of ten
-            await col.upsert(data);
+            const mresp = await col.upsert(data);
+            expect(parseInt(mresp.insert_cnt)).toEqual(10);
             await col.flush();
-            expect(await col.count()).toEqual(10);  
+            expect(await col.count()).toEqual(10);
+            
+
+            //
+            {
+                // two updated records
+                data[0].url = TestUtils.randomAlphanumeric();
+                data[3].url = TestUtils.randomAlphanumeric();
+                const newOrModified = await col.newOrModified(data);
+                expect(newOrModified.length).toEqual(2);
+
+                data.push(TestUtils.randomContent(1)[0]); // new element altogether
+                expect(data.length).toBe(11);
+                expect((await col.newOrModified(data)).length).toBe(3);
+
+                const mresp = await col.upsertNewOrModified(data);
+                expect(parseInt(mresp.insert_cnt)).toEqual(3);
+            }
                                             
         }, 
         TestUtils.TIMEOUT_TWO_MINUTES

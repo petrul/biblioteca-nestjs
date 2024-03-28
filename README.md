@@ -14,6 +14,11 @@ Just run:
 - $ ./gen-tb-api.sh
  in the project root directory. It will download the api json from the production server and 
 
+## Run tests: 
+
+$ npx jest
+
+
 ## Algorithm
 
 On a new event we get the opus id, we get all the paragraphs.

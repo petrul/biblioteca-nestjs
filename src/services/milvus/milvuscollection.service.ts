@@ -1,4 +1,5 @@
-import { CreateIndexParam, DataType, LoadState, MilvusClient, RowData } from '@zilliz/milvus2-sdk-node';
+import { CreateIndexParam, DataType, LoadState, MilvusClient, MutationResult, RowData } from '@zilliz/milvus2-sdk-node';
+import { assert, log } from 'console';
 import { VectorizerConfiguration } from 'src/configuration';
 import { Content } from 'src/model/model';
 
@@ -59,10 +60,15 @@ export class MilvusCollection {
             });
     }
 
+    async unload() {
+      return await this.milvus.releaseCollection({ collection_name: this.name });
+    }
+    
     async drop() {
-        return await this.milvus.dropCollection({
-          collection_name: this.name
-        });
+      await this.unload();
+      return await this.milvus.dropCollection({
+        collection_name: this.name
+      });
     }
 
     async insert(content: Content[]) {
@@ -78,7 +84,7 @@ export class MilvusCollection {
       });
     }
 
-    async upsert(content: Content[]) : Promise<any> {
+    async upsert(content: Content[]) : Promise<MutationResult> {
       if (!content)
         return;
 
@@ -113,7 +119,7 @@ export class MilvusCollection {
       return resp.data;
   }
 
-    async findById(ids: string[], outputFields = [ MilvusCollection.SHA256 ]) : Promise<string[]> {
+    async findById(ids: string[], outputFields = [ MilvusCollection.SHA256 ]) : Promise<Partial<Content>[]> {
       const idListAsTxt = ids.map(it => `'${it}'`).join(",");
       const expr = `${MilvusCollection.SHA256} in [ ${idListAsTxt} ] `
       const resp = await this.milvus.query({ 
@@ -122,7 +128,52 @@ export class MilvusCollection {
         output_fields: outputFields
       })
 
-      return resp.data.map(it => it.sha256);
+      const content: Partial<Content>[] = resp.data.map(it => { 
+        const res: Partial<Content> = {};
+        Object.assign(res, it);        
+        return res;
+      });
+
+      return content;
+    }
+
+    /**
+     * only upserts records that either do not exist at all (sha256 not present as id in 
+     * the milvus collection), or whose url has changed.
+     * Basically will filter out content from param whose sha256 AND url already exist in the db.
+     */
+    async upsertNewOrModified(content: Content[]) {
+      assert(content != null);
+      
+      const newOrModified = await this.newOrModified(content);
+      if (newOrModified.length != content.length) {
+        log(`will only upsert ${newOrModified.length} new or modified out of ${content.length} total`);
+      }
+      return this.upsert(newOrModified);
+    }
+
+    async newOrModified(content: Content[]) : Promise<Content[]> {
+      assert(content != null);
+      const alreadyExisting = await this.findById(
+        content.map(it => it.sha256), 
+        [MilvusCollection.SHA256, MilvusCollection.URL]);
+      const alreadyExistingIds = alreadyExisting.map(it => it.sha256);
+
+      const newOrModified = content.filter(c => {
+        const id = c.sha256;
+        const url = c.url;
+        assert (id != null);
+        assert (url != null);
+
+        const indexOfSha = alreadyExistingIds.indexOf(id);
+        if (indexOfSha < 0)
+          return true; // id not found so this is entirely new
+
+        const extant = alreadyExisting[indexOfSha];
+        assert (extant.sha256 != null);
+        return (url != extant.url); // if urls do not match, this is modified
+      });
+      return newOrModified;
     }
 
     async createIndex() {

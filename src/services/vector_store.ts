@@ -3,8 +3,9 @@ import { Content } from "../model/model"
 import { MilvusCollection } from "./milvus/milvuscollection.service";
 import { Injectable } from "@nestjs/common";
 
-export interface VectorStore {    
+export interface VectorStore {
     store(data: Content[]): Promise<any>;
+    storeNewOrUpdated(data: Content[]): Promise<any>
     flush(): Promise<any>;
 }
 
@@ -26,6 +27,11 @@ export class MilvusColVectorStore implements VectorStore {
     async flush() {
         return await this.col.flush();
     }
+
+    async storeNewOrUpdated(data: Content[]): Promise<any> {
+        return await this.col.upsertNewOrModified(data);
+    }
+
 }
 
 export const PROVIDER_VECTOR_STORE = Symbol('VectorStore')
