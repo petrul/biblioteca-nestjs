@@ -73,12 +73,19 @@ describe('VectorizerService', () => {
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
       expect(op.path).toEqual('stoker/the_snake_s_pass');
 
+      var interPagewasCalled = false;
+
       const maxElems = 20;
-      const nrElems = await vectServ.vectorize(op.id, 0, maxElems);
+      const nrElems = await vectServ.vectorize(op.id, 
+        () => { 
+          interPagewasCalled = true; 
+          return Promise.resolve(); }, 
+        0, maxElems);
 
       log('nr processed elems', nrElems);
       expect(nrElems).toBeGreaterThan(0);
       expect(nrElems).toBeLessThanOrEqual(maxElems);
+      expect(interPagewasCalled).toBeTruthy();
 
     },
     TestUtils.TIMEOUT_TWO_MINUTES);

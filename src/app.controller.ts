@@ -37,15 +37,14 @@ export class AppController {
       try {
         const watch = new StopWatch();
         console.log
-        console.log(`will vectorize: `, op);
+        console.log(`COTROLLER will vectorize: `, op);
         const opid = op.id;
   
         console.log(`starting vectorizing for ${opid}`);
         await this.vectorizer.vectorize(opid);
         console.log(`done vectorizing for ${opid}. took ${watch}`);  
       } catch (err: any) {
-        console.error('will ignore', err);
-        
+        console.error('will ignore', err);        
       }
     }
 

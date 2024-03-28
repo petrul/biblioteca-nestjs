@@ -32,9 +32,13 @@ export class VectorizerService {
      * @param offset skipping the initial offset elements (usable for paging)
      * @param limit only process a maximum of limit (usable for paging)
      * @param divId this should be the id of an opus, but it can be really any div id (even smaller).
+     * @param interPageJob do this after each processed page (usable for kafka heartbeats)
      * @returns the nr of processed elements 
      */
-    async vectorize(divId: number, offset = 0, limit = Number.POSITIVE_INFINITY) : Promise<number> {
+    async vectorize(divId: number, 
+        interPageJob: () => Promise<any> = () => { return Promise.resolve();  },
+        offset = 0, limit = Number.POSITIVE_INFINITY, 
+    ) : Promise<number> {
 
         var processed = 0;
 
@@ -90,6 +94,8 @@ export class VectorizerService {
             }
 
             processed += filtered.length;
+
+            await interPageJob(); // do not await
 
         } while(hasMore && i < (offset + limit))
 
