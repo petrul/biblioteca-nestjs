@@ -1,15 +1,16 @@
-import { Injectable, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { KafkaService } from './kafka.service';
 import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
-import { log } from 'console';
 import { TextbaseClient } from '../textbase_client.service';
 import { Util } from 'src/util';
 
 @Injectable()
-export class ListenerService implements OnApplicationShutdown, OnModuleInit {
+export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit {
 
   consumer: Consumer;
+  
+  private readonly log = new Logger(KafkaListenerService.name);
 
   constructor(protected ks: KafkaService,
     protected tbc: TextbaseClient, 
@@ -52,17 +53,17 @@ export class ListenerService implements OnApplicationShutdown, OnModuleInit {
           }
           heartbeat();
           
-          console.log('KAFKA', obj);
+          this.log.log(obj);
           const opId = obj.id;
-          log(`starting vectorizing for ${obj.id}`, asJson);
+          this.log.log(`starting vectorizing for ${obj.id}`, asJson);
           await this.vectorizer.vectorize(opId, () => { 
-            console.log('kafka heartbeat');
+            this.log.debug('kafka heartbeat');
             return heartbeat(); }
           );
-          log(`done vectorizing for ${obj.id}`, asJson);  
+          this.log.log(`done vectorizing for ${obj.id}`, asJson);
         } catch(err: any) {
           // ignore so that kafka message does not go back 
-          console.error('will ignore exception', err);
+          this.log.error('will ignore exception', err);
         }
       }),
     });

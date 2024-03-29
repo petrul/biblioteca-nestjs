@@ -1,7 +1,7 @@
 import { ConsoleLogger, LoggerService, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { ProducerService } from './services/kafka/producer.service';
-import { ListenerService } from './services/kafka/listener.service';
+import { KafkaListenerService } from './services/kafka/listener.service';
 import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
@@ -35,7 +35,7 @@ import { log } from 'console';
       useClass: AppConfService,
     },
     ProducerService,
-    ListenerService,
+    KafkaListenerService,
     KafkaService,
     TextbaseClient,
     {

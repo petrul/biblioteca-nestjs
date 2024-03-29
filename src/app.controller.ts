@@ -1,4 +1,4 @@
-import { Controller, Post, Query } from '@nestjs/common';
+import { Controller, Logger, Post, Query } from '@nestjs/common';
 import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { StopWatch, Util } from './util';
@@ -19,32 +19,35 @@ function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
 @Controller()
 export class AppController {
   
-  constructor(protected tbc: TextbaseClient, protected vectorizer: VectorizerService, protected col: MilvusCollection) {}
+  constructor(protected tbc: TextbaseClient, 
+    protected vectorizer: VectorizerService, 
+    protected col: MilvusCollection) {}
 
   @Post('/revectorize_all')
   async revectorizeAll(@Query('shuffle') shuffle: boolean = false): Promise<any> {
 
-    const opera = [];
+    const opera: EntityModelTeiDiv[] = [];
     for await(const i of this.tbc.allOperaGen()) {
-      opera.push(i); 
+      if (i)
+        opera.push(i); 
     }
 
     if (shuffle) {
       Util.shuffleArray(opera);
     }
-    console.log('opera length', opera.length);
+    this.log.log(`opera length: ${opera.length}`);
 
     for (const op of opera) {
       try {
         const watch = new StopWatch();
-        console.log(`COTROLLER will vectorize: `, op);
+        this.log.log(`will vectorize: `, op);
         const opid = op.id;
   
-        console.log(`starting vectorizing for ${opid}`);
+        this.log.log(`starting vectorizing for ${opid} - ${op.completePath} - ${op.author?.visualName} - '${op.head}'`);
         await this.vectorizer.vectorize(opid);
-        console.log(`done vectorizing for ${opid}. took ${watch}`);  
+        this.log.log(`done vectorizing for ${opid}. took ${watch}`);  
       } catch (err: any) {
-        console.error('will ignore', err);        
+        this.log.error('will ignore', err);        
       }
     }
 
@@ -54,4 +57,6 @@ export class AppController {
   async optimize() {
     return await this.col.compact();
   }
+
+  private readonly log = new Logger(AppController.name);
 }
