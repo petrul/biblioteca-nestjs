@@ -62,8 +62,16 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
           );
           this.log.log(`done vectorizing for ${obj.id}`, asJson);
         } catch(err: any) {
-          // ignore so that kafka message does not go back 
-          this.log.error('will ignore exception', err);
+          // re-throw instead of swallowing: an unhandled exception is what
+          // keeps kafkajs from committing this message's offset, so it gets
+          // redelivered/retried instead of being silently dropped forever.
+          // This matters most for embedder/Milvus failures - RetryingContentEmbedder
+          // and the MilvusCollection startup check already wait-and-retry
+          // *reachability*, but a failure mid-vectorize() (e.g. Milvus going
+          // down partway through, or any other error) still needs the
+          // message put back rather than treated as done.
+          this.log.error('failed to vectorize - message will be retried, not marked as consumed', err);
+          throw err;
         }
       }),
     });

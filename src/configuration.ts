@@ -7,19 +7,32 @@ import { MilvusCollection } from "./services/milvus/milvuscollection.service";
 export default () => chooseConf();
 
 export interface VectorizerConfiguration {
-    
+
     /**
      * collection name for vectorizing textbase paragraphs using the ALL_MPNET_BASE_V2 SentenceTransformers model.
-     * i.e. tb_paras_all_mpnet_base_v2
+     * i.e. tb_paras_all_mpnet_base_v2 - kept around for the embedder still available under its own name
+     * (see AllMpnetBaseV2_StsService), even though it's no longer the default PROVIDER_EMBEDDER.
      */
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: number;
 
-    //the address of kafka 
+    /**
+     * collection name for vectorizing textbase paragraphs using Qwen3-Embedding-4B (via Ollama) -
+     * the default PROVIDER_EMBEDDER now, replacing the sentence-transformers one above.
+     * i.e. tb_paras_qwen3_embedding_4b
+     */
+    milvus_collection_tb_qwen3_embedding_4b_paras: string;
+    milvus_collection_tb_qwen3_embedding_4b_paras_dim: number;
+
+    //the address of kafka
     kafkaServers: string;
 
     // this is the address of the STS server, i.e. mini.local:xxx
     sentenceTransformersServer: string;
+
+    // the Ollama server backing Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
+    // one fixed instance, unlike sentenceTransformersServer/miniMilvus which vary per environment.
+    ollamaServer: string;
 
     // this is the mini milvus server: mini.local:xxx
     miniMilvus: string;
@@ -36,14 +49,27 @@ export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const commonConf : VectorizerConfiguration = {
     kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
     sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
-    miniMilvus: process.env.MINI_MILVUS  || 'mini:19530',
+    ollamaServer: process.env.OLLAMA_SERVER || "http://zmeu.local:11434",
+    // 19530 is Milvus's raw default port, but this LAN's mini.local instance is
+    // published on 20112 instead (confirmed against textbase-server's own
+    // application-dev/ci.properties, which use the same host+port for the
+    // same Milvus instance) - 19530 is simply unreachable here.
+    miniMilvus: process.env.MINI_MILVUS  || 'mini:20112',
     textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
     milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
+    milvus_collection_tb_qwen3_embedding_4b_paras: process.env.MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B || 'tb_paras_qwen3_embedding_4b',
+    milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
     tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
 }
 
-const prodConf: VectorizerConfiguration = { ...commonConf,}
+const prodConf: VectorizerConfiguration = { ...commonConf,
+    // production's own Milvus instance is on zmeu.local:19530 (its default
+    // port), NOT the shared mini.local:20112 dev/ci/int one commonConf
+    // otherwise defaults to - confirmed against textbase-server's own
+    // application-prod.properties (milvus.host=zmeu.local, milvus.port=19530).
+    miniMilvus: process.env.MINI_MILVUS || 'zmeu.local:19530',
+}
 
 // local dev conf for yoga laptop workstation
 const yogaConf: VectorizerConfiguration = { ...commonConf, 
@@ -58,6 +84,7 @@ const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'mini.local:10106', // kafka tb int
     textbaseUrl: 'http://mini.local:10101',
     milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras',
+    milvus_collection_tb_qwen3_embedding_4b_paras: 'int_tb_paras_qwen3_embedding_4b',
     tb_getParas_pageSize: 200
 }
 
@@ -87,6 +114,10 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('sentenceTransformersServer');
     }
 
+    get ollamaServer(): string {
+        return this.conf.get<string>('ollamaServer');
+    }
+
     get miniMilvus(): string {
         return this.conf.get<string>('miniMilvus');
     }
@@ -105,5 +136,13 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_all_mpnet_base_v2_paras_dim(): number {
         return this.conf.get<number>('milvus_collection_tb_all_mpnet_base_v2_paras_dim');
+    }
+
+    get milvus_collection_tb_qwen3_embedding_4b_paras(): string {
+        return this.conf.get<string>('milvus_collection_tb_qwen3_embedding_4b_paras');
+    }
+
+    get milvus_collection_tb_qwen3_embedding_4b_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_tb_qwen3_embedding_4b_paras_dim');
     }
 }

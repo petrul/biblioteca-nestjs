@@ -1,4 +1,4 @@
-import { Inject, Injectable, LoggerService } from "@nestjs/common";
+import { Inject, Injectable, LoggerService, OnModuleInit } from "@nestjs/common";
 import { TextbaseClient } from "./textbase_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { TeiElemDto } from "../textbase.api";
@@ -11,22 +11,39 @@ import { StopWatch } from "../util";
  * embedding and then store them.
  */
 @Injectable()
-export class VectorizerService {
+export class VectorizerService implements OnModuleInit {
 
     pageSize: number;
 
     /**
      * @param pageSize same value is used for all paged services: the textbase client,
-     * the embedder (sentence transformer service) and the vector store. 
+     * the embedder (sentence transformer service) and the vector store.
      */
     constructor(
-        protected tbc: TextbaseClient, 
-        @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder, 
+        protected tbc: TextbaseClient,
+        @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder,
         @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
         protected log: LoggerService,
         pageSize = 2000) {
             this.pageSize = pageSize;
         }
+
+    /**
+     * KafkaListenerService depends on this service, so Nest constructs (and
+     * runs onModuleInit on) this one first - meaning this blocks Kafka
+     * message consumption from starting until the embedder is confirmed
+     * reachable, not just Milvus (already checked in the MilvusCollection
+     * provider factory in app.module.ts). PROVIDER_EMBEDDER is wrapped in
+     * RetryingContentEmbedder, so a throwaway call here already waits and
+     * retries on failure - this just makes sure that happens at startup
+     * instead of on the first real Kafka message.
+     */
+    async onModuleInit() {
+        await this.embedder.embeddings([
+            { text: 'startup healthcheck', url: 'startup-healthcheck', sha256: 'startup-healthcheck' },
+        ]);
+        this.log.log('Embedder confirmed available at startup.');
+    }
 
     /**
      * @param offset skipping the initial offset elements (usable for paging)

@@ -13,6 +13,7 @@ export class MilvusCollection {
 
     static readonly DIM_384 = 384;
     static readonly DIM_768 = 768;
+    static readonly DIM_2560 = 2560;
 
     constructor(
       public name: string, 

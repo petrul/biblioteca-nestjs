@@ -3,9 +3,14 @@ import { TextbaseClient } from './textbase_client.service';
 import { PROVIDER_LOGGER, Util } from '../util';
 import { PROVIDER_CONF } from '../configuration';
 import { TestUtils } from '../../test/testutils'
+import { FakeTextbaseClient } from '../../test/fake-textbase-client';
 import { ConsoleLogger } from '@nestjs/common';
 
 describe('Textbase_clientService', () => {
+    // FakeTextbaseClient stands in for the real one: no live textbase-server
+    // is reachable from here right now (production is intermittently down,
+    // and there's no other instance with real content) - see FakeTextbaseClient's
+    // own docstring.
     let tbc: TextbaseClient;
     const conf = TestUtils.testConf;
 
@@ -18,13 +23,16 @@ describe('Textbase_clientService', () => {
                     provide: PROVIDER_LOGGER,
                     useClass: ConsoleLogger
                   },
-        
+
                 {
                     provide: PROVIDER_CONF,
                     useValue: conf
                 },
-                TextbaseClient
-            ],  
+                {
+                    provide: TextbaseClient,
+                    useClass: FakeTextbaseClient,
+                },
+            ],
         }).compile();
 
         tbc = module.get<TextbaseClient>(TextbaseClient);

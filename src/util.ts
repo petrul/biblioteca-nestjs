@@ -1,6 +1,37 @@
+import { LoggerService } from '@nestjs/common';
+
 const { createHash } = require('crypto');
 
 export const PROVIDER_LOGGER=Symbol('LoggerService')
+
+/**
+ * Runs fn(), and if it throws, waits pollIntervalMs and tries again -
+ * indefinitely, no cap - instead of the caller failing outright the moment
+ * a dependency (the embedder, Milvus, whichever) happens to be unreachable.
+ * Used both for the embedder (see RetryingContentEmbedder) and for the
+ * Milvus collection at startup (see app.module.ts's MilvusCollection
+ * provider) - both should just sit and wait for their dependency to come
+ * back, however long that takes, rather than crashing the app or failing
+ * one page/message at a time for nothing while it's down.
+ */
+export async function retryUntilAvailable<T>(
+    fn: () => Promise<T>,
+    logger: LoggerService,
+    label: string,
+    pollIntervalMs = 5000,
+): Promise<T> {
+    while (true) {
+        try {
+            return await fn();
+        } catch (e) {
+            logger.warn(
+                `${label} unavailable (${e?.message ?? e}) - waiting ${pollIntervalMs}ms and retrying...`,
+                label,
+            );
+            await Util.delay(pollIntervalMs);
+        }
+    }
+}
 
 export class Util {
 

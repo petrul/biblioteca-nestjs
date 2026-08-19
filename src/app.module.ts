@@ -11,7 +11,9 @@ import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
-import { PROVIDER_LOGGER } from './util';
+import { NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
+import { RetryingContentEmbedder } from './services/retrying_content_embedder';
+import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
 import { log } from 'console';
 
 @Module({
@@ -40,19 +42,38 @@ import { log } from 'console';
     TextbaseClient,
     {
       provide: MilvusCollection,
-      useFactory: async (conf: VectorizerConfiguration) => {
-        const name = conf.milvus_collection_tb_all_mpnet_base_v2_paras;
-        const vectorDim = conf.milvus_collection_tb_all_mpnet_base_v2_paras_dim;
+      useFactory: async (conf: VectorizerConfiguration, logger: LoggerService) => {
+        // qwen3-embedding replaced all-mpnet-base-v2 as the default embedder
+        // below, so this now targets its own (differently-dimensioned)
+        // collection - see VectorizerConfiguration's doc comments.
+        const name = conf.milvus_collection_tb_qwen3_embedding_4b_paras;
+        const vectorDim = conf.milvus_collection_tb_qwen3_embedding_4b_paras_dim;
         const col = new MilvusCollection(name, conf, vectorDim);
-        await col.createAndLoadIfNotExists();
+        // checked at startup (this factory runs during app bootstrap, before
+        // anything depending on MilvusCollection - including the Kafka
+        // listener - is constructed): wait and retry instead of crashing
+        // the whole app the moment Milvus happens to be unreachable.
+        await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Milvus');
         return col;
       },
-      inject: [PROVIDER_CONF]
+      inject: [PROVIDER_CONF, PROVIDER_LOGGER]
     },
     SentenceTransformersService,
+    AllMpnetBaseV2_StsService,
+    OllamaService,
+    Qwen3EmbeddingOllamaService,
+    NomicEmbedOllamaService,
     {
+      // Qwen3-Embedding-4B (via Ollama) is now the default, replacing
+      // AllMpnetBaseV2_StsService (still registered above, still usable
+      // under its own name) - wrapped in RetryingContentEmbedder so a
+      // temporarily-unreachable Ollama server makes vectorize() wait and
+      // retry instead of failing one page at a time for nothing.
       provide: PROVIDER_EMBEDDER,
-      useClass: AllMpnetBaseV2_StsService
+      useFactory: (qwen: Qwen3EmbeddingOllamaService, logger: LoggerService) => {
+        return new RetryingContentEmbedder(qwen, logger);
+      },
+      inject: [Qwen3EmbeddingOllamaService, PROVIDER_LOGGER]
     },
     MilvusColVectorStore,
     {

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { VectorizerService } from './vectorizer.service';
 import { TextbaseClient } from './textbase_client.service';
+import { FakeTextbaseClient } from '../../test/fake-textbase-client';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../configuration';
 import { TestUtils } from '../../test/testutils';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
@@ -46,7 +47,12 @@ describe('VectorizerService', () => {
             inject: [PROVIDER_CONF]
           },
           MilvusColVectorStore,
-          TextbaseClient,
+          {
+            // no live textbase-server reachable from here right now - see
+            // FakeTextbaseClient's own docstring
+            provide: TextbaseClient,
+            useClass: FakeTextbaseClient,
+          },
           {
             provide: VectorizerService,
             useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, logger: LoggerService) => {
