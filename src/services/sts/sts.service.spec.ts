@@ -1,12 +1,12 @@
 
 import { Test } from '@nestjs/testing';
-import {  AppConfService, PROVIDER_CONF, VectorizerConfiguration, commonConf } from '../../configuration';
+import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
 
 describe('StsService', () => {
 
     const conf : Partial<VectorizerConfiguration> = {
-        sentenceTransformersServer: commonConf.sentenceTransformersServer,
+        sentenceTransformersServer: 'http://mini.local:11200',
     }
 
     let stsService: SentenceTransformersService;

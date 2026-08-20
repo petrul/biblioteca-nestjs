@@ -1,11 +1,36 @@
 require 'json'
 
+def load_profile!
+    profile = ENV.fetch('PROFILE', 'dev')
+    path = File.expand_path(".env.#{profile}", __dir__)
+    abort "Profile file not found: #{path}" unless File.file?(path)
+
+    File.foreach(path).with_index(1) do |line, line_number|
+        line = line.strip
+        next if line.empty? || line.start_with?('#')
+
+        key, value = line.sub(/\Aexport\s+/, '').split('=', 2)
+        abort "Invalid entry in #{path}:#{line_number}" unless key && value
+
+        key = key.strip
+        value = value.strip
+        if value.length >= 2 && ['"', "'"].include?(value[0]) && value[-1] == value[0]
+            value = value[1...-1]
+        end
+        ENV[key] = value
+    end
+
+    puts "Loaded #{path}"
+end
+
+load_profile!
+
 desc 'Remove compiled application output'
 task :clean do
     sh 'npm run clean'
 end
 
-require 'json'desc 'Compile the NestJS application'
+desc 'Compile the NestJS application'
 task :build do
     sh 'npm run build'
 end
@@ -17,6 +42,11 @@ task :test do
     else
         sh 'npm', 'test'
     end
+end
+
+desc 'Run the application using the selected profile'
+task :run do
+    sh 'npm run start'
 end
 
 

@@ -1,6 +1,6 @@
 import { MilvusCollection } from './milvuscollection.service';
 import { TestUtils } from '../../../test/testutils';
-import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
+import { VectorizerConfiguration } from '../../configuration';
 import { Content } from 'src/model/model';
 import { log } from 'console';
 import exp from 'constants';
@@ -12,7 +12,7 @@ describe('MilvuscollectionService', () => {
 
     beforeEach(async () => {
         const colname = "test_" + TestUtils.randomAlphanumeric()
-        col = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
+        col = new MilvusCollection(colname, conf as VectorizerConfiguration);
         expect(await col.exists()).toBe(false);
         
         await col.createIfNotExists();

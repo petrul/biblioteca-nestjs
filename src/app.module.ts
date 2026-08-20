@@ -19,6 +19,7 @@ import { log } from 'console';
 @Module({
   imports: [
     ConfigModule.forRoot({
+      ignoreEnvFile: true,
       load: [ configuration ]
     })
   ],
