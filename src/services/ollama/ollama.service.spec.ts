@@ -1,13 +1,13 @@
 
 import { Test } from '@nestjs/testing';
-import { PROVIDER_CONF, VectorizerConfiguration, commonConf } from '../../configuration';
+import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 import { NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './ollama.service';
 import { TestUtils } from '../../../test/testutils';
 
 describe('OllamaService', () => {
 
     const conf: Partial<VectorizerConfiguration> = {
-        ollamaServer: commonConf.ollamaServer,
+        ollamaServer: 'http://zmeu.local:11434',
     }
 
     let ollamaService: OllamaService;

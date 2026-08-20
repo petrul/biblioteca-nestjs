@@ -3,7 +3,32 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MilvusCollection } from "./services/milvus/milvuscollection.service";
 
-export default configuration;
+function required(name: string): string {
+    const value = process.env[name]?.trim();
+    if (!value) throw new Error(`Missing required environment variable ${name}`);
+    return value;
+}
+
+function requiredInteger(name: string): number {
+    const raw = required(name);
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isInteger(value) || value <= 0)
+        throw new Error(`${name} must be a positive integer, received '${raw}'`);
+    return value;
+}
+
+export default (): VectorizerConfiguration => ({
+    kafkaServers: required('KAFKA_SERVERS'),
+    sentenceTransformersServer: required('STS_SERVER'),
+    ollamaServer: required('OLLAMA_SERVER'),
+    miniMilvus: required('MINI_MILVUS'),
+    textbaseUrl: required('TEXTBASE_URL'),
+    milvus_collection_tb_all_mpnet_base_v2_paras: required('MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2'),
+    milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
+    milvus_collection_tb_qwen3_embedding_4b_paras: required('MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B'),
+    milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
+    tb_getParas_pageSize: requiredInteger('TB_GETPARAS_PAGE_SIZE'),
+});
 
 export interface VectorizerConfiguration {
 
@@ -44,23 +69,6 @@ export interface VectorizerConfiguration {
     tb_getParas_pageSize: number;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
-
-export function configuration(): VectorizerConfiguration {
-    return {
-        kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
-        sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
-        ollamaServer: process.env.OLLAMA_SERVER || "http://zmeu.local:11434",
-        miniMilvus: process.env.MINI_MILVUS || 'mini.local:20112',
-        textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
-        milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
-        milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
-        milvus_collection_tb_qwen3_embedding_4b_paras: process.env.MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B || 'tb_paras_qwen3_embedding_4b',
-        milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
-        tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000,
-    };
-}
-
-export const commonConf: VectorizerConfiguration = configuration();
 
 /**
  * typed extension to ConfigService for our properties.

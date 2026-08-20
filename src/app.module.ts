@@ -21,8 +21,7 @@ import { log } from 'console';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath: process.env.APP_PROFILE ? `.env.${process.env.APP_PROFILE}` : undefined,
-      ignoreEnvFile: process.env.NODE_ENV === 'production',
+      ignoreEnvFile: true,
       load: [ configuration ]
     })
   ],
