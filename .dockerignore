@@ -1,0 +1,5 @@
+.git
+.gitignore
+coverage
+npm-debug.log*
+*.tgz

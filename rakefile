@@ -1,0 +1,51 @@
+require 'json'
+
+desc 'Remove compiled application output'
+task :clean do
+    sh 'npm run clean'
+end
+
+desc 'Compile the NestJS application'
+task :build do
+    sh 'npm run build'
+end
+
+desc 'Run the complete test suite'
+task :test do
+    sh 'npm test'
+end
+
+desc 'Build and publish the npm artifact to the shared repository'
+task :publish do
+    sh 'npm run publish:shared'
+end
+
+namespace :docker do
+    desc 'Build the Docker image tagged with the package.json version'
+    task :build do
+        package = JSON.parse(File.read('package.json'))
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{package.fetch('name')}")
+        tag = "#{image}:#{package.fetch('version')}"
+
+        sh 'docker', 'build', '--tag', tag, '.'
+        puts "Built #{tag}"
+    end
+
+    desc 'Build and publish the versioned Docker image to mini.local:5000'
+    task :publish do
+        Rake::Task['clean'].invoke
+        Rake::Task['build'].invoke
+        Rake::Task['test'].invoke
+        Rake::Task['docker:build'].invoke
+
+        package = JSON.parse(File.read('package.json'))
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{package.fetch('name')}")
+        version = package.fetch('version')
+        local_tag = "#{image}:#{version}"
+        remote_tag = "mini.local:5000/#{image}:#{version}"
+
+        sh 'docker', 'tag', local_tag, remote_tag
+        sh 'docker', 'push', remote_tag
+        puts "Published #{remote_tag}"
+    end
+end

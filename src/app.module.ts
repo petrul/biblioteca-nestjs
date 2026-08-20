@@ -19,6 +19,10 @@ import { log } from 'console';
 @Module({
   imports: [
     ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      envFilePath: process.env.APP_PROFILE ? `.env.${process.env.APP_PROFILE}` : undefined,
+      ignoreEnvFile: process.env.NODE_ENV === 'production',
       load: [ configuration ]
     })
   ],
