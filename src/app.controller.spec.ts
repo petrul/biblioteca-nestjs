@@ -4,6 +4,8 @@ import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 
+const packageInfo: { name: string; version: string } = require('../package.json');
+
 describe('AppController', () => {
   let appController: AppController;
 
@@ -33,10 +35,10 @@ describe('AppController', () => {
       expect(appController).toBeDefined();
     });
 
-    it('returns application name and stable version', () => {
+    it('returns the application name and package version', () => {
       expect(appController.info()).toEqual({
-        name: 'textbase-vectorizer',
-        version: '0.1.0',
+        name: packageInfo.name,
+        version: packageInfo.version,
       });
     });
 
