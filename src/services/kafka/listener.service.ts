@@ -34,7 +34,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
-      topic: 'tb_newOpusImportedTopic', 
+      topic: 'textbase_newOpusImportedTopic',
       fromBeginning: true,
     });
     await this.consumer.run({
