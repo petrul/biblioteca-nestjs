@@ -49,8 +49,12 @@ describe('VectorStore', () => {
     });
 
     afterEach(async () => {
-        await col.drop();
-        log(`dropped col ${col.name}`);
+        try {
+            await col.drop();
+            log(`dropped col ${col.name}`);
+        } finally {
+            col.close();
+        }
       })
 
     it('basic store', async () => {

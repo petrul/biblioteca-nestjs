@@ -72,7 +72,11 @@ describe('VectorizerService', () => {
   });
 
   afterEach(async () => {
-    await col.drop();
+    try {
+      await col.drop();
+    } finally {
+      col.close();
+    }
   })
 
     it('vectorizer should work', async () => {

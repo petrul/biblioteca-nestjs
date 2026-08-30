@@ -24,10 +24,13 @@ describe('MilvuscollectionService', () => {
     })
 
     afterEach(async () => {
-        log(`will drop ${col.name}...`);
-        await col.unload();
-        await col.drop();
-        log(`dropped collection ${col.name}`)
+        try {
+            log(`will drop ${col.name}...`);
+            await col.drop();
+            log(`dropped collection ${col.name}`)
+        } finally {
+            col.close();
+        }
     }, TestUtils.TIMEOUT_TWO_MINUTES)
 
     it ('upsert data into milvus', async() => {

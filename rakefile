@@ -1,5 +1,8 @@
 require 'json'
 
+PACKAGE = JSON.parse(File.read(File.expand_path('package.json', __dir__))).freeze
+puts "#{PACKAGE.fetch('name')} version #{PACKAGE.fetch('version')}"
+
 def load_profile!(profile)
     path = File.expand_path(".env.#{profile}", __dir__)
     abort "Profile file not found: #{path}" unless File.file?(path)
@@ -43,7 +46,8 @@ end
 
 desc 'Run the complete test suite with a profile (dev by default)'
 task :test, [:profile] do |_task, args|
-    load_profile!(selected_profile(args))
+    profile = selected_profile(args)
+    load_profile!(profile)
     if ENV['TEAMCITY_VERSION']
         sh 'npm', 'test', '--', '--reporters=jest-teamcity'
     else
@@ -69,9 +73,8 @@ end
 namespace :docker do
     desc 'Build the Docker image tagged with the package.json version'
     task :build do
-        package = JSON.parse(File.read('package.json'))
-        image = ENV.fetch('DOCKER_IMAGE', "editii/#{package.fetch('name')}")
-        tag = "#{image}:#{package.fetch('version')}"
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{PACKAGE.fetch('name')}")
+        tag = "#{image}:#{PACKAGE.fetch('version')}"
 
         sh 'docker', 'build', '--tag', tag, '.'
         puts "Built #{tag}"
@@ -79,9 +82,8 @@ namespace :docker do
 
     desc 'Build and publish the versioned Docker image to mini.local:5000'
     task publish: :build do
-        package = JSON.parse(File.read('package.json'))
-        image = ENV.fetch('DOCKER_IMAGE', "editii/#{package.fetch('name')}")
-        version = package.fetch('version')
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{PACKAGE.fetch('name')}")
+        version = PACKAGE.fetch('version')
         local_tag = "#{image}:#{version}"
         remote_tag = "mini.local:5000/#{image}:#{version}"
 

@@ -72,6 +72,10 @@ export class MilvusCollection {
       });
     }
 
+    close() {
+      return this.milvus.closeConnection();
+    }
+
     async insert(content: Content[]) {
       const data: RowData[] = content.map(it => { return {
         sha256: it.sha256,
@@ -235,4 +239,3 @@ export class MilvusCollection {
   }
 
 }
-
