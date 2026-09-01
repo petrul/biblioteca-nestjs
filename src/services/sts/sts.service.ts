@@ -39,10 +39,14 @@ export interface StsEncoder {
     encode(sentences: string[]) : Promise<number[][]>;
 }
 
-@Injectable() 
+@Injectable()
 export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
 
     static readonly modelName = SentenceTransformersService.NAME_ALL_MPNET_BASE_V2;
+
+    // all-mpnet-base-v2 is trained on English sentence-pair/paraphrase data
+    // only (sentence-transformers' own model card) - not multilingual.
+    readonly supportedLanguages: string[] | 'all' = ['en'];
 
     constructor(private stsService: SentenceTransformersService) {}
 
@@ -51,6 +55,42 @@ export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
      */
     encode(sentences: string[]): Promise<number[][]> {
         return this.stsService.encode(AllMpnetBaseV2_StsService.modelName, sentences);
+    }
+
+    /**
+     * @param content this is an adapter to Content
+     */
+    async embeddings(content: Content[]): Promise<Content[]> {
+        const sentences = content.map(it => it.text);
+        const vectors = await this.encode(sentences);
+        assert(vectors.length == sentences.length);
+        vectors.forEach((val, i) => {
+            const emb = vectors[i];
+            assert(emb != null);
+            content[i].embedding = emb;
+        });
+        return content;
+    }
+
+}
+
+@Injectable()
+export class AllMiniLmL6V2_StsService implements StsEncoder, ContentEmbedder {
+
+    static readonly modelName = SentenceTransformersService.NAME_ALL_MINILM_L6_V2;
+
+    // all-MiniLM-L6-v2 is trained on English sentence-pair data only
+    // (sentence-transformers' own model card) - not multilingual, despite
+    // being the current production-default embedder (see app.module.ts).
+    readonly supportedLanguages: string[] | 'all' = ['en'];
+
+    constructor(private stsService: SentenceTransformersService) {}
+
+    /**
+     * this is the actual api call
+     */
+    encode(sentences: string[]): Promise<number[][]> {
+        return this.stsService.encode(AllMiniLmL6V2_StsService.modelName, sentences);
     }
 
     /**

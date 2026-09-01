@@ -16,9 +16,15 @@ export class MilvusCollection {
     static readonly DIM_2560 = 2560;
 
     constructor(
-      public name: string, 
+      public name: string,
       protected conf: VectorizerConfiguration,
-      protected vectorDim: number = MilvusCollection.DIM_384) {
+      protected vectorDim: number = MilvusCollection.DIM_384,
+      // Should identify the encoder this collection's vectors come from -
+      // where it runs and its name/characteristics - since a collection is
+      // only ever compatible with the one encoder it was created for. See
+      // app.module.ts's MilvusCollection factory for how this gets built
+      // from the real embedder in use.
+      protected description: string = `embeddings storage, collection ${name}`) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
             address: conf.miniMilvus,
@@ -34,6 +40,7 @@ export class MilvusCollection {
       
         return await this.milvus.createCollection({collection_name: this.name,
             consistency_level: 'Eventually',
+            description: this.description,
 
             fields: [
                 {
@@ -213,12 +220,51 @@ export class MilvusCollection {
     return resp.value;
   }
 
+  /** The description this collection was actually created with in Milvus (see create()). */
+  async getDescription(): Promise<string> {
+    const resp = await this.milvus.describeCollection({ collection_name: this.name });
+    return resp.schema.description;
+  }
+
+  /** The EMBEDDING field's actual vector dimension in Milvus (see assertVectorDimensionMatches). */
+  async getVectorDimension(): Promise<number> {
+    const resp = await this.milvus.describeCollection({ collection_name: this.name });
+    const field = resp.schema.fields.find(f => f.name === MilvusCollection.EMBEDDING);
+    if (!field) throw new Error(`Collection '${this.name}' has no '${MilvusCollection.EMBEDDING}' field`);
+    const dimParam = field.type_params.find(p => p.key === 'dim');
+    if (!dimParam) throw new Error(`Collection '${this.name}' embedding field has no 'dim' type param`);
+    return Number(dimParam.value);
+  }
+
+  /**
+   * Throws if this (already-existing) collection's actual vector dimension
+   * doesn't match the dimension the currently-configured embedder produces -
+   * a stale/mismatched collection (e.g. left over from a previous embedder,
+   * or a config typo) would otherwise fail confusingly at the first
+   * insert/search instead of loudly at startup. See app.module.ts's
+   * MilvusCollection factory, which calls this right after
+   * createAndLoadIfNotExists() - a freshly-created collection is always
+   * self-consistent (create() uses the same vectorDim), so this only ever
+   * catches a genuine pre-existing mismatch.
+   */
+  async assertVectorDimensionMatches(expectedDim: number): Promise<void> {
+    const actualDim = await this.getVectorDimension();
+    if (actualDim !== expectedDim) {
+      throw new Error(
+        `Milvus collection '${this.name}' has vector dimension ${actualDim}, but the configured `
+        + `embedder produces ${expectedDim}-dimensional vectors - refusing to start against a `
+        + `mismatched collection (wrong collection name for this embedder, or a stale collection `
+        + `left over from a previous one).`
+      );
+    }
+  }
+
   async createIfNotExists() {
         // if not created, create
         if (! await this.exists()) {
           await this.create();
           await this.createIndex();
-        }    
+        }
   }
 
   async createAndLoadIfNotExists() {

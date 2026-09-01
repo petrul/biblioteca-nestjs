@@ -88,8 +88,14 @@ describe('MilvuscollectionService', () => {
                 expect(parseInt(mresp.insert_cnt)).toEqual(3);
                 expect(await col.count()).toEqual(11);
             }
-                                            
-        }, 
+
+        },
         TestUtils.TIMEOUT_TWO_MINUTES
     )
+
+    it('getVectorDimension reflects the actual collection, assertVectorDimensionMatches throws on mismatch', async () => {
+        expect(await col.getVectorDimension()).toEqual(MilvusCollection.DIM_384);
+        await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_384)).resolves.toBeUndefined();
+        await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_768)).rejects.toThrow(/vector dimension/);
+    });
 });

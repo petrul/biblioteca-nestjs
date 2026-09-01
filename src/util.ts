@@ -76,8 +76,11 @@ export class StopWatch {
     }
 
     toString() : string {
-        const end = Date.now();
-        return this.formatTime(end - this.start);
+        return this.formatTime(this.elapsedMs());
+    }
+
+    elapsedMs(): number {
+        return Date.now() - this.start;
     }
 
     private formatTime(ms) {

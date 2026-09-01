@@ -1,7 +1,7 @@
 
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
-import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
+import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
 
 describe('StsService', () => {
 
@@ -11,24 +11,27 @@ describe('StsService', () => {
 
     let stsService: SentenceTransformersService;
     let all_mpnet_base_v2: AllMpnetBaseV2_StsService;
+    let all_minilm_l6_v2: AllMiniLmL6V2_StsService;
 
     beforeEach(async () => {
-        
+
         const moduleRef = await Test.createTestingModule({
             imports: [],
             controllers: [],
-            providers: [ 
+            providers: [
                 {
                     provide: PROVIDER_CONF,
                     useValue: conf
-                }, 
+                },
                 SentenceTransformersService,
                 AllMpnetBaseV2_StsService,
+                AllMiniLmL6V2_StsService,
             ],
         }).compile();
 
         stsService = moduleRef.get<SentenceTransformersService>(SentenceTransformersService);
         all_mpnet_base_v2 = moduleRef.get<AllMpnetBaseV2_StsService>(AllMpnetBaseV2_StsService);
+        all_minilm_l6_v2 = moduleRef.get<AllMiniLmL6V2_StsService>(AllMiniLmL6V2_StsService);
     });
 
     it('generic call to embeddings', async () => {
@@ -36,7 +39,13 @@ describe('StsService', () => {
         expect(conf.sentenceTransformersServer).toBeTruthy();
         
         const names = await stsService.getModelNames();
-        expect(names.length).toEqual(2);
+        // 3 models now served: all-MiniLM-L6-v2, all-mpnet-base-v2, and
+        // paraphrase-multilingual-MiniLM-L12-v2 (added to the STS server
+        // itself - see ~/work/sentence-transformers-server). This only
+        // passes once that server's updated image is actually deployed to
+        // mini.local, not just built locally.
+        expect(names.length).toEqual(3);
+        expect(names).toContain('paraphrase-multilingual-MiniLM-L12-v2');
 
         {
             const sentences_1 = [
@@ -66,5 +75,22 @@ describe('StsService', () => {
             expect(await all_mpnet_base_v2.encode(sentences_2)).toEqual(allmpnetv2_vects);
         }
 
+    });
+
+    it('AllMiniLmL6V2_StsService.embeddings() adapts Content the same way AllMpnetBaseV2_StsService does', async () => {
+        expect(all_minilm_l6_v2.supportedLanguages).toEqual(['en']);
+
+        const content = [
+            { text: 'hello there', url: 'u1', sha256: 's1' },
+            { text: 'how are you', url: 'u2', sha256: 's2' },
+        ];
+        const enriched = await all_minilm_l6_v2.embeddings(content);
+
+        expect(enriched.length).toEqual(2);
+        enriched.forEach(it => {
+            expect(it.embedding).toBeDefined();
+            expect(it.embedding.length).toEqual(384);
+        });
+        expect(enriched[0].embedding).not.toEqual(enriched[1].embedding);
     });
 });

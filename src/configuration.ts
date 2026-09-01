@@ -27,6 +27,8 @@ export default (): VectorizerConfiguration => ({
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
     milvus_collection_tb_qwen3_embedding_4b_paras: required('MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B'),
     milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras: required('MLVCOL_TEXTBASE_PARAS_STS_ALL_MINILM_L6_V2'),
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim: MilvusCollection.DIM_384,
     tb_getParas_pageSize: requiredInteger('TB_GETPARAS_PAGE_SIZE'),
 });
 
@@ -47,6 +49,15 @@ export interface VectorizerConfiguration {
      */
     milvus_collection_tb_qwen3_embedding_4b_paras: string;
     milvus_collection_tb_qwen3_embedding_4b_paras_dim: number;
+
+    /**
+     * collection name for vectorizing textbase paragraphs using STS's
+     * all-MiniLM-L6-v2 model - the default PROVIDER_EMBEDDER for now (see
+     * AllMiniLmL6V2_StsService), replacing Qwen3-Embedding-4B above.
+     * i.e. textbase_paras_sts_all_minilm_l6_v2
+     */
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras: string;
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim: number;
 
     //the address of kafka
     kafkaServers: string;
@@ -115,5 +126,13 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_qwen3_embedding_4b_paras_dim(): number {
         return this.conf.get<number>('milvus_collection_tb_qwen3_embedding_4b_paras_dim');
+    }
+
+    get milvus_collection_textbase_sts_all_minilm_l6_v2_paras(): string {
+        return this.conf.get<string>('milvus_collection_textbase_sts_all_minilm_l6_v2_paras');
+    }
+
+    get milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim');
     }
 }

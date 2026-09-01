@@ -25,4 +25,8 @@ export class RetryingContentEmbedder implements ContentEmbedder {
             this.pollIntervalMs,
         );
     }
+
+    get supportedLanguages(): string[] | 'all' {
+        return this.inner.supportedLanguages;
+    }
 }

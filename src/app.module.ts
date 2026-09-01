@@ -10,7 +10,7 @@ import configuration, { AppConfService, PROVIDER_CONF, VectorizerConfiguration }
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
-import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
+import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
 import { NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
 import { RetryingContentEmbedder } from './services/retrying_content_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
@@ -46,37 +46,47 @@ import { log } from 'console';
     {
       provide: MilvusCollection,
       useFactory: async (conf: VectorizerConfiguration, logger: LoggerService) => {
-        // qwen3-embedding replaced all-mpnet-base-v2 as the default embedder
-        // below, so this now targets its own (differently-dimensioned)
-        // collection - see VectorizerConfiguration's doc comments.
-        const name = conf.milvus_collection_tb_qwen3_embedding_4b_paras;
-        const vectorDim = conf.milvus_collection_tb_qwen3_embedding_4b_paras_dim;
-        const col = new MilvusCollection(name, conf, vectorDim);
+        // all-MiniLM-L6-v2 (via STS) replaced Qwen3-Embedding-4B as the
+        // default embedder below, so this now targets its own
+        // (differently-dimensioned) collection - see
+        // VectorizerConfiguration's doc comments.
+        const name = conf.milvus_collection_textbase_sts_all_minilm_l6_v2_paras;
+        const vectorDim = conf.milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim;
+        const description = `STS (sentence-transformers) encoder "${AllMiniLmL6V2_StsService.modelName}" `
+          + `at ${conf.sentenceTransformersServer}, dim=${vectorDim}`;
+        const col = new MilvusCollection(name, conf, vectorDim, description);
         // checked at startup (this factory runs during app bootstrap, before
         // anything depending on MilvusCollection - including the Kafka
         // listener - is constructed): wait and retry instead of crashing
         // the whole app the moment Milvus happens to be unreachable.
         await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Milvus');
+        // A freshly-created collection is trivially self-consistent (create()
+        // uses this same vectorDim) - this only ever catches a genuine
+        // pre-existing mismatch (stale collection, config typo), and does so
+        // loudly at startup instead of at the first confusing insert/search
+        // failure.
+        await col.assertVectorDimensionMatches(vectorDim);
         return col;
       },
       inject: [PROVIDER_CONF, PROVIDER_LOGGER]
     },
     SentenceTransformersService,
     AllMpnetBaseV2_StsService,
+    AllMiniLmL6V2_StsService,
     OllamaService,
     Qwen3EmbeddingOllamaService,
     NomicEmbedOllamaService,
     {
-      // Qwen3-Embedding-4B (via Ollama) is now the default, replacing
-      // AllMpnetBaseV2_StsService (still registered above, still usable
-      // under its own name) - wrapped in RetryingContentEmbedder so a
-      // temporarily-unreachable Ollama server makes vectorize() wait and
+      // all-MiniLM-L6-v2 (via STS) is the default for now, replacing
+      // Qwen3-Embedding-4B (still registered above, still usable under its
+      // own name) - wrapped in RetryingContentEmbedder so a
+      // temporarily-unreachable STS server makes vectorize() wait and
       // retry instead of failing one page at a time for nothing.
       provide: PROVIDER_EMBEDDER,
-      useFactory: (qwen: Qwen3EmbeddingOllamaService, logger: LoggerService) => {
-        return new RetryingContentEmbedder(qwen, logger);
+      useFactory: (sts: AllMiniLmL6V2_StsService, logger: LoggerService) => {
+        return new RetryingContentEmbedder(sts, logger);
       },
-      inject: [Qwen3EmbeddingOllamaService, PROVIDER_LOGGER]
+      inject: [AllMiniLmL6V2_StsService, PROVIDER_LOGGER]
     },
     MilvusColVectorStore,
     {

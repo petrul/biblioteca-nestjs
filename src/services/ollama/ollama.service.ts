@@ -55,6 +55,8 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
 
     protected abstract get modelName(): string;
 
+    abstract readonly supportedLanguages: string[] | 'all';
+
     /**
      * this is the actual api call
      */
@@ -82,6 +84,11 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
 export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'qwen3-embedding:4b';
 
+    // Qwen3-Embedding is documented (Alibaba's own model card) as trained
+    // for and evaluated on 100+ languages - genuinely multilingual, unlike
+    // the STS models above.
+    readonly supportedLanguages: string[] | 'all' = 'all';
+
     // explicit constructor required even though it just forwards to super():
     // NestJS's DI resolves constructor params via TypeScript's emitted
     // design:paramtypes metadata, which isn't generated for an inherited
@@ -98,6 +105,11 @@ export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
 @Injectable()
 export class NomicEmbedOllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'nomic-embed-text:v1.5';
+
+    // nomic-embed-text is primarily English-trained (Nomic's own model
+    // card calls out separate multilingual variants as different models) -
+    // conservative default until verified otherwise.
+    readonly supportedLanguages: string[] | 'all' = ['en'];
 
     constructor(ollama: OllamaService) {
         super(ollama);
