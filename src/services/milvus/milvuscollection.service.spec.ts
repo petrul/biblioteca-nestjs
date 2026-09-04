@@ -3,7 +3,6 @@ import { TestUtils } from '../../../test/testutils';
 import { VectorizerConfiguration } from '../../configuration';
 import { Content } from 'src/model/model';
 import { log } from 'console';
-import exp from 'constants';
 
 describe('MilvuscollectionService', () => {
     
@@ -97,5 +96,13 @@ describe('MilvuscollectionService', () => {
         expect(await col.getVectorDimension()).toEqual(MilvusCollection.DIM_384);
         await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_384)).resolves.toBeUndefined();
         await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_768)).rejects.toThrow(/vector dimension/);
+    });
+
+    it('persists useful comments on the collection and every field', async () => {
+        expect(await col.getDescription()).toContain(col.name);
+        const comments = await col.getFieldDescriptions();
+        expect(comments[MilvusCollection.SHA256]).toMatch(/SHA-256.*deduplicate/i);
+        expect(comments[MilvusCollection.URL]).toMatch(/Textbase API URL.*retrieve/i);
+        expect(comments[MilvusCollection.EMBEDDING]).toMatch(/same encoder and dimension/i);
     });
 });

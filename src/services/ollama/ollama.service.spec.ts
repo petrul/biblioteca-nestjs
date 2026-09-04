@@ -1,7 +1,7 @@
 
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
-import { NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './ollama.service';
+import { BgeM3OllamaService, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './ollama.service';
 import { TestUtils } from '../../../test/testutils';
 
 // These tests call a shared production Ollama host and load large models. Keep
@@ -17,6 +17,7 @@ describeOllama('OllamaService', () => {
 
     let qwen3: Qwen3EmbeddingOllamaService;
     let nomic: NomicEmbedOllamaService;
+    let bgeM3: BgeM3OllamaService;
 
     beforeEach(async () => {
 
@@ -29,6 +30,7 @@ describeOllama('OllamaService', () => {
                     useValue: conf
                 },
                 OllamaService,
+                BgeM3OllamaService,
                 Qwen3EmbeddingOllamaService,
                 NomicEmbedOllamaService,
             ],
@@ -36,7 +38,14 @@ describeOllama('OllamaService', () => {
 
         qwen3 = moduleRef.get<Qwen3EmbeddingOllamaService>(Qwen3EmbeddingOllamaService);
         nomic = moduleRef.get<NomicEmbedOllamaService>(NomicEmbedOllamaService);
+        bgeM3 = moduleRef.get<BgeM3OllamaService>(BgeM3OllamaService);
     });
+
+    it('bge-m3 produces 1024-dim multilingual vectors', async () => {
+        const vects = await bgeM3.encode(['foaie verde', '自由与责任']);
+        expect(vects.length).toEqual(2);
+        vects.forEach(it => expect(it.length).toEqual(1024));
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('qwen3-embedding produces 2560-dim vectors', async () => {
         expect(conf.ollamaServer).toBeTruthy();

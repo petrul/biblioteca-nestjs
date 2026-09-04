@@ -19,6 +19,8 @@ function requiredInteger(name: string): number {
 
 export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_SERVERS'),
+    kafkaTopic: required('KAFKA_TOPIC'),
+    kafkaGroupId: required('KAFKA_GROUP_ID'),
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
     miniMilvus: required('MINI_MILVUS'),
@@ -27,6 +29,8 @@ export default (): VectorizerConfiguration => ({
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
     milvus_collection_tb_qwen3_embedding_4b_paras: required('MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B'),
     milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
+    milvus_collection_tb_bge_m3_paras: required('MLVCOL_TB_PARAS_BGE_M3'),
+    milvus_collection_tb_bge_m3_paras_dim: MilvusCollection.DIM_1024,
     milvus_collection_textbase_sts_all_minilm_l6_v2_paras: required('MLVCOL_TEXTBASE_PARAS_STS_ALL_MINILM_L6_V2'),
     milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim: MilvusCollection.DIM_384,
     tb_getParas_pageSize: requiredInteger('TB_GETPARAS_PAGE_SIZE'),
@@ -43,17 +47,24 @@ export interface VectorizerConfiguration {
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: number;
 
     /**
-     * collection name for vectorizing textbase paragraphs using Qwen3-Embedding-4B (via Ollama) -
-     * the default PROVIDER_EMBEDDER now, replacing the sentence-transformers one above.
+     * collection name for vectorizing textbase paragraphs using Qwen3-Embedding-4B (via Ollama).
+     * Retained for explicit use, but BGE-M3 is the default PROVIDER_EMBEDDER.
      * i.e. tb_paras_qwen3_embedding_4b
      */
     milvus_collection_tb_qwen3_embedding_4b_paras: string;
     milvus_collection_tb_qwen3_embedding_4b_paras_dim: number;
 
     /**
+     * Paragraph vectors produced by the multilingual bge-m3 model through
+     * Ollama. This is the default collection/provider.
+     */
+    milvus_collection_tb_bge_m3_paras: string;
+    milvus_collection_tb_bge_m3_paras_dim: number;
+
+    /**
      * collection name for vectorizing textbase paragraphs using STS's
-     * all-MiniLM-L6-v2 model - the default PROVIDER_EMBEDDER for now (see
-     * AllMiniLmL6V2_StsService), replacing Qwen3-Embedding-4B above.
+     * all-MiniLM-L6-v2 model. Retained as an explicitly injectable embedder;
+     * BGE-M3 is the default PROVIDER_EMBEDDER.
      * i.e. textbase_paras_sts_all_minilm_l6_v2
      */
     milvus_collection_textbase_sts_all_minilm_l6_v2_paras: string;
@@ -62,10 +73,14 @@ export interface VectorizerConfiguration {
     //the address of kafka
     kafkaServers: string;
 
+    // Topic carrying newly imported Textbase works and this consumer's group.
+    kafkaTopic: string;
+    kafkaGroupId: string;
+
     // this is the address of the STS server, i.e. mini.local:xxx
     sentenceTransformersServer: string;
 
-    // the Ollama server backing Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
+    // the Ollama server backing BGE-M3, Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
     // one fixed instance, unlike sentenceTransformersServer/miniMilvus which vary per environment.
     ollamaServer: string;
 
@@ -90,6 +105,14 @@ export class AppConfService implements VectorizerConfiguration {
     
     get kafkaServers(): string {
         return this.conf.get<string>('kafkaServers');
+    }
+
+    get kafkaTopic(): string {
+        return this.conf.get<string>('kafkaTopic');
+    }
+
+    get kafkaGroupId(): string {
+        return this.conf.get<string>('kafkaGroupId');
     }
 
     get sentenceTransformersServer(): string {
@@ -126,6 +149,14 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_qwen3_embedding_4b_paras_dim(): number {
         return this.conf.get<number>('milvus_collection_tb_qwen3_embedding_4b_paras_dim');
+    }
+
+    get milvus_collection_tb_bge_m3_paras(): string {
+        return this.conf.get<string>('milvus_collection_tb_bge_m3_paras');
+    }
+
+    get milvus_collection_tb_bge_m3_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_tb_bge_m3_paras_dim');
     }
 
     get milvus_collection_textbase_sts_all_minilm_l6_v2_paras(): string {

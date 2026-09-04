@@ -46,8 +46,8 @@ export interface OllamaEncoder {
  * mirrors AllMpnetBaseV2_StsService's role for the sentence-transformers
  * server, but generic over the model name instead of hardcoded, since
  * Ollama has no fixed model catalog the way the STS server does. Concrete
- * subclasses just pin a model name (see Qwen3EmbeddingOllamaService,
- * NomicEmbedOllamaService below).
+ * subclasses just pin a model name (see BgeM3OllamaService and the other
+ * concrete adapters below).
  */
 export abstract class OllamaContentEmbedderBase implements OllamaEncoder, ContentEmbedder {
 
@@ -77,6 +77,22 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
             content[i].embedding = emb;
         });
         return content;
+    }
+}
+
+/** Multilingual BGE-M3 embeddings served by Ollama (1024 dimensions). */
+@Injectable()
+export class BgeM3OllamaService extends OllamaContentEmbedderBase {
+    static readonly modelName = 'bge-m3';
+
+    readonly supportedLanguages: string[] | 'all' = 'all';
+
+    constructor(ollama: OllamaService) {
+        super(ollama);
+    }
+
+    protected get modelName(): string {
+        return BgeM3OllamaService.modelName;
     }
 }
 

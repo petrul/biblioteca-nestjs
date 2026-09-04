@@ -1,9 +1,10 @@
-import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { KafkaService } from './kafka.service';
 import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
 import { TextbaseClient } from '../textbase_client.service';
 import { Util } from 'src/util';
+import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 
 @Injectable()
 export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit {
@@ -14,7 +15,8 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
 
   constructor(protected ks: KafkaService,
     protected tbc: TextbaseClient, 
-    protected vectorizer: VectorizerService) { }
+    protected vectorizer: VectorizerService,
+    @Inject(PROVIDER_CONF) protected conf: VectorizerConfiguration) { }
 
   async onModuleInit() {
     await this.initKafkaListener();
@@ -22,7 +24,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
 
   async initKafkaListener() {
     this.consumer = this.ks.kafka.consumer({
-      groupId: 'textbase-vectorizer', 
+      groupId: this.conf.kafkaGroupId,
       /**
        * The timeout used to detect client failures when using Kafka’s group management facility. 
        * The client sends periodic heartbeats to indicate its liveness to the broker. 
@@ -34,44 +36,43 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
-      topic: 'textbase_newOpusImportedTopic',
+      topic: this.conf.kafkaTopic,
       fromBeginning: true,
     });
     await this.consumer.run({
-      eachMessage: (async ({ topic, partition, message, heartbeat, pause }) => {
-        try {
-          await Util.delay(2 * 1000); // for some reason, on new import the opus is not yet ready
+      eachMessage: (async ({ message, heartbeat }) => {
+        // Do not let one transient Textbase/Ollama/Milvus outage terminate the
+        // Kafka consumer. Remaining inside eachMessage also prevents KafkaJS
+        // from committing the offset until the work has really succeeded.
+        for (;;) {
+          try {
+            await Util.delay(2 * 1000); // for some reason, on new import the opus is not yet ready
 
-          heartbeat();
+            await heartbeat();
 
-          const asJson = message.value.toString();
-          var obj = JSON.parse(message.value.toString())
-          if (obj.path) {
-            // some older kafka messages have the id already obsolete.
-            // so get the div again just to make sure.
-            obj = await this.tbc.getElemByPath(obj.path);
+            const asJson = message.value.toString();
+            var obj = JSON.parse(asJson);
+            if (obj.path) {
+              // some older kafka messages have the id already obsolete.
+              // so get the div again just to make sure.
+              obj = await this.tbc.getElemByPath(obj.path);
+            }
+            await heartbeat();
+
+            this.log.log(obj);
+            const opId = obj.id;
+            this.log.log(`starting vectorizing for ${obj.id}`, asJson);
+            await this.vectorizer.vectorize(opId, () => {
+              this.log.debug('kafka heartbeat');
+              return heartbeat();
+            });
+            this.log.log(`done vectorizing for ${obj.id}`, asJson);
+            return;
+          } catch(err: any) {
+            this.log.error('failed to vectorize; retaining the Kafka offset and retrying in 10 seconds', err);
+            await Util.delay(10 * 1000);
+            await heartbeat();
           }
-          heartbeat();
-          
-          this.log.log(obj);
-          const opId = obj.id;
-          this.log.log(`starting vectorizing for ${obj.id}`, asJson);
-          await this.vectorizer.vectorize(opId, () => { 
-            this.log.debug('kafka heartbeat');
-            return heartbeat(); }
-          );
-          this.log.log(`done vectorizing for ${obj.id}`, asJson);
-        } catch(err: any) {
-          // re-throw instead of swallowing: an unhandled exception is what
-          // keeps kafkajs from committing this message's offset, so it gets
-          // redelivered/retried instead of being silently dropped forever.
-          // This matters most for embedder/Milvus failures - RetryingContentEmbedder
-          // and the MilvusCollection startup check already wait-and-retry
-          // *reachability*, but a failure mid-vectorize() (e.g. Milvus going
-          // down partway through, or any other error) still needs the
-          // message put back rather than treated as done.
-          this.log.error('failed to vectorize - message will be retried, not marked as consumed', err);
-          throw err;
         }
       }),
     });

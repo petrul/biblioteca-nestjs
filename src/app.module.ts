@@ -11,7 +11,7 @@ import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
 import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
-import { NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
+import { BgeM3OllamaService, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
 import { RetryingContentEmbedder } from './services/retrying_content_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
 import { log } from 'console';
@@ -46,14 +46,12 @@ import { log } from 'console';
     {
       provide: MilvusCollection,
       useFactory: async (conf: VectorizerConfiguration, logger: LoggerService) => {
-        // all-MiniLM-L6-v2 (via STS) replaced Qwen3-Embedding-4B as the
-        // default embedder below, so this now targets its own
-        // (differently-dimensioned) collection - see
-        // VectorizerConfiguration's doc comments.
-        const name = conf.milvus_collection_textbase_sts_all_minilm_l6_v2_paras;
-        const vectorDim = conf.milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim;
-        const description = `STS (sentence-transformers) encoder "${AllMiniLmL6V2_StsService.modelName}" `
-          + `at ${conf.sentenceTransformersServer}, dim=${vectorDim}`;
+        const name = conf.milvus_collection_tb_bge_m3_paras;
+        const vectorDim = conf.milvus_collection_tb_bge_m3_paras_dim;
+        const description = `Textbase paragraph embeddings created by Ollama model "${BgeM3OllamaService.modelName}" `
+          + `at ${conf.ollamaServer}; dim=${vectorDim}. Use for multilingual semantic search and nearest-neighbor `
+          + `retrieval of Textbase paragraphs. Encode every query with the same model, then search the embedding `
+          + `field using the collection's IVF_SQ8 index and L2 metric; resolve matches through the url field.`;
         const col = new MilvusCollection(name, conf, vectorDim, description);
         // checked at startup (this factory runs during app bootstrap, before
         // anything depending on MilvusCollection - including the Kafka
@@ -74,19 +72,17 @@ import { log } from 'console';
     AllMpnetBaseV2_StsService,
     AllMiniLmL6V2_StsService,
     OllamaService,
+    BgeM3OllamaService,
     Qwen3EmbeddingOllamaService,
     NomicEmbedOllamaService,
     {
-      // all-MiniLM-L6-v2 (via STS) is the default for now, replacing
-      // Qwen3-Embedding-4B (still registered above, still usable under its
-      // own name) - wrapped in RetryingContentEmbedder so a
-      // temporarily-unreachable STS server makes vectorize() wait and
-      // retry instead of failing one page at a time for nothing.
+      // BGE-M3 is multilingual and comparatively compact. The other
+      // concrete ContentEmbedder implementations remain injectable by name.
       provide: PROVIDER_EMBEDDER,
-      useFactory: (sts: AllMiniLmL6V2_StsService, logger: LoggerService) => {
-        return new RetryingContentEmbedder(sts, logger);
+      useFactory: (bgeM3: BgeM3OllamaService, logger: LoggerService) => {
+        return new RetryingContentEmbedder(bgeM3, logger);
       },
-      inject: [AllMiniLmL6V2_StsService, PROVIDER_LOGGER]
+      inject: [BgeM3OllamaService, PROVIDER_LOGGER]
     },
     MilvusColVectorStore,
     {

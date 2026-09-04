@@ -1,4 +1,5 @@
 import {
+  BgeM3OllamaService,
   NomicEmbedOllamaService,
   OllamaService,
   Qwen3EmbeddingOllamaService,
@@ -46,12 +47,16 @@ describe('OllamaService unit behavior', () => {
     const ollama = { encode: jest.fn().mockResolvedValue([[1]]) } as unknown as OllamaService;
     const qwen = new Qwen3EmbeddingOllamaService(ollama);
     const nomic = new NomicEmbedOllamaService(ollama);
+    const bgeM3 = new BgeM3OllamaService(ollama);
 
+    await bgeM3.encode(['multilingual input']);
     await qwen.encode(['qwen input']);
     await nomic.encode(['nomic input']);
 
-    expect(ollama.encode).toHaveBeenNthCalledWith(1, 'qwen3-embedding:4b', ['qwen input']);
-    expect(ollama.encode).toHaveBeenNthCalledWith(2, 'nomic-embed-text:v1.5', ['nomic input']);
+    expect(ollama.encode).toHaveBeenNthCalledWith(1, 'bge-m3', ['multilingual input']);
+    expect(ollama.encode).toHaveBeenNthCalledWith(2, 'qwen3-embedding:4b', ['qwen input']);
+    expect(ollama.encode).toHaveBeenNthCalledWith(3, 'nomic-embed-text:v1.5', ['nomic input']);
+    expect(bgeM3.supportedLanguages).toBe('all');
   });
 
   it('adds returned embeddings to content in place', async () => {
