@@ -1,5 +1,6 @@
 /* eslint-disable */
 /* tslint:disable */
+// @ts-nocheck
 /*
  * ---------------------------------------------------------------
  * ## THIS FILE WAS GENERATED VIA SWAGGER-TYPESCRIPT-API        ##
@@ -30,8 +31,6 @@ export interface JsonSchema {
   $schema?: string;
 }
 
-export type Links = Record<string, Link>;
-
 export interface RepresentationModelObject {
   _links?: Links;
 }
@@ -44,36 +43,34 @@ export interface Author {
   firstName?: string;
   displayName?: string;
   avatar?: {
-    binaryStream?: object;
+    binaryStream?: any;
   };
   visualName?: string;
   anonymous?: boolean;
 }
 
-export interface EntityModelTeiDiv {
-  /** @format int64 */
-  id?: number;
+export interface EntityModelTeiElem {
   xpath?: string;
   lang?:
-    | 'BG'
-    | 'BR'
-    | 'CA'
-    | 'DA'
-    | 'DE'
-    | 'EN'
-    | 'ES'
-    | 'FI'
-    | 'FR'
-    | 'GR'
-    | 'HU'
-    | 'IT'
-    | 'LA'
-    | 'NL'
-    | 'NO'
-    | 'PT'
-    | 'RO'
-    | 'RU'
-    | 'ZH';
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
   name?: string;
   /** @format int32 */
   nth?: number;
@@ -83,22 +80,14 @@ export interface EntityModelTeiDiv {
    */
   urlFragment?: string;
   /** @format byte */
-  txtSha25?: string;
+  txtSha256?: Blob;
   /** @format int32 */
   size?: number;
   /** @format int32 */
   wordSize?: number;
-  /** @format int32 */
-  depth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
   leaf?: boolean;
-  url?: string;
-  completePath?: string;
   author?: Author;
+  completePath?: string;
   _links?: Links;
 }
 
@@ -113,85 +102,12 @@ export interface PageMetadata {
   number?: number;
 }
 
-export interface PagedModelEntityModelTeiDiv {
+export interface PagedModelEntityModelTeiElem {
   _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
+    teiElems?: EntityModelTeiElem[];
   };
   _links?: Links;
   page?: PageMetadata;
-}
-
-export interface TeiDiv {
-  /** @format int64 */
-  id?: number;
-  xpath?: string;
-  lang?:
-    | 'BG'
-    | 'BR'
-    | 'CA'
-    | 'DA'
-    | 'DE'
-    | 'EN'
-    | 'ES'
-    | 'FI'
-    | 'FR'
-    | 'GR'
-    | 'HU'
-    | 'IT'
-    | 'LA'
-    | 'NL'
-    | 'NO'
-    | 'PT'
-    | 'RO'
-    | 'RU'
-    | 'ZH';
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha25?: string;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  /** @format int32 */
-  depth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
-  leaf?: boolean;
-  url?: string;
-  completePath?: string;
-  author?: Author;
-}
-
-export interface CollectionModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
-}
-
-export interface TeiFile {
-  /** @format int64 */
-  id?: number;
-  filename?: string;
-  /**
-   * @minLength 0
-   * @maxLength 1000
-   */
-  title?: string;
-  authors?: Author[];
-  /** @format date-time */
-  timestamp?: string;
-  author?: Author;
 }
 
 export interface EntityModelAuthor {
@@ -202,7 +118,7 @@ export interface EntityModelAuthor {
   firstName?: string;
   displayName?: string;
   avatar?: {
-    binaryStream?: object;
+    binaryStream?: any;
   };
   visualName?: string;
   anonymous?: boolean;
@@ -224,28 +140,30 @@ export interface CollectionModelEntityModelAuthor {
   _links?: Links;
 }
 
-export interface EntityModelTeiElem {
+export interface EntityModelTeiDiv {
+  /** @format int64 */
+  id?: number;
   xpath?: string;
   lang?:
-    | 'BG'
-    | 'BR'
-    | 'CA'
-    | 'DA'
-    | 'DE'
-    | 'EN'
-    | 'ES'
-    | 'FI'
-    | 'FR'
-    | 'GR'
-    | 'HU'
-    | 'IT'
-    | 'LA'
-    | 'NL'
-    | 'NO'
-    | 'PT'
-    | 'RO'
-    | 'RU'
-    | 'ZH';
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
   name?: string;
   /** @format int32 */
   nth?: number;
@@ -255,26 +173,158 @@ export interface EntityModelTeiElem {
    */
   urlFragment?: string;
   /** @format byte */
-  txtSha25?: string;
+  txtSha256?: Blob;
   /** @format int32 */
   size?: number;
   /** @format int32 */
   wordSize?: number;
-  /** @format int32 */
-  depth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
   leaf?: boolean;
-  url?: string;
-  completePath?: string;
   author?: Author;
+  completePath?: string;
   _links?: Links;
 }
 
-export interface PagedModelEntityModelTeiElem {
+export interface TeiDiv {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
+  leaf?: boolean;
+  author?: Author;
+  completePath?: string;
+}
+
+export interface PagedModelEntityModelTeiDiv {
   _embedded?: {
-    teiElems?: EntityModelTeiElem[];
+    teiDivs?: EntityModelTeiDiv[];
   };
   _links?: Links;
   page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+}
+
+export interface TeiFile {
+  /** @format int64 */
+  id?: number;
+  filename?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1000
+   */
+  title?: string;
+  authors?: Author[];
+  language?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  repoName?: string;
+  /** @format date-time */
+  timestamp?: string;
+  author?: Author;
+}
+
+export interface RegisterRequest {
+  username?: string;
+  password?: string;
+}
+
+export interface CreateCollectionRequest {
+  name?: string;
+}
+
+export interface DivCollectionDto {
+  /** @format int64 */
+  id?: number;
+  name?: string;
+  /** @format date-time */
+  createdAt?: string;
+  items?: DivCollectionItemDto[];
+  favorites?: boolean;
+}
+
+export interface DivCollectionItemDto {
+  /** @format int64 */
+  id?: number;
+  kind?: string;
+  divPath?: string;
+  divHead?: string;
+  fragmentStart?: string;
+  fragmentEnd?: string;
+  fragmentText?: string[];
+  /** @format date-time */
+  addedAt?: string;
+}
+
+export interface AddItemRequest {
+  type?: string;
+  path?: string;
+  start?: string;
+  end?: string;
 }
 
 export interface HitDto {
@@ -283,7 +333,27 @@ export interface HitDto {
   /** @format float */
   score?: number;
   content?: string;
-  data?: object;
+  data?: any;
+}
+
+export interface Hits {
+  data?: HitsDto;
+  page?: PagingDto;
+}
+
+export interface HitsDto {
+  hits?: HitDto[];
+}
+
+export interface PagingDto {
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  totalElements?: number;
+  /** @format int32 */
+  totalPages?: number;
+  /** @format int32 */
+  number?: number;
 }
 
 export interface TeiElemDto {
@@ -291,30 +361,23 @@ export interface TeiElemDto {
   id?: number;
   parent?: TeiElemDto;
   name?: string;
-  xpath?: string;
   path?: string;
+  xpath?: string;
   urlFragment?: string;
   url?: string;
   text?: string;
   text_sha256?: string;
+  language?: string;
   /** @format int32 */
   size?: number;
   /** @format int32 */
   wordSize?: number;
-  /**
-   * ISO 639-1 code (e.g. "en", "ro") of the parent TeiFile's detected language - manually
-   * added here since this client is normally regenerated (`npm run generate:api`-equivalent)
-   * against a live textbase-server; regenerate for real once one's reachable to confirm this
-   * matches the server's actual OpenAPI schema.
-   */
-  language?: string;
 }
 
 export interface AuthorDto {
   strId?: string;
   lastName?: string;
   firstName?: string;
-  originalNameInTeiFile?: string;
   displayName?: string;
   description?: string;
   opera?: OpusDto[];
@@ -326,12 +389,13 @@ export interface OpusDto {
   id?: number;
   parent?: TeiElemDto;
   name?: string;
-  xpath?: string;
   path?: string;
+  xpath?: string;
   urlFragment?: string;
   url?: string;
   text?: string;
   text_sha256?: string;
+  language?: string;
   /** @format int32 */
   size?: number;
   /** @format int32 */
@@ -339,7 +403,7 @@ export interface OpusDto {
   head?: string;
   /** @format int32 */
   depth?: number;
-  author?: AuthorDto;
+  author?: any;
   leaf?: boolean;
   opus?: boolean;
   authors?: AuthorDto[];
@@ -350,12 +414,13 @@ export interface TeiDivDto {
   id?: number;
   parent?: TeiElemDto;
   name?: string;
-  xpath?: string;
   path?: string;
+  xpath?: string;
   urlFragment?: string;
   url?: string;
   text?: string;
   text_sha256?: string;
+  language?: string;
   /** @format int32 */
   size?: number;
   /** @format int32 */
@@ -369,6 +434,32 @@ export interface TeiDivDto {
   opus?: boolean;
 }
 
+export interface Embedder {
+  model?: string;
+  /** @format int32 */
+  dimension?: number;
+  description?: string;
+  ollamaModel?: string;
+  host?: string;
+  /** @format int32 */
+  port?: number;
+}
+
+export interface Kafka {
+  newOpusImportedTopic?: string;
+  opusReimportedTopic?: string;
+}
+
+export interface Milvus {
+  collection?: string;
+}
+
+export interface SharedConfigDto {
+  kafka?: Kafka;
+  milvus?: Milvus;
+  embedder?: Embedder;
+}
+
 export interface Link {
   href?: string;
   hreflang?: string;
@@ -380,10 +471,12 @@ export interface Link {
   templated?: boolean;
 }
 
-export type QueryParamsType = Record<string | number, any>;
-export type ResponseFormat = keyof Omit<Body, 'body' | 'bodyUsed'>;
+export type Links = Record<string, Link>;
 
-export interface FullRequestParams extends Omit<RequestInit, 'body'> {
+export type QueryParamsType = Record<string | number, any>;
+export type ResponseFormat = keyof Omit<Body, "body" | "bodyUsed">;
+
+export interface FullRequestParams extends Omit<RequestInit, "body"> {
   /** set parameter to `true` for call `securityWorker` for this request */
   secure?: boolean;
   /** request path */
@@ -402,16 +495,22 @@ export interface FullRequestParams extends Omit<RequestInit, 'body'> {
   cancelToken?: CancelToken;
 }
 
-export type RequestParams = Omit<FullRequestParams, 'body' | 'method' | 'query' | 'path'>;
+export type RequestParams = Omit<
+  FullRequestParams,
+  "body" | "method" | "query" | "path"
+>;
 
 export interface ApiConfig<SecurityDataType = unknown> {
   baseUrl?: string;
-  baseApiParams?: Omit<RequestParams, 'baseUrl' | 'cancelToken' | 'signal'>;
-  securityWorker?: (securityData: SecurityDataType | null) => Promise<RequestParams | void> | RequestParams | void;
+  baseApiParams?: Omit<RequestParams, "baseUrl" | "cancelToken" | "signal">;
+  securityWorker?: (
+    securityData: SecurityDataType | null,
+  ) => Promise<RequestParams | void> | RequestParams | void;
   customFetch?: typeof fetch;
 }
 
-export interface HttpResponse<D extends unknown, E extends unknown = unknown> extends Response {
+export interface HttpResponse<D extends unknown, E extends unknown = unknown>
+  extends Response {
   data: D;
   error: E;
 }
@@ -419,24 +518,26 @@ export interface HttpResponse<D extends unknown, E extends unknown = unknown> ex
 type CancelToken = Symbol | string | number;
 
 export enum ContentType {
-  Json = 'application/json',
-  FormData = 'multipart/form-data',
-  UrlEncoded = 'application/x-www-form-urlencoded',
-  Text = 'text/plain',
+  Json = "application/json",
+  JsonApi = "application/vnd.api+json",
+  FormData = "multipart/form-data",
+  UrlEncoded = "application/x-www-form-urlencoded",
+  Text = "text/plain",
 }
 
 export class HttpClient<SecurityDataType = unknown> {
-  public baseUrl: string = '/';
+  public baseUrl: string = "/";
   private securityData: SecurityDataType | null = null;
-  private securityWorker?: ApiConfig<SecurityDataType>['securityWorker'];
+  private securityWorker?: ApiConfig<SecurityDataType>["securityWorker"];
   private abortControllers = new Map<CancelToken, AbortController>();
-  private customFetch = (...fetchParams: Parameters<typeof fetch>) => fetch(...fetchParams);
+  private customFetch = (...fetchParams: Parameters<typeof fetch>) =>
+    fetch(...fetchParams);
 
   private baseApiParams: RequestParams = {
-    credentials: 'same-origin',
+    credentials: "same-origin",
     headers: {},
-    redirect: 'follow',
-    referrerPolicy: 'no-referrer',
+    redirect: "follow",
+    referrerPolicy: "no-referrer",
   };
 
   constructor(apiConfig: ApiConfig<SecurityDataType> = {}) {
@@ -449,7 +550,7 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected encodeQueryParam(key: string, value: any) {
     const encodedKey = encodeURIComponent(key);
-    return `${encodedKey}=${encodeURIComponent(typeof value === 'number' ? value : `${value}`)}`;
+    return `${encodedKey}=${encodeURIComponent(typeof value === "number" ? value : `${value}`)}`;
   }
 
   protected addQueryParam(query: QueryParamsType, key: string) {
@@ -458,43 +559,66 @@ export class HttpClient<SecurityDataType = unknown> {
 
   protected addArrayQueryParam(query: QueryParamsType, key: string) {
     const value = query[key];
-    return value.map((v: any) => this.encodeQueryParam(key, v)).join('&');
+    return value.map((v: any) => this.encodeQueryParam(key, v)).join("&");
   }
 
   protected toQueryString(rawQuery?: QueryParamsType): string {
     const query = rawQuery || {};
-    const keys = Object.keys(query).filter((key) => 'undefined' !== typeof query[key]);
+    const keys = Object.keys(query).filter(
+      (key) => "undefined" !== typeof query[key],
+    );
     return keys
-      .map((key) => (Array.isArray(query[key]) ? this.addArrayQueryParam(query, key) : this.addQueryParam(query, key)))
-      .join('&');
+      .map((key) =>
+        Array.isArray(query[key])
+          ? this.addArrayQueryParam(query, key)
+          : this.addQueryParam(query, key),
+      )
+      .join("&");
   }
 
   protected addQueryParams(rawQuery?: QueryParamsType): string {
     const queryString = this.toQueryString(rawQuery);
-    return queryString ? `?${queryString}` : '';
+    return queryString ? `?${queryString}` : "";
   }
 
   private contentFormatters: Record<ContentType, (input: any) => any> = {
     [ContentType.Json]: (input: any) =>
-      input !== null && (typeof input === 'object' || typeof input === 'string') ? JSON.stringify(input) : input,
-    [ContentType.Text]: (input: any) => (input !== null && typeof input !== 'string' ? JSON.stringify(input) : input),
-    [ContentType.FormData]: (input: any) =>
-      Object.keys(input || {}).reduce((formData, key) => {
+      input !== null && (typeof input === "object" || typeof input === "string")
+        ? JSON.stringify(input)
+        : input,
+    [ContentType.JsonApi]: (input: any) =>
+      input !== null && (typeof input === "object" || typeof input === "string")
+        ? JSON.stringify(input)
+        : input,
+    [ContentType.Text]: (input: any) =>
+      input !== null && typeof input !== "string"
+        ? JSON.stringify(input)
+        : input,
+    [ContentType.FormData]: (input: any) => {
+      if (input instanceof FormData) {
+        return input;
+      }
+
+      return Object.keys(input || {}).reduce((formData, key) => {
         const property = input[key];
         formData.append(
           key,
           property instanceof Blob
             ? property
-            : typeof property === 'object' && property !== null
-            ? JSON.stringify(property)
-            : `${property}`,
+            : typeof property === "object" && property !== null
+              ? JSON.stringify(property)
+              : `${property}`,
         );
         return formData;
-      }, new FormData()),
+      }, new FormData());
+    },
     [ContentType.UrlEncoded]: (input: any) => this.toQueryString(input),
   };
 
-  protected mergeRequestParams(params1: RequestParams, params2?: RequestParams): RequestParams {
+  protected mergeRequestParams(
+    params1: RequestParams,
+    params2?: RequestParams,
+  ): RequestParams {
     return {
       ...this.baseApiParams,
       ...params1,
@@ -507,7 +631,9 @@ export class HttpClient<SecurityDataType = unknown> {
     };
   }
 
-  protected createAbortSignal = (cancelToken: CancelToken): AbortSignal | undefined => {
+  protected createAbortSignal = (
+    cancelToken: CancelToken,
+  ): AbortSignal | undefined => {
     if (this.abortControllers.has(cancelToken)) {
       const abortController = this.abortControllers.get(cancelToken);
       if (abortController) {
@@ -542,7 +668,7 @@ export class HttpClient<SecurityDataType = unknown> {
     ...params
   }: FullRequestParams): Promise<HttpResponse<T, E>> => {
     const secureParams =
-      ((typeof secure === 'boolean' ? secure : this.baseApiParams.secure) &&
+      ((typeof secure === "boolean" ? secure : this.baseApiParams.secure) &&
         this.securityWorker &&
         (await this.securityWorker(this.securityData))) ||
       {};
@@ -551,22 +677,34 @@ export class HttpClient<SecurityDataType = unknown> {
     const payloadFormatter = this.contentFormatters[type || ContentType.Json];
     const responseFormat = format || requestParams.format;
 
-    return this.customFetch(`${baseUrl || this.baseUrl || ''}${path}${queryString ? `?${queryString}` : ''}`, {
-      ...requestParams,
-      headers: {
-        ...(requestParams.headers || {}),
-        ...(type && type !== ContentType.FormData ? { 'Content-Type': type } : {}),
+    return this.customFetch(
+      `${baseUrl || this.baseUrl || ""}${path}${queryString ? `?${queryString}` : ""}`,
+      {
+        ...requestParams,
+        headers: {
+          ...(requestParams.headers || {}),
+          ...(type && type !== ContentType.FormData
+            ? { "Content-Type": type }
+            : {}),
+        },
+        signal:
+          (cancelToken
+            ? this.createAbortSignal(cancelToken)
+            : requestParams.signal) || null,
+        body:
+          typeof body === "undefined" || body === null
+            ? null
+            : payloadFormatter(body),
       },
-      signal: (cancelToken ? this.createAbortSignal(cancelToken) : requestParams.signal) || null,
-      body: typeof body === 'undefined' || body === null ? null : payloadFormatter(body),
-    }).then(async (response) => {
+    ).then(async (response) => {
       const r = response as HttpResponse<T, E>;
       r.data = null as unknown as T;
       r.error = null as unknown as E;
 
+      const responseToParse = responseFormat ? response.clone() : response;
       const data = !responseFormat
         ? r
-        : await response[responseFormat]()
+        : await responseToParse[responseFormat]()
             .then((data) => {
               if (r.ok) {
                 r.data = data;
@@ -594,16 +732,18 @@ export class HttpClient<SecurityDataType = unknown> {
  * @title No title
  * @baseUrl /
  */
-export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDataType> {
+export class Api<
+  SecurityDataType extends unknown,
+> extends HttpClient<SecurityDataType> {
   api = {
     /**
      * @description get-author
      *
      * @tags author-entity-controller
-     * @name GetCollectionResourceAuthorGet1
+     * @name GetCollectionResourceAuthorGet
      * @request GET:/api/drest/authors
      */
-    getCollectionResourceAuthorGet1: (
+    getCollectionResourceAuthorGet: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -624,9 +764,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelAuthor, any>({
         path: `/api/drest/authors`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -659,9 +799,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByFirstNameContainingIgnoreCase`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -694,9 +834,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByLastNameContainingIgnoreCase`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -729,9 +869,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByLastNameIgnoreCase`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -750,9 +890,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<CollectionModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByOriginalNameInTeiFile`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -771,9 +911,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<CollectionModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByStrId`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -806,9 +946,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/findByStrIdContainingIgnoreCase`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -827,9 +967,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<EntityModelAuthor, void>({
         path: `/api/drest/authors/search/getByOriginalNameInTeiFile`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -848,9 +988,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<EntityModelAuthor, void>({
         path: `/api/drest/authors/search/getByStrId`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -870,9 +1010,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<CollectionModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/getTeiFiles`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -886,8 +1026,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getItemResourceAuthorGet: (id: string, params: RequestParams = {}) =>
       this.request<EntityModelAuthor, void>({
         path: `/api/drest/authors/${id}`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -895,14 +1035,14 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags profile-controller
-     * @name ListAllFormsOfMetadata1
+     * @name ListAllFormsOfMetadata
      * @request GET:/api/drest/profile
      */
-    listAllFormsOfMetadata1: (params: RequestParams = {}) =>
+    listAllFormsOfMetadata: (params: RequestParams = {}) =>
       this.request<RepresentationModelObject, any>({
         path: `/api/drest/profile`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -910,14 +1050,14 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor111
+     * @name Descriptor
      * @request GET:/api/drest/profile/authors
      */
-    descriptor111: (params: RequestParams = {}) =>
+    descriptor: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/authors`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -925,14 +1065,14 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor112
+     * @name Descriptor1
      * @request GET:/api/drest/profile/teiDivs
      */
-    descriptor112: (params: RequestParams = {}) =>
+    descriptor1: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiDivs`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -940,14 +1080,14 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor113
+     * @name Descriptor2
      * @request GET:/api/drest/profile/teiElems
      */
-    descriptor113: (params: RequestParams = {}) =>
+    descriptor2: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiElems`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -955,10 +1095,10 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * @description get-teidiv
      *
      * @tags tei-div-entity-controller
-     * @name GetCollectionResourceTeidivGet1
+     * @name GetCollectionResourceTeidivGet
      * @request GET:/api/drest/teiDivs
      */
-    getCollectionResourceTeidivGet1: (
+    getCollectionResourceTeidivGet: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -979,9 +1119,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiDiv, any>({
         path: `/api/drest/teiDivs`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -990,19 +1130,13 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet
-     * @request GET:/api/drest/teiDivs/search/findByHead
+     * @request GET:/api/drest/teiDivs/search/findAllOpera
      */
-    executeSearchTeidivGet: (
-      query?: {
-        head?: string;
-      },
-      params: RequestParams = {},
-    ) =>
+    executeSearchTeidivGet: (params: RequestParams = {}) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/findByHead`,
-        method: 'GET',
-        query: query,
-        format: 'json',
+        path: `/api/drest/teiDivs/search/findAllOpera`,
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1011,9 +1145,30 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet1
-     * @request GET:/api/drest/teiDivs/search/findByHeadContainingIgnoreCase
+     * @request GET:/api/drest/teiDivs/search/findByHead
      */
     executeSearchTeidivGet1: (
+      query?: {
+        head?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findByHead`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet2
+     * @request GET:/api/drest/teiDivs/search/findByHeadContainingIgnoreCase
+     */
+    executeSearchTeidivGet2: (
       query?: {
         excerpt?: string;
         /**
@@ -1035,9 +1190,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findByHeadContainingIgnoreCase`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1045,31 +1200,31 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet2
+     * @name ExecuteSearchTeidivGet3
      * @request GET:/api/drest/teiDivs/search/findByLang
      */
-    executeSearchTeidivGet2: (
+    executeSearchTeidivGet3: (
       query?: {
         lang?:
-          | 'BG'
-          | 'BR'
-          | 'CA'
-          | 'DA'
-          | 'DE'
-          | 'EN'
-          | 'ES'
-          | 'FI'
-          | 'FR'
-          | 'GR'
-          | 'HU'
-          | 'IT'
-          | 'LA'
-          | 'NL'
-          | 'NO'
-          | 'PT'
-          | 'RO'
-          | 'RU'
-          | 'ZH';
+          | "BG"
+          | "BR"
+          | "CA"
+          | "DA"
+          | "DE"
+          | "EN"
+          | "ES"
+          | "FI"
+          | "FR"
+          | "GR"
+          | "HU"
+          | "IT"
+          | "LA"
+          | "NL"
+          | "NO"
+          | "PT"
+          | "RO"
+          | "RU"
+          | "ZH";
         /**
          * Zero-based page index (0..N)
          * @min 0
@@ -1089,30 +1244,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findByLang`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet3
-     * @request GET:/api/drest/teiDivs/search/findByTeiFile
-     */
-    executeSearchTeidivGet3: (
-      query?: {
-        teiFile?: TeiFile;
-      },
-      params: RequestParams = {},
-    ) =>
-      this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/findByTeiFile`,
-        method: 'GET',
-        query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1121,20 +1255,19 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet4
-     * @request GET:/api/drest/teiDivs/search/findByTeiFileAndXpath
+     * @request GET:/api/drest/teiDivs/search/findByTeiFile
      */
     executeSearchTeidivGet4: (
       query?: {
         teiFile?: TeiFile;
-        xpath?: string;
       },
       params: RequestParams = {},
     ) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/findByTeiFileAndXpath`,
-        method: 'GET',
+        path: `/api/drest/teiDivs/search/findByTeiFile`,
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1143,20 +1276,20 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet5
-     * @request GET:/api/drest/teiDivs/search/findByUrlFragmentAndParent
+     * @request GET:/api/drest/teiDivs/search/findByTeiFileAndXpath
      */
     executeSearchTeidivGet5: (
       query?: {
-        urlFragment?: string;
-        parent?: TeiDiv;
+        teiFile?: TeiFile;
+        xpath?: string;
       },
       params: RequestParams = {},
     ) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/findByUrlFragmentAndParent`,
-        method: 'GET',
+        path: `/api/drest/teiDivs/search/findByTeiFileAndXpath`,
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1165,9 +1298,31 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet6
-     * @request GET:/api/drest/teiDivs/search/findOpera
+     * @request GET:/api/drest/teiDivs/search/findByUrlFragmentAndParent
      */
     executeSearchTeidivGet6: (
+      query?: {
+        urlFragment?: string;
+        parent?: TeiDiv;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findByUrlFragmentAndParent`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet7
+     * @request GET:/api/drest/teiDivs/search/findOpera
+     */
+    executeSearchTeidivGet7: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -1188,9 +1343,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findOpera`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1198,31 +1353,31 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet7
+     * @name ExecuteSearchTeidivGet8
      * @request GET:/api/drest/teiDivs/search/findOperaByLang
      */
-    executeSearchTeidivGet7: (
+    executeSearchTeidivGet8: (
       query?: {
         lang?:
-          | 'BG'
-          | 'BR'
-          | 'CA'
-          | 'DA'
-          | 'DE'
-          | 'EN'
-          | 'ES'
-          | 'FI'
-          | 'FR'
-          | 'GR'
-          | 'HU'
-          | 'IT'
-          | 'LA'
-          | 'NL'
-          | 'NO'
-          | 'PT'
-          | 'RO'
-          | 'RU'
-          | 'ZH';
+          | "BG"
+          | "BR"
+          | "CA"
+          | "DA"
+          | "DE"
+          | "EN"
+          | "ES"
+          | "FI"
+          | "FR"
+          | "GR"
+          | "HU"
+          | "IT"
+          | "LA"
+          | "NL"
+          | "NO"
+          | "PT"
+          | "RO"
+          | "RU"
+          | "ZH";
         /**
          * Zero-based page index (0..N)
          * @min 0
@@ -1242,30 +1397,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findOperaByLang`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet8
-     * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
-     */
-    executeSearchTeidivGet8: (
-      query?: {
-        authorStrId?: string;
-      },
-      params: RequestParams = {},
-    ) =>
-      this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/findOperaForAuthorStrId`,
-        method: 'GET',
-        query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1274,20 +1408,19 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet9
-     * @request GET:/api/drest/teiDivs/search/getAuthors
+     * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
      */
     executeSearchTeidivGet9: (
       query?: {
-        /** @format int64 */
-        id?: number;
+        authorStrId?: string;
       },
       params: RequestParams = {},
     ) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/getAuthors`,
-        method: 'GET',
+        path: `/api/drest/teiDivs/search/findOperaForAuthorStrId`,
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1296,20 +1429,20 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet10
-     * @request GET:/api/drest/teiDivs/search/getByTeiFileAndXpath
+     * @request GET:/api/drest/teiDivs/search/getAuthors
      */
     executeSearchTeidivGet10: (
       query?: {
-        teiFile?: TeiFile;
-        xpath?: string;
+        /** @format int64 */
+        id?: number;
       },
       params: RequestParams = {},
     ) =>
-      this.request<EntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/getByTeiFileAndXpath`,
-        method: 'GET',
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/getAuthors`,
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1318,13 +1451,20 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet11
-     * @request GET:/api/drest/teiDivs/search/getNrOfBottomDivs
+     * @request GET:/api/drest/teiDivs/search/getByTeiFileAndXpath
      */
-    executeSearchTeidivGet11: (params: RequestParams = {}) =>
-      this.request<number, void>({
-        path: `/api/drest/teiDivs/search/getNrOfBottomDivs`,
-        method: 'GET',
-        format: 'json',
+    executeSearchTeidivGet11: (
+      query?: {
+        teiFile?: TeiFile;
+        xpath?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/getByTeiFileAndXpath`,
+        method: "GET",
+        query: query,
+        format: "json",
         ...params,
       }),
 
@@ -1333,9 +1473,24 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet12
+     * @request GET:/api/drest/teiDivs/search/getNrOfBottomDivs
+     */
+    executeSearchTeidivGet12: (params: RequestParams = {}) =>
+      this.request<number, void>({
+        path: `/api/drest/teiDivs/search/getNrOfBottomDivs`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet13
      * @request GET:/api/drest/teiDivs/search/getOperaForTeiFileId
      */
-    executeSearchTeidivGet12: (
+    executeSearchTeidivGet13: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -1344,9 +1499,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/getOperaForTeiFileId`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1360,8 +1515,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getItemResourceTeidivGet: (id: string, params: RequestParams = {}) =>
       this.request<EntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/${id}`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1369,10 +1524,10 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
      * @description get-teielem
      *
      * @tags tei-elem-entity-controller
-     * @name GetCollectionResourceTeielemGet1
+     * @name GetCollectionResourceTeielemGet
      * @request GET:/api/drest/teiElems
      */
-    getCollectionResourceTeielemGet1: (
+    getCollectionResourceTeielemGet: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -1393,9 +1548,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<PagedModelEntityModelTeiElem, any>({
         path: `/api/drest/teiElems`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1409,8 +1564,74 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getItemResourceTeielemGet: (id: string, params: RequestParams = {}) =>
       this.request<EntityModelTeiElem, void>({
         path: `/api/drest/teiElems/${id}`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags user-rest-controller
+     * @name Register
+     * @request POST:/api/users/register
+     */
+    register: (data: RegisterRequest, params: RequestParams = {}) =>
+      this.request<Record<string, any>, any>({
+        path: `/api/users/register`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Mine
+     * @request GET:/api/collections/mine
+     */
+    mine: (params: RequestParams = {}) =>
+      this.request<DivCollectionDto[], any>({
+        path: `/api/collections/mine`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Create
+     * @request POST:/api/collections/mine
+     */
+    create: (data: CreateCollectionRequest, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name AddItem
+     * @request POST:/api/collections/mine/{name}/items
+     */
+    addItem: (name: string, data: AddItemRequest, params: RequestParams = {}) =>
+      this.request<DivCollectionItemDto, any>({
+        path: `/api/collections/mine/${name}/items`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
         ...params,
       }),
 
@@ -1438,9 +1659,69 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<HitDto[], any>({
         path: `/api/search/milvus`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags search-rest-controller
+     * @name SearchLucene
+     * @request GET:/api/search/lucene
+     */
+    searchLucene: (
+      query: {
+        /**
+         * @minLength 3
+         * @maxLength 2147483647
+         */
+        q: string;
+        /**
+         * @format int32
+         * @default 10
+         */
+        limit?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<HitDto[], any>({
+        path: `/api/search/lucene`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags search-rest-controller
+     * @name SearchGrep
+     * @request GET:/api/search/grep
+     */
+    searchGrep: (
+      query: {
+        /**
+         * @minLength 3
+         * @maxLength 2147483647
+         */
+        q: string;
+        /**
+         * @format int32
+         * @default 10
+         */
+        limit?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<HitDto[], any>({
+        path: `/api/search/grep`,
+        method: "GET",
+        query: query,
+        format: "json",
         ...params,
       }),
 
@@ -1468,9 +1749,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<HitDto[], any>({
         path: `/api/search/divHeads`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1498,20 +1779,43 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<HitDto[], any>({
         path: `/api/search/authors`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
     /**
-     * No description
+     * @description gets
+     *
+     * @tags search-rest-controller
+     * @name Ann
+     * @request GET:/api/search/ann
+     */
+    ann: (
+      query?: {
+        path?: string;
+        /** @format int64 */
+        divid?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Hits, any>({
+        path: `/api/search/ann`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description retrieves TeiElemDto information for a given path, i.e. /alecsandri/versuri
      *
      * @tags div-rest-controller
-     * @name GetByPath
+     * @name GetElemByPath
      * @request GET:/api/divs
      */
-    getByPath: (
+    getElemByPath: (
       query: {
         path: string;
       },
@@ -1519,9 +1823,9 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<TeiElemDto, any>({
         path: `/api/divs`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1535,8 +1839,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getId: (id: number, params: RequestParams = {}) =>
       this.request<TeiDivDto, any>({
         path: `/api/divs/${id}`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1565,21 +1869,22 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<TeiDivDto[], any>({
         path: `/api/divs/${id}/toc`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
     /**
-     * No description
+     * @description Returns all child elements of the given div
      *
      * @tags div-rest-controller
      * @name GetIdParas
-     * @request GET:/api/divs/{id}/paras
+     * @summary Get div paragraphs
+     * @request GET:/api/divs/{divId}/paras
      */
     getIdParas: (
-      id: number,
+      divId: number,
       query?: {
         /**
          * @format int32
@@ -1596,10 +1901,10 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       params: RequestParams = {},
     ) =>
       this.request<TeiElemDto[], any>({
-        path: `/api/divs/${id}/paras`,
-        method: 'GET',
+        path: `/api/divs/${divId}/paras`,
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
         ...params,
       }),
 
@@ -1627,9 +1932,98 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     ) =>
       this.request<TeiDivDto[], any>({
         path: `/api/divs/`,
-        method: 'GET',
+        method: "GET",
         query: query,
-        format: 'json',
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name RepoNames
+     * @request GET:/api/collections/system/repos
+     */
+    repoNames: (params: RequestParams = {}) =>
+      this.request<string[], any>({
+        path: `/api/collections/system/repos`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name ByRepo
+     * @request GET:/api/collections/system/by-repo/{repoName}
+     */
+    byRepo: (repoName: string, params: RequestParams = {}) =>
+      this.request<TeiDivDto[], any>({
+        path: `/api/collections/system/by-repo/${repoName}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name ByLanguage
+     * @request GET:/api/collections/system/by-language/{lang}
+     */
+    byLanguage: (lang: string, params: RequestParams = {}) =>
+      this.request<TeiDivDto[], any>({
+        path: `/api/collections/system/by-language/${lang}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name ByAuthor
+     * @request GET:/api/collections/system/by-author/{authorStrId}
+     */
+    byAuthor: (authorStrId: string, params: RequestParams = {}) =>
+      this.request<TeiDivDto[], any>({
+        path: `/api/collections/system/by-author/${authorStrId}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Get
+     * @request GET:/api/collections/mine/{name}
+     */
+    get: (name: string, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine/${name}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Delete
+     * @request DELETE:/api/collections/mine/{name}
+     */
+    delete: (name: string, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/api/collections/mine/${name}`,
+        method: "DELETE",
         ...params,
       }),
 
@@ -1643,8 +2037,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getAuthor: (strId: string, params: RequestParams = {}) =>
       this.request<AuthorDto, any>({
         path: `/api/authors/${strId}`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1658,8 +2052,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getOpera: (strId: string, params: RequestParams = {}) =>
       this.request<TeiDivDto[], any>({
         path: `/api/authors/${strId}/opera`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1673,8 +2067,37 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     getAuthors: (params: RequestParams = {}) =>
       this.request<AuthorDto[], any>({
         path: `/api/authors/`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags config-rest-controller
+     * @name Config
+     * @request GET:/api/admin/config
+     */
+    config: (params: RequestParams = {}) =>
+      this.request<SharedConfigDto, any>({
+        path: `/api/admin/config`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name RemoveItem
+     * @request DELETE:/api/collections/mine/{name}/items/{itemId}
+     */
+    removeItem: (name: string, itemId: number, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/api/collections/mine/${name}/items/${itemId}`,
+        method: "DELETE",
         ...params,
       }),
   };
@@ -1689,8 +2112,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     random: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/util/random`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
 
@@ -1704,8 +2127,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     echo: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/util/echo`,
-        method: 'GET',
-        format: 'json',
+        method: "GET",
+        format: "json",
         ...params,
       }),
   };

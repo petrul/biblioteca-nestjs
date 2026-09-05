@@ -37,31 +37,63 @@ export class TextbaseClient {
     }
 
     async getAllOpera(pageNr = 0, pageSize = 20) {
-      const watch = new StopWatch();      
-      const resp = await this.tb.api.executeSearchTeidivGet6({ page: pageNr, size: pageSize});
+      const watch = new StopWatch();
+      // executeSearchTeidivGetN's numeric suffix is Spring Data REST's own
+      // generated name for this un-annotated search endpoint - it shifts
+      // whenever a sibling /api/drest/teiDivs/search/* endpoint is added or
+      // removed elsewhere, so it has to be re-checked (grep textbase.api.ts
+      // for `findOpera`) every time the client gets regenerated.
+      const resp = await this.tb.api.executeSearchTeidivGet7({ page: pageNr, size: pageSize});
       const divs = resp.data._embedded.teiDivs;
       this.log.log(`GET ${this.conf.textbaseUrl}/api/drest/teiDivs/search/findOpera?page=${pageNr}&size=${pageSize} : done, got ${divs.length} opi, took ${watch}`);
       return divs;
     }
 
     async getElemByPath(path: string) {
-      const resp = await this.tb.api.getByPath({ path: path});
+      const resp = await this.tb.api.getElemByPath({ path: path});
       return resp.data;
     }
 
     /**
      * The non-secret shared-resource naming convention (Kafka topics, the
      * Milvus collection, which embedding model) textbase-server is the
-     * source of truth for -- see its AdminRestController.config(). Not part
-     * of the swagger-generated client since it's a new, small endpoint;
-     * plain fetch instead, same as OllamaService's calls.
+     * source of truth for -- see its ConfigRestController.config(). Goes
+     * through the generated client (this.tb.api.config()) like every other
+     * call here; the generated SharedConfigDto type marks every field
+     * optional (springdoc has no way to express "always present" for a
+     * plain Map-turned-record), so this validates the fields the rest of
+     * textbase-nestjs actually relies on being present and narrows to the
+     * stricter SharedTextbaseConfig shape used everywhere else.
      */
     async getConfig(): Promise<SharedTextbaseConfig> {
-      const resp = await fetch(`${this.conf.textbaseUrl}/api/admin/config`);
-      if (!resp.ok) {
-        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config failed: HTTP ${resp.status} ${await resp.text()}`);
+      const resp = await this.tb.api.config();
+      const cfg = resp.data;
+      if (!cfg.kafka?.newOpusImportedTopic || !cfg.kafka?.opusReimportedTopic) {
+        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing kafka topic name(s): ${JSON.stringify(cfg.kafka)}`);
       }
-      return await resp.json() as SharedTextbaseConfig;
+      if (!cfg.milvus?.collection) {
+        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing milvus collection name: ${JSON.stringify(cfg.milvus)}`);
+      }
+      if (!cfg.embedder?.model || cfg.embedder?.dimension == null) {
+        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing embedder model/dimension: ${JSON.stringify(cfg.embedder)}`);
+      }
+      return {
+        kafka: {
+          newOpusImportedTopic: cfg.kafka.newOpusImportedTopic,
+          opusReimportedTopic: cfg.kafka.opusReimportedTopic,
+        },
+        milvus: {
+          collection: cfg.milvus.collection,
+        },
+        embedder: {
+          model: cfg.embedder.model,
+          dimension: cfg.embedder.dimension,
+          description: cfg.embedder.description,
+          ollamaModel: cfg.embedder.ollamaModel,
+          host: cfg.embedder.host,
+          port: cfg.embedder.port,
+        },
+      };
     }
 
     /**
