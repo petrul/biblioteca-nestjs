@@ -1,0 +1,101 @@
+require 'json'
+
+PACKAGE = JSON.parse(File.read(File.expand_path('package.json', __dir__))).freeze
+puts "#{PACKAGE.fetch('name')} version #{PACKAGE.fetch('version')}"
+
+def load_profile!(profile)
+    path = File.expand_path(".env.#{profile}", __dir__)
+    abort "Profile file not found: #{path}" unless File.file?(path)
+
+    File.foreach(path).with_index(1) do |line, line_number|
+        line = line.strip
+        next if line.empty? || line.start_with?('#')
+
+        key, value = line.sub(/\Aexport\s+/, '').split('=', 2)
+        abort "Invalid entry in #{path}:#{line_number}" unless key && value
+
+        key = key.strip
+        value = value.strip
+        if value.length >= 2 && ['"', "'"].include?(value[0]) && value[-1] == value[0]
+            value = value[1...-1]
+        end
+        ENV[key] = value
+    end
+
+    puts "Loaded #{path}"
+end
+
+def selected_profile(args)
+    args[:profile] || ENV.fetch('PROFILE', 'dev')
+end
+
+desc 'Remove compiled application output'
+task :clean do
+    sh 'npm run clean'
+end
+
+desc 'Install exactly the dependencies recorded in package-lock.json'
+task :npminstall do
+    sh 'npm ci'
+end
+
+desc 'Compile the NestJS application'
+task :build do
+    sh 'npm run build'
+end
+
+desc 'Run the complete test suite with a profile (dev by default)'
+task :test, [:profile] do |_task, args|
+    profile = selected_profile(args)
+    load_profile!(profile)
+    if ENV['TEAMCITY_VERSION']
+        sh 'npm', 'test', '--', '--reporters=jest-teamcity'
+    else
+        sh 'npm', 'test'
+    end
+end
+
+desc 'Run the application using a profile (dev by default)'
+task :run, [:profile] do |_task, args|
+    load_profile!(selected_profile(args))
+    sh 'npm run start'
+end
+task :start, [:profile] do |_task, args|
+    Rake::Task[:run].invoke(selected_profile(args))
+end
+
+
+desc 'Build and publish the npm artifact to the shared repository'
+task :publish do
+    sh 'npm run publish:shared'
+end
+
+namespace :docker do
+    desc 'Build the Docker image tagged with the package.json version'
+    task :build do
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{PACKAGE.fetch('name')}")
+        tag = "#{image}:#{PACKAGE.fetch('version')}"
+
+        sh 'docker', 'build', '--tag', tag, '.'
+        puts "Built #{tag}"
+    end
+
+    desc 'Build and publish the versioned Docker image to mini.local:5000'
+    task publish: :build do
+        image = ENV.fetch('DOCKER_IMAGE', "editii/#{PACKAGE.fetch('name')}")
+        version = PACKAGE.fetch('version')
+        local_tag = "#{image}:#{version}"
+        remote_tag = "mini.local:5000/#{image}:#{version}"
+
+        sh 'docker', 'tag', local_tag, remote_tag
+        sh 'docker', 'push', remote_tag
+        puts "Published #{remote_tag}"
+    end
+end
+
+desc 'Run the complete CI pipeline with .env.ci, including Docker publication'
+task ci: [:clean, :npminstall] do
+    Rake::Task[:test].invoke('ci')
+    Rake::Task[:build].invoke
+    Rake::Task['docker:publish'].invoke
+end

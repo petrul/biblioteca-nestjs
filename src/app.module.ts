@@ -10,8 +10,8 @@ import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, S
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
-import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
-import { DynamicOllamaEmbedder, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
+import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
+import { BgeM3OllamaService, DynamicOllamaEmbedder, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
 import { RetryingContentEmbedder } from './services/retrying_content_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
 import { log } from 'console';
@@ -19,6 +19,9 @@ import { log } from 'console';
 @Module({
   imports: [
     ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      ignoreEnvFile: true,
       load: [ configuration ]
     })
   ],
@@ -60,30 +63,42 @@ import { log } from 'console';
       provide: MilvusCollection,
       useFactory: async (conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService) => {
         const name = shared.milvus.collection;
-        const vectorDim = MilvusCollection.DIM_BY_MODEL[shared.embedder.model];
+        const vectorDim = shared.embedder.dimension;
         if (!vectorDim) {
-          throw new Error(`No known vector dimension for embedder model '${shared.embedder.model}' reported by textbase-server -- add it to MilvusCollection.DIM_BY_MODEL.`);
+          throw new Error(`textbase-server's GET /api/admin/config didn't report an embedder dimension for model '${shared.embedder.model}'.`);
         }
-        const col = new MilvusCollection(name, conf, vectorDim);
+        const description = shared.embedder.description
+          ?? `Textbase paragraph embeddings created by embedder "${shared.embedder.model}"; dim=${vectorDim}.`;
+        const col = new MilvusCollection(name, conf, vectorDim, description);
         // checked at startup (this factory runs during app bootstrap, before
         // anything depending on MilvusCollection - including the Kafka
         // listener - is constructed): wait and retry instead of crashing
         // the whole app the moment Milvus happens to be unreachable.
         await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Milvus');
+        // A freshly-created collection is trivially self-consistent (create()
+        // uses this same vectorDim) - this only ever catches a genuine
+        // pre-existing mismatch (stale collection, config typo), and does so
+        // loudly at startup instead of at the first confusing insert/search
+        // failure.
+        await col.assertVectorDimensionMatches(vectorDim);
         return col;
       },
       inject: [PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
     SentenceTransformersService,
     AllMpnetBaseV2_StsService,
+    AllMiniLmL6V2_StsService,
     OllamaService,
+    BgeM3OllamaService,
     Qwen3EmbeddingOllamaService,
     NomicEmbedOllamaService,
     {
-      // Whichever model textbase-server's shared config reports (currently
-      // Qwen3-Embedding-4B) -- wrapped in RetryingContentEmbedder so a
+      // Whichever model textbase-server's shared config reports as active
+      // (currently BGE-M3) -- wrapped in RetryingContentEmbedder so a
       // temporarily-unreachable Ollama server makes vectorize() wait and
-      // retry instead of failing one page at a time for nothing.
+      // retry instead of failing one page at a time for nothing. The other
+      // concrete ContentEmbedder implementations above remain injectable
+      // by name for explicit/manual use.
       provide: PROVIDER_EMBEDDER,
       useFactory: (shared: SharedTextbaseConfig, ollama: OllamaService, logger: LoggerService) => {
         if (!shared.embedder.ollamaModel) {

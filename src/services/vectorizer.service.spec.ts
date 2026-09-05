@@ -6,7 +6,7 @@ import { FakeTextbaseClient } from '../../test/fake-textbase-client';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../configuration';
 import { TestUtils } from '../../test/testutils';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
-import { AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts/sts.service';
+import { AllMiniLmL6V2_StsService, SentenceTransformersService } from './sts/sts.service';
 import { MilvusCollection } from './milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './vector_store';
 import { ConsoleLogger, LoggerService } from '@nestjs/common';
@@ -36,7 +36,7 @@ describe('VectorizerService', () => {
           SentenceTransformersService,
           {
             provide: PROVIDER_EMBEDDER,
-            useClass: AllMpnetBaseV2_StsService
+            useClass: AllMiniLmL6V2_StsService
           },
           {
             provide: MilvusCollection,
@@ -72,7 +72,11 @@ describe('VectorizerService', () => {
   });
 
   afterEach(async () => {
-    await col.drop();
+    try {
+      await col.drop();
+    } finally {
+      col.close();
+    }
   })
 
     it('vectorizer should work', async () => {
@@ -93,6 +97,24 @@ describe('VectorizerService', () => {
       expect(nrElems).toBeLessThanOrEqual(maxElems);
       expect(interPagewasCalled).toBeTruthy();
 
+    },
+    TestUtils.TIMEOUT_TWO_MINUTES);
+
+    it('skips French paragraphs (all-MiniLM-L6-v2 is English-only) but embeds English ones',
+    async () => {
+      const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
+
+      // FakeTextbaseClient yields 3 synthetic English paragraphs followed by
+      // 20 real French ones (Durkheim) - a large enough limit to pull all 23
+      // confirms the French ones are actively filtered out by language, not
+      // just never reached.
+      const nrElems = await vectServ.vectorize(op.id, undefined, 0, 100);
+
+      expect(nrElems).toEqual(3);
+
+      const stored = await col.findAll([MilvusCollection.SHA256, MilvusCollection.URL]);
+      expect(stored.length).toEqual(3);
+      stored.forEach((it: any) => expect(it.url).toContain('english_fixture'));
     },
     TestUtils.TIMEOUT_TWO_MINUTES);
 });

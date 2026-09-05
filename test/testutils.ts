@@ -1,5 +1,5 @@
 import { Util } from "../src/util";
-import { VectorizerConfiguration, commonConf } from "../src/configuration";
+import { VectorizerConfiguration } from "../src/configuration";
 import { Content } from "src/model/model";
 
 
@@ -12,8 +12,8 @@ export class TestUtils {
 
     static readonly testConf: Partial<VectorizerConfiguration> = {
         textbaseUrl: this.PROD_TEXTBASE_URL,
-        miniMilvus: commonConf.miniMilvus,
-        sentenceTransformersServer: commonConf.sentenceTransformersServer,
+        miniMilvus: 'mini.local:20112',
+        sentenceTransformersServer: 'http://mini.local:11200',
     }
     
     static randomAlphanumeric(n: number = 10) {

@@ -301,6 +301,13 @@ export interface TeiElemDto {
   size?: number;
   /** @format int32 */
   wordSize?: number;
+  /**
+   * ISO 639-1 code (e.g. "en", "ro") of the parent TeiFile's detected language - manually
+   * added here since this client is normally regenerated (`npm run generate:api`-equivalent)
+   * against a live textbase-server; regenerate for real once one's reachable to confirm this
+   * matches the server's actual OpenAPI schema.
+   */
+  language?: string;
 }
 
 export interface AuthorDto {

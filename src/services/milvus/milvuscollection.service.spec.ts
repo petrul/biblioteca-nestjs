@@ -1,9 +1,8 @@
 import { MilvusCollection } from './milvuscollection.service';
 import { TestUtils } from '../../../test/testutils';
-import { VectorizerConfiguration as VectorizerConfiguration, commonConf } from '../../configuration';
+import { VectorizerConfiguration } from '../../configuration';
 import { Content } from 'src/model/model';
 import { log } from 'console';
-import exp from 'constants';
 
 describe('MilvuscollectionService', () => {
     
@@ -12,7 +11,7 @@ describe('MilvuscollectionService', () => {
 
     beforeEach(async () => {
         const colname = "test_" + TestUtils.randomAlphanumeric()
-        col = new MilvusCollection(colname, commonConf as VectorizerConfiguration);
+        col = new MilvusCollection(colname, conf as VectorizerConfiguration);
         expect(await col.exists()).toBe(false);
         
         await col.createIfNotExists();
@@ -24,10 +23,13 @@ describe('MilvuscollectionService', () => {
     })
 
     afterEach(async () => {
-        log(`will drop ${col.name}...`);
-        await col.unload();
-        await col.drop();
-        log(`dropped collection ${col.name}`)
+        try {
+            log(`will drop ${col.name}...`);
+            await col.drop();
+            log(`dropped collection ${col.name}`)
+        } finally {
+            col.close();
+        }
     }, TestUtils.TIMEOUT_TWO_MINUTES)
 
     it ('upsert data into milvus', async() => {
@@ -85,8 +87,22 @@ describe('MilvuscollectionService', () => {
                 expect(parseInt(mresp.insert_cnt)).toEqual(3);
                 expect(await col.count()).toEqual(11);
             }
-                                            
-        }, 
+
+        },
         TestUtils.TIMEOUT_TWO_MINUTES
     )
+
+    it('getVectorDimension reflects the actual collection, assertVectorDimensionMatches throws on mismatch', async () => {
+        expect(await col.getVectorDimension()).toEqual(MilvusCollection.DIM_384);
+        await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_384)).resolves.toBeUndefined();
+        await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_768)).rejects.toThrow(/vector dimension/);
+    });
+
+    it('persists useful comments on the collection and every field', async () => {
+        expect(await col.getDescription()).toContain(col.name);
+        const comments = await col.getFieldDescriptions();
+        expect(comments[MilvusCollection.SHA256]).toMatch(/SHA-256.*deduplicate/i);
+        expect(comments[MilvusCollection.URL]).toMatch(/Textbase API URL.*retrieve/i);
+        expect(comments[MilvusCollection.EMBEDDING]).toMatch(/same encoder and dimension/i);
+    });
 });

@@ -1,10 +1,40 @@
 
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { log } from "console";
 import { MilvusCollection } from "./services/milvus/milvuscollection.service";
 
-export default () => chooseConf();
+function required(name: string): string {
+    const value = process.env[name]?.trim();
+    if (!value) throw new Error(`Missing required environment variable ${name}`);
+    return value;
+}
+
+function requiredInteger(name: string): number {
+    const raw = required(name);
+    const value = Number.parseInt(raw, 10);
+    if (!Number.isInteger(value) || value <= 0)
+        throw new Error(`${name} must be a positive integer, received '${raw}'`);
+    return value;
+}
+
+export default (): VectorizerConfiguration => ({
+    kafkaServers: required('KAFKA_SERVERS'),
+    kafkaTopic: required('KAFKA_TOPIC'),
+    kafkaGroupId: required('KAFKA_GROUP_ID'),
+    sentenceTransformersServer: required('STS_SERVER'),
+    ollamaServer: required('OLLAMA_SERVER'),
+    miniMilvus: required('MINI_MILVUS'),
+    textbaseUrl: required('TEXTBASE_URL'),
+    milvus_collection_tb_all_mpnet_base_v2_paras: required('MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2'),
+    milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
+    milvus_collection_tb_qwen3_embedding_4b_paras: required('MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B'),
+    milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
+    milvus_collection_tb_bge_m3_paras: required('MLVCOL_TB_PARAS_BGE_M3'),
+    milvus_collection_tb_bge_m3_paras_dim: MilvusCollection.DIM_1024,
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras: required('MLVCOL_TEXTBASE_PARAS_STS_ALL_MINILM_L6_V2'),
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim: MilvusCollection.DIM_384,
+    tb_getParas_pageSize: requiredInteger('TB_GETPARAS_PAGE_SIZE'),
+});
 
 /**
  * The non-secret shared-resource naming convention textbase-server exports
@@ -24,9 +54,14 @@ export interface SharedTextbaseConfig {
         collection: string;
     };
     embedder: {
-        // canonical Milvus-collection-naming-convention identifier, e.g. "QWEN3_EMBEDDING_4B"
+        // canonical Milvus-collection-naming-convention identifier, e.g. "BGE_M3"
         model: string;
-        // the actual Ollama model tag to call /api/embed with, e.g. "qwen3-embedding:4b" -
+        // vector dimension this embedder produces -- required to create/validate
+        // the Milvus collection (see MilvusCollection.assertVectorDimensionMatches).
+        dimension: number;
+        // human-readable summary, used as the Milvus collection's own description.
+        description?: string;
+        // the actual Ollama model tag to call /api/embed with, e.g. "bge-m3" -
         // absent if textbase-server's active embedder isn't Ollama-backed.
         ollamaModel?: string;
         host?: string;
@@ -45,13 +80,42 @@ export interface VectorizerConfiguration {
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: number;
 
+    /**
+     * collection name for vectorizing textbase paragraphs using Qwen3-Embedding-4B (via Ollama).
+     * Retained for explicit use -- see SharedTextbaseConfig for the actual active default,
+     * which now comes from textbase-server rather than any of these fields.
+     * i.e. tb_paras_qwen3_embedding_4b
+     */
+    milvus_collection_tb_qwen3_embedding_4b_paras: string;
+    milvus_collection_tb_qwen3_embedding_4b_paras_dim: number;
+
+    /**
+     * Paragraph vectors produced by the multilingual bge-m3 model through
+     * Ollama. Retained for explicit use -- see SharedTextbaseConfig's doc
+     * comment for why the active default no longer comes from a field here.
+     */
+    milvus_collection_tb_bge_m3_paras: string;
+    milvus_collection_tb_bge_m3_paras_dim: number;
+
+    /**
+     * collection name for vectorizing textbase paragraphs using STS's
+     * all-MiniLM-L6-v2 model. Retained as an explicitly injectable embedder.
+     * i.e. textbase_paras_sts_all_minilm_l6_v2
+     */
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras: string;
+    milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim: number;
+
     //the address of kafka
     kafkaServers: string;
+
+    // Topic carrying newly imported Textbase works and this consumer's group.
+    kafkaTopic: string;
+    kafkaGroupId: string;
 
     // this is the address of the STS server, i.e. mini.local:xxx
     sentenceTransformersServer: string;
 
-    // the Ollama server backing Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
+    // the Ollama server backing BGE-M3, Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
     // one fixed instance, unlike sentenceTransformersServer/miniMilvus which vary per environment.
     ollamaServer: string;
 
@@ -68,56 +132,6 @@ export interface VectorizerConfiguration {
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
 
-export const commonConf : VectorizerConfiguration = {
-    kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
-    sentenceTransformersServer: process.env.STS_SERVER || "http://mini.local:11200",
-    ollamaServer: process.env.OLLAMA_SERVER || "http://zmeu.local:11434",
-    // 19530 is Milvus's raw default port, but this LAN's mini.local instance is
-    // published on 20112 instead (confirmed against textbase-server's own
-    // application-dev/ci.properties, which use the same host+port for the
-    // same Milvus instance) - 19530 is simply unreachable here.
-    miniMilvus: process.env.MINI_MILVUS  || 'mini:20112',
-    textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
-    milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
-    milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
-    tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
-}
-
-const prodConf: VectorizerConfiguration = { ...commonConf,
-    // production's own Milvus instance is on zmeu.local:19530 (its default
-    // port), NOT the shared mini.local:20112 dev/ci/int one commonConf
-    // otherwise defaults to - confirmed against textbase-server's own
-    // application-prod.properties (milvus.host=zmeu.local, milvus.port=19530).
-    miniMilvus: process.env.MINI_MILVUS || 'zmeu.local:19530',
-}
-
-// local dev conf for yoga laptop workstation
-const yogaConf: VectorizerConfiguration = { ...commonConf, 
-    kafkaServers: 'localhost:30115', 
-}
-
-const yoga2ProdConf: VectorizerConfiguration = { ...commonConf,
-    kafkaServers: 'srv2.local:9028', // kafka prod
-}
-
-const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
-    kafkaServers: 'mini.local:10106', // kafka tb int
-    textbaseUrl: 'http://mini.local:10101',
-    milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras',
-    tb_getParas_pageSize: 200
-}
-
-function chooseConf() {
-    var os = require('os');
-    const hostname: string = os.hostname();
-    log(`==> hostname: ` + hostname);
-    if ('yoga' == hostname.toLowerCase())
-        // return yogaConf;
-        // return yoga2ProdConf;
-        return yoga2IntConf;
-    return prodConf;
-}
-
 /**
  * typed extension to ConfigService for our properties.
  */
@@ -127,6 +141,14 @@ export class AppConfService implements VectorizerConfiguration {
     
     get kafkaServers(): string {
         return this.conf.get<string>('kafkaServers');
+    }
+
+    get kafkaTopic(): string {
+        return this.conf.get<string>('kafkaTopic');
+    }
+
+    get kafkaGroupId(): string {
+        return this.conf.get<string>('kafkaGroupId');
     }
 
     get sentenceTransformersServer(): string {
@@ -155,5 +177,29 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_all_mpnet_base_v2_paras_dim(): number {
         return this.conf.get<number>('milvus_collection_tb_all_mpnet_base_v2_paras_dim');
+    }
+
+    get milvus_collection_tb_qwen3_embedding_4b_paras(): string {
+        return this.conf.get<string>('milvus_collection_tb_qwen3_embedding_4b_paras');
+    }
+
+    get milvus_collection_tb_qwen3_embedding_4b_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_tb_qwen3_embedding_4b_paras_dim');
+    }
+
+    get milvus_collection_tb_bge_m3_paras(): string {
+        return this.conf.get<string>('milvus_collection_tb_bge_m3_paras');
+    }
+
+    get milvus_collection_tb_bge_m3_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_tb_bge_m3_paras_dim');
+    }
+
+    get milvus_collection_textbase_sts_all_minilm_l6_v2_paras(): string {
+        return this.conf.get<string>('milvus_collection_textbase_sts_all_minilm_l6_v2_paras');
+    }
+
+    get milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim(): number {
+        return this.conf.get<number>('milvus_collection_textbase_sts_all_minilm_l6_v2_paras_dim');
     }
 }

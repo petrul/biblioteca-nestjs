@@ -1,9 +1,16 @@
-import { Controller, Logger, Post, Query } from '@nestjs/common';
+import { Controller, Get, Logger, Post, Query } from '@nestjs/common';
 import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { StopWatch, Util } from './util';
 import { EntityModelTeiDiv } from './textbase.api';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
+
+const packageInfo: { name: string; version: string } = require('../package.json');
+
+export interface AppInfo {
+  name: string;
+  version: string;
+}
 
 
 function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
@@ -22,6 +29,14 @@ export class AppController {
   constructor(protected tbc: TextbaseClient, 
     protected vectorizer: VectorizerService, 
     protected col: MilvusCollection) {}
+
+  @Get('/api/info')
+  info(): AppInfo {
+    return {
+      name: packageInfo.name,
+      version: packageInfo.version,
+    };
+  }
 
   @Post('/revectorize_all')
   async revectorizeAll(@Query('shuffle') shuffle: boolean = false): Promise<any> {

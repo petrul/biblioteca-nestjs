@@ -46,14 +46,16 @@ export interface OllamaEncoder {
  * mirrors AllMpnetBaseV2_StsService's role for the sentence-transformers
  * server, but generic over the model name instead of hardcoded, since
  * Ollama has no fixed model catalog the way the STS server does. Concrete
- * subclasses just pin a model name (see Qwen3EmbeddingOllamaService,
- * NomicEmbedOllamaService below).
+ * subclasses just pin a model name (see BgeM3OllamaService and the other
+ * concrete adapters below).
  */
 export abstract class OllamaContentEmbedderBase implements OllamaEncoder, ContentEmbedder {
 
     constructor(protected ollama: OllamaService) {}
 
     protected abstract get modelName(): string;
+
+    abstract readonly supportedLanguages: string[] | 'all';
 
     /**
      * this is the actual api call
@@ -81,13 +83,23 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
 /**
  * Ollama-backed embedder for whichever model textbase-server's shared
  * config (GET /api/admin/config) reports as its active one -- unlike
- * Qwen3EmbeddingOllamaService/NomicEmbedOllamaService below (each pinned
- * to one hardcoded model), this is constructed directly with the model
- * name at runtime, since textbase-nestjs must use exactly whatever
- * textbase-server says, not its own independent choice. See
+ * BgeM3OllamaService/Qwen3EmbeddingOllamaService/NomicEmbedOllamaService
+ * below (each pinned to one hardcoded model), this is constructed directly
+ * with the model name at runtime, since textbase-nestjs must use exactly
+ * whatever textbase-server says, not its own independent choice. See
  * app.module.ts's PROVIDER_EMBEDDER factory.
+ *
+ * supportedLanguages defaults to 'all': textbase-server's actual current
+ * default (BGE-M3) and Qwen3-Embedding are both genuinely multilingual, so
+ * this is correct for either. It would be wrong if textbase-server ever
+ * switched its default to nomic-embed-text (English-only) -- a narrower
+ * gap than the ones this whole mechanism closes (topic/collection/model
+ * identity), since it degrades embedding quality for some languages rather
+ * than producing an outright cross-service mismatch.
  */
 export class DynamicOllamaEmbedder extends OllamaContentEmbedderBase {
+    readonly supportedLanguages: string[] | 'all' = 'all';
+
     constructor(ollama: OllamaService, private readonly ollamaModelName: string) {
         super(ollama);
     }
@@ -97,9 +109,30 @@ export class DynamicOllamaEmbedder extends OllamaContentEmbedderBase {
     }
 }
 
+/** Multilingual BGE-M3 embeddings served by Ollama (1024 dimensions). */
+@Injectable()
+export class BgeM3OllamaService extends OllamaContentEmbedderBase {
+    static readonly modelName = 'bge-m3';
+
+    readonly supportedLanguages: string[] | 'all' = 'all';
+
+    constructor(ollama: OllamaService) {
+        super(ollama);
+    }
+
+    protected get modelName(): string {
+        return BgeM3OllamaService.modelName;
+    }
+}
+
 @Injectable()
 export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'qwen3-embedding:4b';
+
+    // Qwen3-Embedding is documented (Alibaba's own model card) as trained
+    // for and evaluated on 100+ languages - genuinely multilingual, unlike
+    // the STS models above.
+    readonly supportedLanguages: string[] | 'all' = 'all';
 
     // explicit constructor required even though it just forwards to super():
     // NestJS's DI resolves constructor params via TypeScript's emitted
@@ -117,6 +150,11 @@ export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
 @Injectable()
 export class NomicEmbedOllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'nomic-embed-text:v1.5';
+
+    // nomic-embed-text is primarily English-trained (Nomic's own model
+    // card calls out separate multilingual variants as different models) -
+    // conservative default until verified otherwise.
+    readonly supportedLanguages: string[] | 'all' = ['en'];
 
     constructor(ollama: OllamaService) {
         super(ollama);

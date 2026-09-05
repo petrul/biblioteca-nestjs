@@ -16,6 +16,13 @@ import { Util } from '../src/util';
  * from some earlier text-normalization change) and
  * textbase_client.service.spec.ts asserts that invariant for real.
  *
+ * paras.json is entirely Durkheim's "Cours de philosophie" - real French
+ * text, tagged 'fr' here accordingly (it predates the `language` field and
+ * has none of its own). A handful of synthetic English paragraphs are
+ * appended so callers have real French-vs-English coverage for the
+ * language-aware embedding filter (see VectorizerService) without needing
+ * a second real fixture file.
+ *
  * "Opera" (top-level book/work divs) are synthesized rather than loaded
  * from a fixture: textbase_client.service.spec.ts's allOperaGen() test
  * expects a catalog in the thousands (pagination across many pages), which
@@ -29,7 +36,26 @@ export class FakeTextbaseClient {
 
     constructor() {
         const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'res/paras.json'), 'utf-8'));
-        this.paras = raw.map((p: any) => ({ ...p, text_sha256: Util.sha256AsHex(p.text) }));
+        const frenchParas = raw.map((p: any) => ({ ...p, text_sha256: Util.sha256AsHex(p.text), language: 'fr' }));
+
+        const englishTexts = [
+            'The quick brown fox jumps over the lazy dog near the riverbank.',
+            'Textbase is a structured digital library for critical editions.',
+            'Sentence transformers turn natural language into dense vector embeddings.',
+        ];
+        const englishParas = englishTexts.map((text, i) => ({
+            name: 'p',
+            path: `fake/english_fixture/_${i}`,
+            url: `https://textbase.scriptorium.ro/fake/english_fixture/_${i}`,
+            text,
+            text_sha256: Util.sha256AsHex(text),
+            language: 'en',
+        }));
+
+        // English first: callers that page/limit (e.g. `vectorize(..., 0, maxElems)`
+        // with a small maxElems) should still see some embeddable content
+        // within their first N items, not just the (STS-unsupported) French ones.
+        this.paras = [...englishParas, ...frenchParas];
     }
 
     async getAuthors() {
