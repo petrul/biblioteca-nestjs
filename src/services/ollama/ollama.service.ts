@@ -78,6 +78,25 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
     }
 }
 
+/**
+ * Ollama-backed embedder for whichever model textbase-server's shared
+ * config (GET /api/admin/config) reports as its active one -- unlike
+ * Qwen3EmbeddingOllamaService/NomicEmbedOllamaService below (each pinned
+ * to one hardcoded model), this is constructed directly with the model
+ * name at runtime, since textbase-nestjs must use exactly whatever
+ * textbase-server says, not its own independent choice. See
+ * app.module.ts's PROVIDER_EMBEDDER factory.
+ */
+export class DynamicOllamaEmbedder extends OllamaContentEmbedderBase {
+    constructor(ollama: OllamaService, private readonly ollamaModelName: string) {
+        super(ollama);
+    }
+
+    protected get modelName(): string {
+        return this.ollamaModelName;
+    }
+}
+
 @Injectable()
 export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'qwen3-embedding:4b';

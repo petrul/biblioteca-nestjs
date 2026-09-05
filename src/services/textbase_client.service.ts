@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { Api, AuthorDto, EntityModelTeiDiv } from "../textbase.api";
-import { AppConfService, PROVIDER_CONF } from "../configuration";
+import { AppConfService, PROVIDER_CONF, SharedTextbaseConfig } from "../configuration";
 import { assert } from "console";
 import { StopWatch } from "../util";
 
@@ -47,6 +47,21 @@ export class TextbaseClient {
     async getElemByPath(path: string) {
       const resp = await this.tb.api.getByPath({ path: path});
       return resp.data;
+    }
+
+    /**
+     * The non-secret shared-resource naming convention (Kafka topics, the
+     * Milvus collection, which embedding model) textbase-server is the
+     * source of truth for -- see its AdminRestController.config(). Not part
+     * of the swagger-generated client since it's a new, small endpoint;
+     * plain fetch instead, same as OllamaService's calls.
+     */
+    async getConfig(): Promise<SharedTextbaseConfig> {
+      const resp = await fetch(`${this.conf.textbaseUrl}/api/admin/config`);
+      if (!resp.ok) {
+        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config failed: HTTP ${resp.status} ${await resp.text()}`);
+      }
+      return await resp.json() as SharedTextbaseConfig;
     }
 
     /**

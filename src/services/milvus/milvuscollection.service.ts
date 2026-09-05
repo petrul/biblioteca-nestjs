@@ -15,6 +15,20 @@ export class MilvusCollection {
     static readonly DIM_768 = 768;
     static readonly DIM_2560 = 2560;
 
+    /**
+     * Vector dimension is an intrinsic property of the embedding model
+     * itself, not a shared-resource naming choice the two services could
+     * disagree on the way a topic/collection name could -- so, unlike
+     * those, it's fine for textbase-nestjs to know this locally, keyed by
+     * the canonical model identifier textbase-server's GET
+     * /api/admin/config reports as `embedder.model` (see app.module.ts).
+     */
+    static readonly DIM_BY_MODEL: Record<string, number> = {
+        QWEN3_EMBEDDING_4B: MilvusCollection.DIM_2560,
+        NOMIC_EMBED_TEXT: MilvusCollection.DIM_768,
+        ALL_MPNET_BASE_V2: MilvusCollection.DIM_768,
+    };
+
     constructor(
       public name: string, 
       protected conf: VectorizerConfiguration,

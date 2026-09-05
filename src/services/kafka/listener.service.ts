@@ -1,20 +1,22 @@
-import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { KafkaService } from './kafka.service';
 import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
 import { TextbaseClient } from '../textbase_client.service';
+import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from 'src/configuration';
 import { Util } from 'src/util';
 
 @Injectable()
 export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit {
 
   consumer: Consumer;
-  
+
   private readonly log = new Logger(KafkaListenerService.name);
 
   constructor(protected ks: KafkaService,
-    protected tbc: TextbaseClient, 
-    protected vectorizer: VectorizerService) { }
+    protected tbc: TextbaseClient,
+    protected vectorizer: VectorizerService,
+    @Inject(PROVIDER_SHARED_CONFIG) protected sharedConfig: SharedTextbaseConfig) { }
 
   async onModuleInit() {
     await this.initKafkaListener();
@@ -34,7 +36,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
-      topic: 'tb_newOpusImportedTopic', 
+      topic: this.sharedConfig.kafka.newOpusImportedTopic,
       fromBeginning: true,
     });
     await this.consumer.run({

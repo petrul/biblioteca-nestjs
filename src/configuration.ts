@@ -6,23 +6,44 @@ import { MilvusCollection } from "./services/milvus/milvuscollection.service";
 
 export default () => chooseConf();
 
+/**
+ * The non-secret shared-resource naming convention textbase-server exports
+ * from GET /api/admin/config -- see AdminRestController.config() there.
+ * textbase-nestjs has no configuration of its own for any of this (no env
+ * var, no hardcoded default): it fetches this once at startup (see
+ * app.module.ts's PROVIDER_SHARED_CONFIG) and uses it directly, so the two
+ * services structurally cannot disagree on which Kafka topic, Milvus
+ * collection, or embedding model to use.
+ */
+export interface SharedTextbaseConfig {
+    kafka: {
+        newOpusImportedTopic: string;
+        opusReimportedTopic: string;
+    };
+    milvus: {
+        collection: string;
+    };
+    embedder: {
+        // canonical Milvus-collection-naming-convention identifier, e.g. "QWEN3_EMBEDDING_4B"
+        model: string;
+        // the actual Ollama model tag to call /api/embed with, e.g. "qwen3-embedding:4b" -
+        // absent if textbase-server's active embedder isn't Ollama-backed.
+        ollamaModel?: string;
+        host?: string;
+        port?: number;
+    };
+}
+
 export interface VectorizerConfiguration {
 
     /**
      * collection name for vectorizing textbase paragraphs using the ALL_MPNET_BASE_V2 SentenceTransformers model.
      * i.e. tb_paras_all_mpnet_base_v2 - kept around for the embedder still available under its own name
-     * (see AllMpnetBaseV2_StsService), even though it's no longer the default PROVIDER_EMBEDDER.
+     * (see AllMpnetBaseV2_StsService), an alternate embedder nothing currently wires up as the
+     * active PROVIDER_EMBEDDER (see SharedTextbaseConfig for what textbase-server actually expects).
      */
     milvus_collection_tb_all_mpnet_base_v2_paras: string;
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: number;
-
-    /**
-     * collection name for vectorizing textbase paragraphs using Qwen3-Embedding-4B (via Ollama) -
-     * the default PROVIDER_EMBEDDER now, replacing the sentence-transformers one above.
-     * i.e. tb_paras_qwen3_embedding_4b
-     */
-    milvus_collection_tb_qwen3_embedding_4b_paras: string;
-    milvus_collection_tb_qwen3_embedding_4b_paras_dim: number;
 
     //the address of kafka
     kafkaServers: string;
@@ -45,6 +66,7 @@ export interface VectorizerConfiguration {
     tb_getParas_pageSize: number;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
+export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
 
 export const commonConf : VectorizerConfiguration = {
     kafkaServers: process.env.KAFKA_SERVERS || "kafka:9092",
@@ -58,8 +80,6 @@ export const commonConf : VectorizerConfiguration = {
     textbaseUrl: process.env.TEXTBASE_URL || "http://textbase-server:8080",
     milvus_collection_tb_all_mpnet_base_v2_paras: process.env.MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2 || 'tb_paras_all_mpnet_base_v2',
     milvus_collection_tb_all_mpnet_base_v2_paras_dim: MilvusCollection.DIM_768,
-    milvus_collection_tb_qwen3_embedding_4b_paras: process.env.MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B || 'tb_paras_qwen3_embedding_4b',
-    milvus_collection_tb_qwen3_embedding_4b_paras_dim: MilvusCollection.DIM_2560,
     tb_getParas_pageSize: parseInt(process.env.TB_GETPARAS_PAGE_SIZE) || 2000
 }
 
@@ -84,7 +104,6 @@ const yoga2IntConf: VectorizerConfiguration = { ...commonConf,
     kafkaServers: 'mini.local:10106', // kafka tb int
     textbaseUrl: 'http://mini.local:10101',
     milvus_collection_tb_all_mpnet_base_v2_paras: 'int_tb_all_mpnet_base_v2_paras',
-    milvus_collection_tb_qwen3_embedding_4b_paras: 'int_tb_paras_qwen3_embedding_4b',
     tb_getParas_pageSize: 200
 }
 
@@ -136,13 +155,5 @@ export class AppConfService implements VectorizerConfiguration {
 
     get milvus_collection_tb_all_mpnet_base_v2_paras_dim(): number {
         return this.conf.get<number>('milvus_collection_tb_all_mpnet_base_v2_paras_dim');
-    }
-
-    get milvus_collection_tb_qwen3_embedding_4b_paras(): string {
-        return this.conf.get<string>('milvus_collection_tb_qwen3_embedding_4b_paras');
-    }
-
-    get milvus_collection_tb_qwen3_embedding_4b_paras_dim(): number {
-        return this.conf.get<number>('milvus_collection_tb_qwen3_embedding_4b_paras_dim');
     }
 }
