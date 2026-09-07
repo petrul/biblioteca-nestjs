@@ -41,10 +41,12 @@ export class AppController {
   @Post('/revectorize_all')
   async revectorizeAll(@Query('shuffle') shuffle: boolean = false): Promise<any> {
 
+    this.vectorizer.clearStop();
+
     const opera: EntityModelTeiDiv[] = [];
     for await(const i of this.tbc.allOperaGen()) {
       if (i)
-        opera.push(i); 
+        opera.push(i);
     }
 
     if (shuffle) {
@@ -53,6 +55,10 @@ export class AppController {
     this.log.log(`opera length: ${opera.length}`);
 
     for (const op of opera) {
+      if (this.vectorizer.isStopRequested()) {
+        this.log.log('Stop requested - halting revectorize_all.');
+        break;
+      }
       try {
         const watch = new StopWatch();
         this.log.log(`will vectorize: `, op);
@@ -66,6 +72,12 @@ export class AppController {
       }
     }
 
+  }
+
+  @Post('/stop_vectorizing')
+  stopVectorizing(): { stopped: boolean } {
+    this.vectorizer.requestStop();
+    return { stopped: true };
   }
 
   @Post('/optimize')

@@ -14,6 +14,22 @@ import { StopWatch, Util } from "../util";
 export class VectorizerService implements OnModuleInit {
 
     pageSize: number;
+    private stopRequested = false;
+
+    /** Called at the start of a fresh run so a previous stop doesn't carry over. */
+    clearStop(): void {
+        this.stopRequested = false;
+    }
+
+    /** Halts the current and any in-progress vectorize() after its current batch. */
+    requestStop(): void {
+        this.stopRequested = true;
+        this.log.log('Stop requested - will halt after the current batch.');
+    }
+
+    isStopRequested(): boolean {
+        return this.stopRequested;
+    }
 
     /**
      * @param pageSize same value is used for all paged services: the textbase client,
@@ -148,7 +164,7 @@ export class VectorizerService implements OnModuleInit {
 
             await interPageJob();
 
-        } while(hasMore && i < (offset + limit))
+        } while(hasMore && i < (offset + limit) && !this.stopRequested)
 
 
         // flush at the end of the opus
