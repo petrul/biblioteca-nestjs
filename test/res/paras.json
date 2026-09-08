@@ -1,0 +1,182 @@
+[
+    {
+      "name": "head",
+      "xpath": "/tei:div[6]/*[1]",
+      "path": "durkheim/cours_de_philosophie/_1",
+      "urlFragment": "_1",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/_1",
+      "text": "Cours de philosophie",
+      "text_sha256": "632c8c4521b27fd3e7295b7d01337b56a4a823252acf1c2a9fc76508cf9eb796"
+    },
+    {
+      "name": "subtitle",
+      "xpath": "/tei:div[6]/*[2]",
+      "path": "durkheim/cours_de_philosophie/_2",
+      "urlFragment": "_2",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/_2",
+      "text": "Exporté de Wikisource le 17 septembre 2022",
+      "text_sha256": "ee48849d4eecf3057ca531aa98844491756e399f0250bab8edf4b59ae2d30907"
+    },
+    {
+      "name": "head",
+      "xpath": "/tei:div[6]/tei:div[2]/*[1]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_1",
+      "urlFragment": "_1",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_1",
+      "text": "Cours de philosophie",
+      "text_sha256": "632c8c4521b27fd3e7295b7d01337b56a4a823252acf1c2a9fc76508cf9eb796"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[2]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_2",
+      "urlFragment": "_2",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_2",
+      "text": "Qu’est ce que la philosophie ? Le mot est fréquemment employé. Par cela même, il donne une idée grossière, mais simple de ce qu’il signifie. Philosopher, c’est réfléchir sur un ensemble de faits pour en tirer des généralités. Philosophie, en un mot, veut dire réflexion et généralisation. C’est ainsi que l’on dit : la philosophie de l’art, la philosophie de l’histoire.",
+      "text_sha256": "5396b01d7541e6b8f915011903568a04085c90902306565f4499a8357dcd826e"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[3]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_3",
+      "urlFragment": "_3",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_3",
+      "text": "En examinant la forme de la philosophie, le genre de réflexion qui lui convient, ce qu’on appelle : l’esprit philosophique, on voit qu’on peut le définir ainsi : il consiste dans le besoin de se rendre compte de toutes ses opinions, jointe à une force d’intelligence suffisante pour satisfaire plus ou moins ce besoin. La qualité caractéristique de l’esprit philosophique est la libre réflexion, le libre examen. Réfléchir librement, c’est se soustraire quand on réfléchit à toute influence étrangère à la logique. C’est raisonner en ne reconnaissant d’autres autorités que les règles de cette science et les lumières de la raison.",
+      "text_sha256": "1898637643c57f490b7852738154d610fa609f88ad32081d5e518df9da778a2c"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[4]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_4",
+      "urlFragment": "_4",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_4",
+      "text": "Les deux caractères principaux de l’esprit philosophique sont donc la tendance à réfléchir pour généraliser et la liberté dans la réflexion.",
+      "text_sha256": "1f0dc8ca3e07ffba6b5439b495b71682d32573728c17bfdfe149c08caf0c0a47"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[5]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_5",
+      "urlFragment": "_5",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_5",
+      "text": "De cette dernière condition s’ensuit nécessairement qu’on ne saurait confondre la philosophie avec les religions. La religion admet, outre le témoignage de la raison, l’autorité de la tradition historique. La philosophie ne connaît que les questions et les solutions relevant de la seule raison. Leurs domaines sont donc nettement distincts.",
+      "text_sha256": "c715c935ff2daf7857011c12f34c315d177af3bf891da15b544d382b00f587ed"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[6]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_6",
+      "urlFragment": "_6",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_6",
+      "text": "En étudiant les divers systèmes des philosophes, on s’aperçoit que la réflexion philosophique a, suivant les temps et les circonstances, procédé de deux manières différentes. En d’autres termes, il y a deux formes d’esprit philosophique. Tantôt il procède par analyse ; il se rapproche alors de la méthode mathématique. Ce genre d’esprit consiste à prendre pour point de départ du système une idée évidente ou admise comme telle, et d’y rattacher toutes les idées secondaires de manière à former une série ininterrompue ; tirant de la première idée une seconde, de cette seconde une troisième, et ainsi de suite ; de telle sorte que la première étant admise, toutes les autres en sortent sans solution de continuité. C’est en cela, par exemple, que consiste l’esprit cartésien.",
+      "text_sha256": "18ec940ace0274c242b1cc9722be140a2c653a2f026f00828f01ccdcca92325f"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[7]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_7",
+      "urlFragment": "_7",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_7",
+      "text": "L’autre forme de l’esprit philosophique est synthétique, et laisse une place bien plus grande à l’inspiration et à l’imagination. Sans avoir besoin d’ordre mathématique, les esprits de ce genre voient les faits dans leur ensemble, et s’y attachent spécialement. Ils préfèrent les vastes hypothèses qui groupent les faits à l’analyse qui les dissèque. Au lieu de classer leur idées en séries, ils en font un ensemble qu’on puisse embrasser d’un coup d’œil. Tel, est par exemple, l’esprit platonicien. [En marge de ce paragraphe : « non sens philosophiques » ].",
+      "text_sha256": "970207009dcd95ce4961887482fa381c6b7ae331b43d3e8379919d238dfda276"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[8]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_8",
+      "urlFragment": "_8",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_8",
+      "text": "Nous connaissons maintenant la forme, l’extérieur de la philosophie. Reste à la définir par son objet. On a proposé diverses définitions.",
+      "text_sha256": "510f7a2c8872b19aeb1da1dc68eb5819bd977b881b39493f7356fa4dce71f8e0"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[9]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_9",
+      "urlFragment": "_9",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_9",
+      "text": "Bossuet dit : « La philosophie est la science de l’homme et de Dieu. » — Cicéron la définit : « La science des choses divines et humaines. » — Aristote : « la science des premières causes et des premiers principes. » — On a dit enfin : « La philosophie est la science de l’absolu. »",
+      "text_sha256": "085c8d22f1e1a26b6bbbc431bbb056fbb8a927f8c6a81575919891cba6dc254e"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[10]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_10",
+      "urlFragment": "_10",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_10",
+      "text": "On peut faire voir que toutes ces définitions reviennent au même. Il faut d’abord pour cela définir « absolu. » On appelle absolu ce qui est par soi-même, ce qui ne dépend de rien, ce qui est sans relation aucune. L’absolu serait indépendant de l’espace et du temps.",
+      "text_sha256": "2186e328f4f61814e3715298a5d45615329e014cc63b832a47d35c47a5cfc280"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[11]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_11",
+      "urlFragment": "_11",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_11",
+      "text": "Sachant cela, montrons que toutes ces définitions donnent pour objet à la philosophie l’absolu. En effet, la première cause c’est l’être ou les êtres d’où vient toute la réalité. Le premier principe, c’est la loi la plus générale qui a présidé à ce développement. Rechercher la première cause et le premier principe, c’est rechercher le primitif, l’absolu, tant dans le monde de la connaissance que dans celui de l’existence. Or, dans le premier, quel est l’absolu ? C’est l’esprit de l’homme. Dans le second ? C’est Dieu. Toutes ces définitions viennent donc à celle-ci : La philosophie est la science de l’absolu.",
+      "text_sha256": "148745f3df8871282746df73f6d106b289561f403643b4890d518bb0ec878b96"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[12]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_12",
+      "urlFragment": "_12",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_12",
+      "text": "Voici maintenant à quelles objections cette définition est exposée.",
+      "text_sha256": "1afb00c0869eb800ce2a7ef608ffe2d82b3110ed8cd1a394710c7880fd8a1dac"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[13]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_13",
+      "urlFragment": "_13",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_13",
+      "text": "Elle assigne pour but à la philosophie ce qui n’en est que le dernier mot, la dernière hypothèse, nécessaire peut-être pour donner la raison de certains faits, mais qui ne saurait en tout cas être prise pour point de départ. L’absolu n’est évidemment pas ce que l’on recherche en commençant la philosophie, on n’a dès lors aucune raison de le faire figurer dans la définition de la philosophie.",
+      "text_sha256": "06fa883512e512f88314f4311bf26cd69266ba191efff9efa1434947aea9b1f0"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[14]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_14",
+      "urlFragment": "_14",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_14",
+      "text": "Il y a d’ailleurs des systèmes philosophiques importants, le positivisme par exemple, qui n’admettent pas l’existence de l’absolu. On ne saurait exclure de la philosophie des systèmes qui agitent les mêmes questions que les autres et n’en différent que par la manière de les résoudre. On ne saurait donner pour objet à la philosophie une chose dont l’existence même est en question.",
+      "text_sha256": "39ab6e275032b3ef142b5a435daead26a8315929ad7b157ac589a236132b3c58"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[15]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_15",
+      "urlFragment": "_15",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_15",
+      "text": "Comment donc définir la philosophie ?",
+      "text_sha256": "881bef2486b5040e1f348ba445d61bb6902f9a0e9d4150c562956c0e8017e419"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[16]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_16",
+      "urlFragment": "_16",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_16",
+      "text": "Quand on considère les faits dont s’occupe cette science, on voit que ce sont tous des phénomènes ayant trait à l’homme, et, dans l’homme, à ce qui n’a rien de physique, à ce que n’étudient en aucune façon les sciences positives. Le domaine de la philosophie est l’homme intérieur.",
+      "text_sha256": "e878de358131271d02177644d7cacd35a12fa7162a04e2f60a7b5b781a26f762"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[17]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_17",
+      "urlFragment": "_17",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_17",
+      "text": "De quoi se compose l’homme intérieur ? De faits qui ne tombent point sous les sens, mais nous sont connus par une sorte de sens intime qu’on nomme conscience.",
+      "text_sha256": "cd61decff46ac791ad397ec3f7e88434f7f2079356c6894d2be837dd2d0ec13a"
+    },
+    {
+      "name": "p",
+      "xpath": "/tei:div[6]/tei:div[2]/*[18]",
+      "path": "durkheim/cours_de_philosophie/cours_de_philosophie/_18",
+      "urlFragment": "_18",
+      "url": "https://textbase.scriptorium.ro/durkheim/cours_de_philosophie/cours_de_philosophie/_18",
+      "text": "La perception de ces faits modifie la conscience comme la perception matérielle modifie les sens qui lui sont soumis. Aussi désigne-t-on ces faits sous le nom d’états de conscience.",
+      "text_sha256": "6a4317dd5cbd0c200e183d314cb88b16fc20566f391fa49d0503cab85601953e"
+    }
+  ]
