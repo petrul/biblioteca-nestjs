@@ -1,9 +1,12 @@
+.env.dev
+.env.ci
 # compiled output
 /dist
 /node_modules
 /build
 .codex/
 .claude/
+
 
 
 # Logs
