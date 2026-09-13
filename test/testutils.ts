@@ -12,7 +12,7 @@ export class TestUtils {
 
     static readonly testConf: Partial<VectorizerConfiguration> = {
         textbaseUrl: this.PROD_TEXTBASE_URL,
-        miniMilvus: 'mini.local:20112',
+        miniMilvus: 'zmeu.local:20112',
         sentenceTransformersServer: 'http://mini.local:11200',
     }
     
