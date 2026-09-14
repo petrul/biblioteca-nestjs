@@ -13,8 +13,6 @@ export class MilvusCollection {
 
     static readonly DIM_384 = 384;
     static readonly DIM_768 = 768;
-    static readonly DIM_1024 = 1024;
-    static readonly DIM_2560 = 2560;
 
     // No DIM_BY_MODEL lookup here: textbase-server's GET /api/admin/config
     // now reports embedder.dimension directly (from Embedder.vectorDimension()),

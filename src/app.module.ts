@@ -6,7 +6,7 @@ import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
 import { TextbaseClient } from './services/textbase_client.service';
-import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, VectorizerConfiguration } from './configuration';
+import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
@@ -115,8 +115,7 @@ import { log } from 'console';
       useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
         conf: VectorizerConfiguration, logger: LoggerService ) => {
         log(conf);
-        const pageSize = conf.tb_getParas_pageSize;
-        return new VectorizerService(tbc, embedder, vecstore, logger, pageSize);
+        return new VectorizerService(tbc, embedder, vecstore, logger, TB_GETPARAS_PAGE_SIZE);
       },
       inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
     },
