@@ -5,7 +5,15 @@ puts "#{PACKAGE.fetch('name')} version #{PACKAGE.fetch('version')}"
 
 def load_profile!(profile)
     path = File.expand_path(".env.#{profile}", __dir__)
-    abort "Profile file not found: #{path}" unless File.file?(path)
+    unless File.file?(path)
+        # Not fatal: real secrets come from the process environment (see
+        # load_pass_secrets) - a dotenv file is an optional local-dev
+        # fallback, not a hard requirement. NestJS's own configuration.ts
+        # still throws a clear, specific error at boot if something
+        # actually needed is missing from ENV.
+        puts "No #{path} - relying entirely on already-set environment variables"
+        return
+    end
 
     File.foreach(path).with_index(1) do |line, line_number|
         line = line.strip
@@ -19,10 +27,39 @@ def load_profile!(profile)
         if value.length >= 2 && ['"', "'"].include?(value[0]) && value[-1] == value[0]
             value = value[1...-1]
         end
-        ENV[key] = value
+        # Never overwrites a value already set (e.g. by load_pass_secrets,
+        # or a human's own shell override) - dotenv is the fallback, not
+        # the priority.
+        ENV[key] ||= value
     end
 
     puts "Loaded #{path}"
+end
+
+desc 'Load textbase/ci/* secrets from the local pass store into the environment'
+task :load_pass_secrets do
+    store_dir = ENV['PASSWORD_STORE_DIR'] || File.expand_path('~/.password-store')
+    ci_dir = File.join(store_dir, 'textbase', 'ci')
+
+    unless Dir.exist?(ci_dir)
+        puts "> No pass store found at #{ci_dir} - relying entirely on .env.ci"
+        next
+    end
+
+    loaded = 0
+    Dir.glob(File.join(ci_dir, '*.gpg')).sort.each do |gpg_file|
+        key = File.basename(gpg_file, '.gpg')
+        next unless ENV[key].nil? || ENV[key].empty?
+
+        value = `pass show textbase/ci/#{key}`.chomp
+        if $?.success? && !value.empty?
+            ENV[key] = value
+            loaded += 1
+        else
+            warn "> pass show textbase/ci/#{key} failed or returned nothing"
+        end
+    end
+    puts "> Loaded #{loaded} secret(s) from pass (#{ci_dir})"
 end
 
 def selected_profile(args)
@@ -95,7 +132,7 @@ namespace :docker do
 end
 
 desc 'Run the complete CI pipeline with .env.ci, including Docker publication'
-task ci: [:clean, :npminstall] do
+task ci: [:load_pass_secrets, :clean, :npminstall] do
     Rake::Task[:test].invoke('ci')
     Rake::Task[:build].invoke
     Rake::Task['docker:publish'].invoke
