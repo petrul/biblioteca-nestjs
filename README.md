@@ -200,6 +200,26 @@ everything is actually wired together before diving into any one service.
   tests.
 - `services/sts/sts.service.spec.ts` — the original STS embedder.
 
+## This service's own API
+
+A small admin/control surface (`src/app.controller.ts`), not the vectorization
+pipeline itself (that's driven entirely by Kafka - see
+[Shared config](#shared-config-the-important-part) and
+[Kafka contract](#kafka-contract-asyncapi) above/below):
+
+| Endpoint | What it does |
+| --- | --- |
+| `GET /api/info` | Name + version from `package.json` |
+| `POST /revectorize_all?shuffle=` | Walks every opus via `TextbaseClient` and re-vectorizes each one, optionally in random order; stoppable mid-run |
+| `POST /stop_vectorizing` | Signals a running `revectorize_all` to halt after its current opus |
+| `POST /optimize` | Compacts the Milvus collection |
+
+`@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
+at `/api/docs` - same mechanism, one instance per this app rather than a
+checked-in export like textbase-server's, since this surface is small and
+purely operational (no external client generates against it the way the
+reader generates against textbase-server's).
+
 ## Regenerating the textbase-server API client
 
 `swagger-typescript-api` generates this project's typed client from
