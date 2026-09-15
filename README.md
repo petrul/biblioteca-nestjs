@@ -94,6 +94,15 @@ which collection or topic to use, because it never makes its own decision
 about either. `SharedTextbaseConfig` (`src/configuration.ts`) documents
 the exact shape fetched.
 
+## Kafka contract (AsyncAPI)
+
+`KafkaListenerService` (`src/services/kafka/listener.service.ts`) is this
+service's one Kafka consumer — the message schema it consumes, and
+textbase-server's other topics this service *doesn't* touch, are
+documented in full in textbase-server's own `asyncapi.yml` rather than
+duplicated here (textbase-server is the sole producer of everything on
+Kafka in this whole system, so that's the natural source of truth).
+
 ## Embedding backends
 
 Every embedder implements the `ContentEmbedder` interface
