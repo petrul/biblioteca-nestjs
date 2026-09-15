@@ -78,7 +78,7 @@ task :npminstall do
 end
 
 desc 'Compile the NestJS application'
-task build: [:npminstall]  do
+task build: [:npminstall] do
     sh 'npm run build'
 end
 

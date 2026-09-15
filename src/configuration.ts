@@ -84,7 +84,7 @@ export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
 @Injectable()
 export class AppConfService implements VectorizerConfiguration {
     constructor (private conf: ConfigService) {}
-    
+
     get kafkaServers(): string {
         return this.conf.get<string>('kafkaServers');
     }

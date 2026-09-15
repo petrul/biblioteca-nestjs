@@ -22,7 +22,7 @@ describe('VectorStore', () => {
                 {
                     provide: PROVIDER_LOGGER,
                     useClass: ConsoleLogger
-                },                
+                },
                 {
                     provide: PROVIDER_CONF,
                     useValue: conf
@@ -36,7 +36,7 @@ describe('VectorStore', () => {
                     inject: [PROVIDER_CONF]
                   },
                   MilvusColVectorStore,
-        
+
             ],
         }).compile();
 
@@ -78,7 +78,7 @@ describe('VectorStore', () => {
         await col.load();
         expect(await col.count()).toEqual(nrElems);
 
-    }, 
+    },
     TestUtils.TIMEOUT_TWO_MINUTES * 2);
 
     it('modify url', async () => {
@@ -116,8 +116,8 @@ describe('VectorStore', () => {
             const newUrls: String[] = all.map(it => it.url)
             const embs = all.map(it => it.embedding)
             // log(newUrls);
-            newUrls.forEach(it => { 
-                expect(it).toBeTruthy(); 
+            newUrls.forEach(it => {
+                expect(it).toBeTruthy();
                 expect(it.startsWith('http:'));
             })
             embs.forEach(it => { expect(it).toBeTruthy();});
@@ -125,6 +125,6 @@ describe('VectorStore', () => {
             expect(new Set(originalUrls)).not.toEqual(new Set(newUrls));
         }
 
-    }, 
+    },
     TestUtils.TIMEOUT_TWO_MINUTES * 2)
 });

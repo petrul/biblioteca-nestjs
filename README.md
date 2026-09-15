@@ -67,22 +67,14 @@ rake docker:publish    # also push to mini.local:5000
 
 ## Configuration: what's actually load-bearing
 
-`.env.example` lists every environment variable `src/configuration.ts`
-requires at startup — but **not all of them still do anything**. Since the
-shared-config change described below, two groups exist:
-
-| Still genuinely used | Value now comes from textbase-server instead (must still be *set*, but the value is ignored) |
-| --- | --- |
-| `KAFKA_SERVERS`, `KAFKA_GROUP_ID` | `KAFKA_TOPIC` |
-| `STS_SERVER`, `OLLAMA_SERVER` | `MLVCOL_TB_PARAS_ALL_MPNET_BASE_V2` |
-| `MINI_MILVUS` | `MLVCOL_TB_PARAS_QWEN3_EMBEDDING_4B` |
-| `TEXTBASE_URL` | `MLVCOL_TB_PARAS_BGE_M3` |
-| `TB_GETPARAS_PAGE_SIZE` | `MLVCOL_TEXTBASE_PARAS_STS_ALL_MINILM_L6_V2` |
-
-Don't try to change which Milvus collection or Kafka topic this service
-uses by editing the right-hand column — it won't work. See
-[Shared config](#shared-config-the-important-part) for where those values
-actually come from.
+`.env.example` lists the complete set of environment variables
+`src/configuration.ts` requires at startup: `KAFKA_SERVERS`,
+`KAFKA_GROUP_ID`, `STS_SERVER`, `OLLAMA_SERVER`, `MINI_MILVUS`,
+`TEXTBASE_URL`. There used to be more of these — a per-collection env var
+for each Milvus collection, a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE` —
+but all of that is now decided by textbase-server instead (see
+[Shared config](#shared-config-the-important-part)), so those variables
+were removed rather than left around unused.
 
 ### Shared config (the important part)
 
