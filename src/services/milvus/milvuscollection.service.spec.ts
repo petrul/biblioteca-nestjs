@@ -4,6 +4,15 @@ import { VectorizerConfiguration } from '../../configuration';
 import { Content } from 'src/model/model';
 import { log } from 'console';
 
+async function waitForRows(col: MilvusCollection, expected: number): Promise<any[]> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+        const rows = await col.findAll([MilvusCollection.SHA256, MilvusCollection.URL]);
+        if (rows.length === expected) return rows;
+        await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    throw new Error(`Timed out waiting for ${expected} visible Milvus rows`);
+}
+
 describe('MilvuscollectionService', () => {
     
     const conf = TestUtils.testConf;
@@ -91,6 +100,25 @@ describe('MilvuscollectionService', () => {
         },
         TestUtils.TIMEOUT_TWO_MINUTES
     )
+
+    it('deletes one opus without deleting a similarly-prefixed sibling', async () => {
+        const data = TestUtils.randomContent(4, MilvusCollection.DIM_384, 200);
+        data[0].url = 'seneca/de-vita';
+        data[1].url = 'seneca/de-vita/chapter-1/p-1';
+        data[2].url = 'seneca/de-vita/chapter-2/p-1';
+        data[3].url = 'seneca/de-vita-longa/chapter-1/p-1';
+        await col.upsert(data);
+        await col.flush();
+        await col.load();
+        await waitForRows(col, 4);
+
+        await col.deleteByUrlPrefix('seneca/de-vita');
+        await col.flush();
+
+        const remaining = await waitForRows(col, 1);
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0].url).toEqual('seneca/de-vita-longa/chapter-1/p-1');
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('getVectorDimension reflects the actual collection, assertVectorDimensionMatches throws on mismatch', async () => {
         expect(await col.getVectorDimension()).toEqual(MilvusCollection.DIM_384);

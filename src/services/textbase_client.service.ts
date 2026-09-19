@@ -68,7 +68,7 @@ export class TextbaseClient {
     async getConfig(): Promise<SharedTextbaseConfig> {
       const resp = await this.tb.api.config();
       const cfg = resp.data;
-      if (!cfg.kafka?.newOpusImportedTopic || !cfg.kafka?.opusReimportedTopic) {
+      if (!cfg.kafka?.newOpusImportedTopic || !cfg.kafka?.opusReimportedTopic || !cfg.kafka?.opusRemovedTopic) {
         throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing kafka topic name(s): ${JSON.stringify(cfg.kafka)}`);
       }
       if (!cfg.milvus?.collection) {
@@ -81,6 +81,7 @@ export class TextbaseClient {
         kafka: {
           newOpusImportedTopic: cfg.kafka.newOpusImportedTopic,
           opusReimportedTopic: cfg.kafka.opusReimportedTopic,
+          opusRemovedTopic: cfg.kafka.opusRemovedTopic,
         },
         milvus: {
           collection: cfg.milvus.collection,

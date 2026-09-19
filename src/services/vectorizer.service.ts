@@ -31,6 +31,12 @@ export class VectorizerService implements OnModuleInit {
         return this.stopRequested;
     }
 
+    async removeOpus(opusPath: string): Promise<void> {
+        await this.vecstore.removeOpus(opusPath);
+        await this.vecstore.flush();
+        this.log.log(`Removed vectors for opus ${opusPath}`);
+    }
+
     /**
      * @param pageSize same value is used for all paged services: the textbase client,
      * the embedder (sentence transformer service) and the vector store.

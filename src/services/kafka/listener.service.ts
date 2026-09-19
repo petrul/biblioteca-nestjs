@@ -41,11 +41,14 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
-      topic: this.sharedConfig.kafka.newOpusImportedTopic,
+      topics: [
+        this.sharedConfig.kafka.newOpusImportedTopic,
+        this.sharedConfig.kafka.opusRemovedTopic,
+      ],
       fromBeginning: true,
     });
     await this.consumer.run({
-      eachMessage: (async ({ message, heartbeat }) => {
+      eachMessage: (async ({ topic, message, heartbeat }) => {
         // Do not let one transient Textbase/Ollama/Milvus outage terminate the
         // Kafka consumer. Remaining inside eachMessage also prevents KafkaJS
         // from committing the offset until the work has really succeeded.
@@ -57,6 +60,18 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
 
             const asJson = message.value.toString();
             var obj = JSON.parse(asJson);
+            if (!obj.path) throw new Error(`Kafka event on ${topic} has no opus path: ${asJson}`);
+
+            if (topic === this.sharedConfig.kafka.opusRemovedTopic) {
+              await this.vectorizer.removeOpus(obj.path);
+              await heartbeat();
+              this.log.log(`removed Milvus vectors for ${obj.path}`, asJson);
+              return;
+            }
+
+            // An import can replace an existing book. Purge the old vectors
+            // first so paragraphs removed by the new edition do not linger.
+            await this.vectorizer.removeOpus(obj.path);
             if (obj.path) {
               // some older kafka messages have the id already obsolete.
               // so get the div again just to make sure.
@@ -74,7 +89,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
             this.log.log(`done vectorizing for ${obj.id}`, asJson);
             return;
           } catch(err: any) {
-            this.log.error('failed to vectorize; retaining the Kafka offset and retrying in 10 seconds', err);
+            this.log.error('failed to process opus event; retaining the Kafka offset and retrying in 10 seconds', err);
             await Util.delay(10 * 1000);
             await heartbeat();
           }

@@ -7,6 +7,7 @@ export interface VectorStore {
     store(data: Content[]): Promise<any>;
     storeNewOrUpdated(data: Content[]): Promise<any>
     flush(): Promise<any>;
+    removeOpus(opusPath: string): Promise<any>;
 }
 
 @Injectable()
@@ -30,6 +31,10 @@ export class MilvusColVectorStore implements VectorStore {
 
     async storeNewOrUpdated(data: Content[]): Promise<any> {
         return await this.col.upsertNewOrModified(data);
+    }
+
+    async removeOpus(opusPath: string): Promise<any> {
+        return await this.col.deleteByUrlPrefix(opusPath);
     }
 
 }

@@ -35,6 +35,7 @@ export interface SharedTextbaseConfig {
     kafka: {
         newOpusImportedTopic: string;
         opusReimportedTopic: string;
+        opusRemovedTopic: string;
     };
     milvus: {
         collection: string;

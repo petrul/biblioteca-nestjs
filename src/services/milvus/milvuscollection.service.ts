@@ -123,6 +123,16 @@ export class MilvusCollection {
       })
     }
 
+    /** Delete exactly one opus root and its descendants, never a similarly-prefixed sibling. */
+    async deleteByUrlPrefix(opusPath: string): Promise<MutationResult> {
+      if (!opusPath?.trim()) throw new Error("Cannot delete Milvus vectors for an empty opus path");
+      const escaped = opusPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      return await this.milvus.deleteEntities({
+        collection_name: this.name,
+        expr: `${MilvusCollection.URL} == '${escaped}' || ${MilvusCollection.URL} like '${escaped}/%'`,
+      });
+    }
+
     async count(): Promise<number> {
       return (await this.milvus.count({collection_name: this.name})).data;
     }

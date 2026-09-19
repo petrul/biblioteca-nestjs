@@ -448,6 +448,7 @@ export interface Embedder {
 export interface Kafka {
   newOpusImportedTopic?: string;
   opusReimportedTopic?: string;
+  opusRemovedTopic?: string;
 }
 
 export interface Milvus {
