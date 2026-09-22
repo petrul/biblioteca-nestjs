@@ -1,9 +1,27 @@
 require 'json'
+require 'shellwords'
+require 'open3'
 
 PACKAGE = JSON.parse(File.read(File.expand_path('package.json', __dir__))).freeze
 puts "#{PACKAGE.fetch('name')} version #{PACKAGE.fetch('version')}"
 
+desc 'Print the package version from package.json'
+task :version do
+    puts PACKAGE.fetch('version')
+end
+
 def load_profile!(profile)
+    store_dir = ENV.fetch('PASSWORD_STORE_DIR', File.expand_path('~/.password-store'))
+    loader = File.join(store_dir, 'load-env.sh')
+    abort "Password-store environment loader not found: #{loader}" unless File.file?(loader)
+    output, status = Open3.capture2('bash', '-c', "source #{Shellwords.escape(loader)} #{Shellwords.escape(profile)} && env -0")
+    abort "Could not load biblioteca/#{profile} from pass store" unless status.success?
+    output.split("\0").each do |entry|
+        key, value = entry.split('=', 2)
+        ENV[key] = value if key && value && !key.start_with?('_')
+    end
+    puts "> Loaded biblioteca/#{profile} from #{loader}"
+    return
     path = File.expand_path(".env.#{profile}", __dir__)
     unless File.file?(path)
         # Not fatal: real secrets come from the process environment (see
@@ -132,7 +150,8 @@ namespace :docker do
 end
 
 desc 'Run the complete CI pipeline with .env.ci, including Docker publication'
-task ci: [:load_pass_secrets, :clean, :npminstall] do
+task ci: [:clean, :npminstall] do
+    load_profile!('ci')
     Rake::Task[:test].invoke('ci')
     Rake::Task[:build].invoke
     Rake::Task['docker:publish'].invoke

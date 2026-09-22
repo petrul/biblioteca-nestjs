@@ -9,6 +9,7 @@ import { log } from 'console';
 import { Content } from 'src/model/model';
 
 describe('VectorStore', () => {
+    jest.setTimeout(TestUtils.TIMEOUT_TWO_MINUTES * 2);
     const conf = TestUtils.testConf;
     let vectorStore: MilvusColVectorStore;
     let col: MilvusCollection;

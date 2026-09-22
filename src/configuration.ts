@@ -8,13 +8,17 @@ function required(name: string): string {
     return value;
 }
 
+// This identifies the application, not the deployment environment. Keep it
+// in code so every environment consumes the same Kafka stream independently.
+export const BIBLIOTECA_NESTJS_KAFKA_GROUP_ID = 'biblioteca-nestjs';
+
 export default (): VectorizerConfiguration => ({
-    kafkaServers: required('KAFKA_SERVERS'),
-    kafkaGroupId: required('KAFKA_GROUP_ID'),
+    kafkaServers: required('KAFKA_BROKERS'),
+    kafkaGroupId: BIBLIOTECA_NESTJS_KAFKA_GROUP_ID,
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
-    miniMilvus: required('MINI_MILVUS'),
-    textbaseUrl: required('TEXTBASE_URL'),
+    miniMilvus: required('MILVUS_URL'),
+    textbaseUrl: required('BIBLIOTECA_URL'),
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
@@ -25,7 +29,7 @@ export const TB_GETPARAS_PAGE_SIZE = 200;
 /**
  * The non-secret shared-resource naming convention textbase-server exports
  * from GET /api/admin/config -- see AdminRestController.config() there.
- * textbase-nestjs has no configuration of its own for any of this (no env
+ * biblioteca-vectorizer has no configuration of its own for any of this (no env
  * var, no hardcoded default): it fetches this once at startup (see
  * app.module.ts's PROVIDER_SHARED_CONFIG) and uses it directly, so the two
  * services structurally cannot disagree on which Kafka topic, Milvus

@@ -11,7 +11,7 @@ const describeOllama = process.env.RUN_OLLAMA_INTEGRATION === 'true' ? describe 
 describe('StsService', () => {
 
     const conf : Partial<VectorizerConfiguration> = {
-        sentenceTransformersServer: 'http://mini.local:11200',
+        sentenceTransformersServer: process.env.STS_SERVER,
     }
 
     let stsService: SentenceTransformersService;

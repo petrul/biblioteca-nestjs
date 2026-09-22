@@ -102,7 +102,7 @@ import { log } from 'console';
       provide: PROVIDER_EMBEDDER,
       useFactory: (shared: SharedTextbaseConfig, ollama: OllamaService, logger: LoggerService) => {
         if (!shared.embedder.ollamaModel) {
-          throw new Error(`textbase-server's active embedder ('${shared.embedder.model}') isn't Ollama-backed -- textbase-nestjs only supports Ollama-backed embedders.`);
+          throw new Error(`textbase-server's active embedder ('${shared.embedder.model}') isn't Ollama-backed -- biblioteca-vectorizer only supports Ollama-backed embedders.`);
         }
         const embedder = new DynamicOllamaEmbedder(ollama, shared.embedder.ollamaModel);
         return new RetryingContentEmbedder(embedder, logger);

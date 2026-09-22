@@ -85,7 +85,7 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
  * config (GET /api/admin/config) reports as its active one -- unlike
  * BgeM3OllamaService/Qwen3EmbeddingOllamaService/NomicEmbedOllamaService
  * below (each pinned to one hardcoded model), this is constructed directly
- * with the model name at runtime, since textbase-nestjs must use exactly
+ * with the model name at runtime, since biblioteca-vectorizer must use exactly
  * whatever textbase-server says, not its own independent choice. See
  * app.module.ts's PROVIDER_EMBEDDER factory.
  *

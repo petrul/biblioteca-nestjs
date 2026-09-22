@@ -1,4 +1,4 @@
-# Textbase Vectorizer (textbase-nestjs)
+# Biblioteca Vectorizer
 
 A small, standalone NestJS worker that turns [textbase-server](../textbase-server)'s
 text content into vector embeddings and stores them in Milvus — so the
@@ -33,14 +33,13 @@ to pull content from and to read shared config off of.
 
 ```bash
 git clone <this repo>
-cd textbase-nestjs
-cp .env.example .env.dev   # then fill in your Kafka/Milvus/Ollama/textbase-server values
+cd biblioteca-vectorizer
 rake npminstall
-rake run[dev]     # loads .env.dev, then `npm run start`
+rake run          # loads biblioteca/dev from the pass store, then `npm run start`
 ```
 
 For iterating with auto-restart on file changes, load the env yourself and
-use Nest's watch mode instead: `set -a && source .env.dev && set +a && npm run start:dev`.
+Use Nest's watch mode after loading the pass-store environment.
 
 There's nothing to open in a browser — this is a background worker. Watch
 its logs for `Kafka consumer connected` and vectorization activity as
@@ -49,7 +48,7 @@ opera get imported on the textbase-server side.
 ## Running tests
 
 ```bash
-rake test[dev]     # or: npx jest
+rake test          # loads biblioteca/dev; rake test[ci] uses biblioteca/ci
 ```
 
 Most specs run against fakes (no live services needed) — see
@@ -59,7 +58,7 @@ server and take longer as a result.
 ## Docker
 
 ```bash
-rake docker:build     # build editii/textbase-vectorizer:<version> locally
+rake docker:build     # build editii/biblioteca-vectorizer:<version> locally
 rake docker:publish    # also push to mini.local:5000
 ```
 
@@ -68,9 +67,9 @@ rake docker:publish    # also push to mini.local:5000
 ## Configuration: what's actually load-bearing
 
 `.env.example` lists the complete set of environment variables
-`src/configuration.ts` requires at startup: `KAFKA_SERVERS`,
-`KAFKA_GROUP_ID`, `STS_SERVER`, `OLLAMA_SERVER`, `MINI_MILVUS`,
-`TEXTBASE_URL`. There used to be more of these — a per-collection env var
+`src/configuration.ts` requires at startup: `KAFKA_BROKERS`,
+`STS_SERVER`, `OLLAMA_SERVER`, `MILVUS_URL`,
+`BIBLIOTECA_URL`. There used to be more of these — a per-collection env var
 for each Milvus collection, a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE` —
 but all of that is now decided by textbase-server instead (see
 [Shared config](#shared-config-the-important-part)), so those variables

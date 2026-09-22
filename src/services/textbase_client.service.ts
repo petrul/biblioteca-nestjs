@@ -62,7 +62,7 @@ export class TextbaseClient {
      * call here; the generated SharedConfigDto type marks every field
      * optional (springdoc has no way to express "always present" for a
      * plain Map-turned-record), so this validates the fields the rest of
-     * textbase-nestjs actually relies on being present and narrows to the
+     * biblioteca-vectorizer actually relies on being present and narrows to the
      * stricter SharedTextbaseConfig shape used everywhere else.
      */
     async getConfig(): Promise<SharedTextbaseConfig> {
@@ -70,6 +70,14 @@ export class TextbaseClient {
       const cfg = resp.data;
       if (!cfg.kafka?.newOpusImportedTopic || !cfg.kafka?.opusReimportedTopic || !cfg.kafka?.opusRemovedTopic) {
         throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing kafka topic name(s): ${JSON.stringify(cfg.kafka)}`);
+      }
+      const kafkaTopics = [
+        cfg.kafka.newOpusImportedTopic,
+        cfg.kafka.opusReimportedTopic,
+        cfg.kafka.opusRemovedTopic,
+      ];
+      if (kafkaTopics.some(topic => !topic.startsWith('biblioteca_'))) {
+        throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: Kafka topics must use the biblioteca_ prefix: ${JSON.stringify(cfg.kafka)}`);
       }
       if (!cfg.milvus?.collection) {
         throw new Error(`GET ${this.conf.textbaseUrl}/api/admin/config: missing milvus collection name: ${JSON.stringify(cfg.milvus)}`);
