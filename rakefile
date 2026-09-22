@@ -36,10 +36,14 @@ def load_profile!(profile)
     puts "Loaded #{path}"
 end
 
-desc 'Load textbase/ci/* secrets from the local pass store into the environment'
+# biblioteca/ci is shared across every app in the Biblioteca family
+# (this repo, biblioteca-server, textbase-reader) - one flat section,
+# not a per-repo subtree (was textbase/ci until this was consolidated;
+# see the pass store's own README.md).
+desc 'Load biblioteca/ci/* secrets from the local pass store into the environment'
 task :load_pass_secrets do
     store_dir = ENV['PASSWORD_STORE_DIR'] || File.expand_path('~/.password-store')
-    ci_dir = File.join(store_dir, 'textbase', 'ci')
+    ci_dir = File.join(store_dir, 'biblioteca', 'ci')
 
     unless Dir.exist?(ci_dir)
         puts "> No pass store found at #{ci_dir} - relying entirely on .env.ci"
@@ -51,12 +55,12 @@ task :load_pass_secrets do
         key = File.basename(gpg_file, '.gpg')
         next unless ENV[key].nil? || ENV[key].empty?
 
-        value = `pass show textbase/ci/#{key}`.chomp
+        value = `pass show biblioteca/ci/#{key}`.chomp
         if $?.success? && !value.empty?
             ENV[key] = value
             loaded += 1
         else
-            warn "> pass show textbase/ci/#{key} failed or returned nothing"
+            warn "> pass show biblioteca/ci/#{key} failed or returned nothing"
         end
     end
     puts "> Loaded #{loaded} secret(s) from pass (#{ci_dir})"
