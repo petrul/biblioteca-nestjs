@@ -1,4 +1,4 @@
-# Textbase Vectorizer (textbase-nestjs)
+# Biblioteca NestJS Vectorizer
 
 A small, standalone NestJS worker that turns [textbase-server](../textbase-server)'s
 text content into vector embeddings and stores them in Milvus — so the
@@ -33,7 +33,7 @@ to pull content from and to read shared config off of.
 
 ```bash
 git clone <this repo>
-cd textbase-nestjs
+cd biblioteca-nestjs
 cp .env.example .env.dev   # then fill in your Kafka/Milvus/Ollama/textbase-server values
 rake npminstall
 rake run[dev]     # loads .env.dev, then `npm run start`
@@ -59,7 +59,7 @@ server and take longer as a result.
 ## Docker
 
 ```bash
-rake docker:build     # build editii/textbase-vectorizer:<version> locally
+rake docker:build     # build editii/biblioteca-nestjs:<version> locally
 rake docker:publish    # also push to mini.local:5000
 ```
 
@@ -99,7 +99,7 @@ the exact shape fetched.
 `KafkaListenerService` (`src/services/kafka/listener.service.ts`) is this
 service's one Kafka consumer — the message schema it consumes, and
 textbase-server's other topics this service *doesn't* touch, are
-documented in full in textbase-server's own `asyncapi.yml` rather than
+documented in full in biblioteca-server's `src/main/resources/static/asyncapi.yml` rather than
 duplicated here (textbase-server is the sole producer of everything on
 Kafka in this whole system, so that's the natural source of truth).
 

@@ -62,7 +62,7 @@ export class TextbaseClient {
      * call here; the generated SharedConfigDto type marks every field
      * optional (springdoc has no way to express "always present" for a
      * plain Map-turned-record), so this validates the fields the rest of
-     * textbase-nestjs actually relies on being present and narrows to the
+     * biblioteca-nestjs actually relies on being present and narrows to the
      * stricter SharedTextbaseConfig shape used everywhere else.
      */
     async getConfig(): Promise<SharedTextbaseConfig> {

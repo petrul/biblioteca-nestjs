@@ -10,7 +10,7 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Textbase NestJS')
+    .setTitle('Biblioteca NestJS')
     .setDescription('Textbase Vectorizer computes embeddings of text excerpts')
     .setVersion('0.1')
     .addTag('textbase')

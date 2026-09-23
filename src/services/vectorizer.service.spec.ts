@@ -20,6 +20,7 @@ describe('VectorizerService', () => {
   let vectServ: VectorizerService;
   let tbc: TextbaseClient;
   let col: MilvusCollection;
+  let vecstore: MilvusColVectorStore;
 
   beforeEach(async () => {
 
@@ -66,6 +67,7 @@ describe('VectorizerService', () => {
     vectServ = app.get<VectorizerService>(VectorizerService);
     tbc = app.get<TextbaseClient>(TextbaseClient);
     col = app.get<MilvusCollection>(MilvusCollection);
+    vecstore = app.get<MilvusColVectorStore>(MilvusColVectorStore);
     await col.create();
     await col.createIndex();
     await col.load();
@@ -78,6 +80,23 @@ describe('VectorizerService', () => {
       col.close();
     }
   })
+
+    it('removeOpus drops only that opus\'s vectors, not a similarly-prefixed sibling', async () => {
+      const embedding = Array.from({ length: 384 }, () => Math.random());
+      await vecstore.store([
+        { sha256: 'a-p0', url: 'seneca/de-vita/p0', embedding, text: null },
+        { sha256: 'a-p1', url: 'seneca/de-vita/p1', embedding, text: null },
+        { sha256: 'b-p0', url: 'seneca/de-vita-longa/p0', embedding, text: null },
+      ]);
+      expect(await col.count()).toEqual(3);
+
+      await vectServ.removeOpus('seneca/de-vita');
+      await col.flush();
+
+      const remaining = await col.findAll(['sha256']);
+      expect(remaining.map(it => it.sha256)).toEqual(['b-p0']);
+    },
+    TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('vectorizer should work', async () => {
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');

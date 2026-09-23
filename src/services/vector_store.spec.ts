@@ -81,6 +81,29 @@ describe('VectorStore', () => {
     },
     TestUtils.TIMEOUT_TWO_MINUTES * 2);
 
+    it('removeOpus removes only the matching opus, not a similarly-prefixed sibling', async () => {
+        const opusA: Content[] = [
+            { sha256: 'a-p0', url: 'seneca/de-vita/p0', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
+            { sha256: 'a-p1', url: 'seneca/de-vita/p1', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
+        ];
+        // Deliberately a URL that starts with opusA's own path as a plain
+        // string prefix but is a distinct opus - same reasoning as
+        // LuceneIndexServiceResumeTest's sibling-prefix test server-side.
+        const opusB: Content[] = [
+            { sha256: 'b-p0', url: 'seneca/de-vita-longa/p0', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
+        ];
+
+        await vectorStore.store([...opusA, ...opusB]);
+        expect(await col.count()).toEqual(3);
+
+        await vectorStore.removeOpus('seneca/de-vita');
+        await col.flush();
+
+        const remaining = await col.findAll(['sha256', 'url']);
+        expect(remaining.map(it => it.sha256)).toEqual(['b-p0']);
+    },
+    TestUtils.TIMEOUT_TWO_MINUTES * 2);
+
     it('modify url', async () => {
         const nrElems = 10
         const content = TestUtils.randomContent(nrElems);

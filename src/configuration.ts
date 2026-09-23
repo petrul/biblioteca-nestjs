@@ -25,7 +25,7 @@ export const TB_GETPARAS_PAGE_SIZE = 200;
 /**
  * The non-secret shared-resource naming convention textbase-server exports
  * from GET /api/admin/config -- see AdminRestController.config() there.
- * textbase-nestjs has no configuration of its own for any of this (no env
+ * biblioteca-nestjs has no configuration of its own for any of this (no env
  * var, no hardcoded default): it fetches this once at startup (see
  * app.module.ts's PROVIDER_SHARED_CONFIG) and uses it directly, so the two
  * services structurally cannot disagree on which Kafka topic, Milvus
