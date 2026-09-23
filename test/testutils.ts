@@ -8,12 +8,11 @@ export class TestUtils {
     protected static randomPossibleAlphanum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     static readonly TIMEOUT_TWO_MINUTES = 2 * 60 * 1000;
 
-    static readonly PROD_TEXTBASE_URL = 'https://textbase.scriptorium.ro';
-
     static readonly testConf: Partial<VectorizerConfiguration> = {
-        textbaseUrl: this.PROD_TEXTBASE_URL,
-        miniMilvus: 'zmeu.local:20112',
-        sentenceTransformersServer: 'http://mini.local:11200',
+        // `rake test` loads biblioteca/dev, whose MILVUS_URL points at the
+        // dedicated integration-deps Milvus instance.
+        miniMilvus: process.env.MILVUS_URL,
+        sentenceTransformersServer: process.env.STS_SERVER,
     }
     
     static randomAlphanumeric(n: number = 10) {

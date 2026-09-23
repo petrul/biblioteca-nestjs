@@ -15,6 +15,7 @@ import { log } from 'console';
 
 describe('VectorizerService', () => {
   
+  jest.setTimeout(TestUtils.TIMEOUT_TWO_MINUTES);
   const conf = TestUtils.testConf;
 
   let vectServ: VectorizerService;
