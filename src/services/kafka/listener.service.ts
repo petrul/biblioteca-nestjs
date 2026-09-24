@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from 
 import { KafkaService } from './kafka.service';
 import { Consumer } from 'kafkajs';
 import { VectorizerService } from '../vectorizer.service';
-import { TextbaseClient } from '../textbase_client.service';
+import { BibliotecaClient } from '../biblioteca_client.service';
 import { PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, VectorizerConfiguration } from 'src/configuration';
 import { Util } from 'src/util';
 
@@ -14,7 +14,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
   private readonly log = new Logger(KafkaListenerService.name);
 
   constructor(protected ks: KafkaService,
-    protected tbc: TextbaseClient,
+    protected tbc: BibliotecaClient,
     protected vectorizer: VectorizerService,
     // kafkaGroupId is this worker's own internal consumer identity -- textbase-server
     // never needs to agree on it, so it's a hardcoded application default

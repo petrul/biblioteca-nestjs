@@ -1,5 +1,5 @@
 import { Inject, Injectable, LoggerService, OnModuleInit } from "@nestjs/common";
-import { TextbaseClient } from "./textbase_client.service";
+import { BibliotecaClient } from "./biblioteca_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { TeiElemDto } from "../biblioteca.api";
 import { assert } from "console";
@@ -42,7 +42,7 @@ export class VectorizerService implements OnModuleInit {
      * the embedder (sentence transformer service) and the vector store.
      */
     constructor(
-        protected tbc: TextbaseClient,
+        protected tbc: BibliotecaClient,
         @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder,
         @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
         protected log: LoggerService,

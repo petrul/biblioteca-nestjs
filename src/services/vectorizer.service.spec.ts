@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { VectorizerService } from './vectorizer.service';
-import { TextbaseClient } from './textbase_client.service';
-import { FakeTextbaseClient } from '../../test/fake-textbase-client';
+import { BibliotecaClient } from './biblioteca_client.service';
+import { FakeBibliotecaClient } from '../../test/fake-biblioteca-client';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../configuration';
 import { TestUtils } from '../../test/testutils';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
@@ -19,7 +19,7 @@ describe('VectorizerService', () => {
   const conf = TestUtils.testConf;
 
   let vectServ: VectorizerService;
-  let tbc: TextbaseClient;
+  let tbc: BibliotecaClient;
   let col: MilvusCollection;
   let vecstore: MilvusColVectorStore;
 
@@ -51,22 +51,22 @@ describe('VectorizerService', () => {
           MilvusColVectorStore,
           {
             // no live textbase-server reachable from here right now - see
-            // FakeTextbaseClient's own docstring
-            provide: TextbaseClient,
-            useClass: FakeTextbaseClient,
+            // FakeBibliotecaClient's own docstring
+            provide: BibliotecaClient,
+            useClass: FakeBibliotecaClient,
           },
           {
             provide: VectorizerService,
-            useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, logger: LoggerService) => {
+            useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, logger: LoggerService) => {
               return new VectorizerService(tbc, embedder, vecstore, logger);
             },
-            inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_LOGGER]
+            inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_LOGGER]
           }
         ],
     }).compile();
 
     vectServ = app.get<VectorizerService>(VectorizerService);
-    tbc = app.get<TextbaseClient>(TextbaseClient);
+    tbc = app.get<BibliotecaClient>(BibliotecaClient);
     col = app.get<MilvusCollection>(MilvusCollection);
     vecstore = app.get<MilvusColVectorStore>(MilvusColVectorStore);
     await col.create();
@@ -124,7 +124,7 @@ describe('VectorizerService', () => {
     async () => {
       const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');
 
-      // FakeTextbaseClient yields 3 synthetic English paragraphs followed by
+      // FakeBibliotecaClient yields 3 synthetic English paragraphs followed by
       // 20 real French ones (Durkheim) - a large enough limit to pull all 23
       // confirms the French ones are actively filtered out by language, not
       // just never reached.

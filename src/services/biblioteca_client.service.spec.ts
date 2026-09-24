@@ -1,17 +1,17 @@
 import { Test } from '@nestjs/testing';
-import { TextbaseClient } from './textbase_client.service';
+import { BibliotecaClient } from './biblioteca_client.service';
 import { PROVIDER_LOGGER, Util } from '../util';
 import { PROVIDER_CONF } from '../configuration';
 import { TestUtils } from '../../test/testutils'
-import { FakeTextbaseClient } from '../../test/fake-textbase-client';
+import { FakeBibliotecaClient } from '../../test/fake-biblioteca-client';
 import { ConsoleLogger } from '@nestjs/common';
 
 describe('Textbase_clientService', () => {
-    // FakeTextbaseClient stands in for the real one: no live textbase-server
+    // FakeBibliotecaClient stands in for the real one: no live textbase-server
     // is reachable from here right now (production is intermittently down,
-    // and there's no other instance with real content) - see FakeTextbaseClient's
+    // and there's no other instance with real content) - see FakeBibliotecaClient's
     // own docstring.
-    let tbc: TextbaseClient;
+    let tbc: BibliotecaClient;
     const conf = TestUtils.testConf;
 
     beforeEach(async () => {
@@ -29,13 +29,13 @@ describe('Textbase_clientService', () => {
                     useValue: conf
                 },
                 {
-                    provide: TextbaseClient,
-                    useClass: FakeTextbaseClient,
+                    provide: BibliotecaClient,
+                    useClass: FakeBibliotecaClient,
                 },
             ],
         }).compile();
 
-        tbc = module.get<TextbaseClient>(TextbaseClient);
+        tbc = module.get<BibliotecaClient>(BibliotecaClient);
     });
 
     it('generator paragraphs()',  async () => {

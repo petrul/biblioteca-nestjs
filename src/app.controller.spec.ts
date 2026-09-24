@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
-import { TextbaseClient } from './services/textbase_client.service';
+import { BibliotecaClient } from './services/biblioteca_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 
@@ -14,7 +14,7 @@ describe('AppController', () => {
       controllers: [AppController],
       providers: [
         {
-          provide: TextbaseClient,
+          provide: BibliotecaClient,
           useValue: {},
         },
         {

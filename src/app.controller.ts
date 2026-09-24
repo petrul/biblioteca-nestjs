@@ -1,5 +1,5 @@
 import { Controller, Get, Logger, Post, Query } from '@nestjs/common';
-import { TextbaseClient } from './services/textbase_client.service';
+import { BibliotecaClient } from './services/biblioteca_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { StopWatch, Util } from './util';
 import { EntityModelTeiDiv } from './biblioteca.api';
@@ -26,7 +26,7 @@ function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
 @Controller()
 export class AppController {
   
-  constructor(protected tbc: TextbaseClient, 
+  constructor(protected tbc: BibliotecaClient, 
     protected vectorizer: VectorizerService, 
     protected col: MilvusCollection) {}
 

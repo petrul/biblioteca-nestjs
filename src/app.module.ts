@@ -5,7 +5,7 @@ import { KafkaListenerService } from './services/kafka/listener.service';
 import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
-import { TextbaseClient } from './services/textbase_client.service';
+import { BibliotecaClient } from './services/biblioteca_client.service';
 import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 import { MilvusColVectorStore } from './services/vector_store';
@@ -42,7 +42,7 @@ import { log } from 'console';
     ProducerService,
     KafkaListenerService,
     KafkaService,
-    TextbaseClient,
+    BibliotecaClient,
     {
       // The non-secret shared-resource naming convention (Kafka topics,
       // Milvus collection, embedding model) textbase-server is the source
@@ -54,10 +54,10 @@ import { log } from 'console';
       // since this also runs during app bootstrap before textbase-server
       // is necessarily up yet.
       provide: PROVIDER_SHARED_CONFIG,
-      useFactory: async (tbc: TextbaseClient, logger: LoggerService) => {
-        return await retryUntilAvailable(() => tbc.getConfig(), logger, 'textbase-server /api/admin/config');
+      useFactory: async (tbc: BibliotecaClient, logger: LoggerService) => {
+        return await retryUntilAvailable(() => tbc.getConfig(), logger, 'biblioteca-server /api/admin/config');
       },
-      inject: [TextbaseClient, PROVIDER_LOGGER]
+      inject: [BibliotecaClient, PROVIDER_LOGGER]
     },
     {
       provide: MilvusCollection,
@@ -112,12 +112,12 @@ import { log } from 'console';
     MilvusColVectorStore,
     {
       provide: VectorizerService,
-      useFactory: (tbc: TextbaseClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
+      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
         conf: VectorizerConfiguration, logger: LoggerService ) => {
         log(conf);
         return new VectorizerService(tbc, embedder, vecstore, logger, TB_GETPARAS_PAGE_SIZE);
       },
-      inject: [TextbaseClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
+      inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
     },
     
   ],

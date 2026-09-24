@@ -21,7 +21,7 @@ export default (): VectorizerConfiguration => ({
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
     miniMilvus: required('MILVUS_URL'),
-    textbaseUrl: required('BIBLIOTECA_EXTERNAL_URL'),
+    bibliotecaUrl: required('BIBLIOTECA_EXTERNAL_URL'),
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
@@ -81,7 +81,7 @@ export interface VectorizerConfiguration {
     miniMilvus: string;
 
     // this is the textbase url (i.e. https://textbase.scriptorium.ro)
-    textbaseUrl: string;
+    bibliotecaUrl: string;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
@@ -113,7 +113,7 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('miniMilvus');
     }
 
-    get textbaseUrl(): string {
-        return this.conf.get<string>('textbaseUrl');
+    get bibliotecaUrl(): string {
+        return this.conf.get<string>('bibliotecaUrl');
     }
 }

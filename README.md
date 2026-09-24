@@ -187,10 +187,10 @@ otherwise insert as new.
 | `src/services/milvus/` | `MilvusCollection` — collection creation, dimension assertions, upserts |
 | `src/services/vector_store.ts` | `MilvusColVectorStore` — the storage-facing side of a vectorize() call |
 | `src/services/vectorizer.service.ts` | The orchestration: fetch paragraphs → diff → embed → store |
-| `src/services/textbase_client.service.ts` | `TextbaseClient` — this worker's HTTP client into textbase-server (paragraphs, shared config) |
+| `src/services/biblioteca_client.service.ts` | `BibliotecaClient` — this worker's HTTP client into biblioteca-server (paragraphs, shared config) |
 | `src/services/retrying_content_embedder.ts`, `src/util.ts` | The `retryUntilAvailable`/retry-wrapper machinery used throughout |
 | `src/model/model.ts` | `ContentEmbedder` interface, `Content` shape, `PROVIDER_EMBEDDER` token |
-| `test/fake-textbase-client.ts`, `test/res/paras.json` | Fixture data and fake client used by tests instead of a live textbase-server |
+| `test/fake-biblioteca-client.ts`, `test/res/paras.json` | Fixture data and fake client used by tests instead of a live textbase-server |
 
 For a concrete task, `app.module.ts` is the fastest way to see how
 everything is actually wired together before diving into any one service.
@@ -206,8 +206,8 @@ everything is actually wired together before diving into any one service.
   embedder (fast, no real network): succeeds-first-try, recovers after
   several failures, logs one short warning per attempt rather than a
   stack trace, and proves there's no small hardcoded retry cap.
-- `textbase_client.service.spec.ts` / `vectorizer.service.spec.ts` — run
-  against `test/fake-textbase-client.ts`'s `FakeTextbaseClient` rather
+- `biblioteca_client.service.spec.ts` / `vectorizer.service.spec.ts` — run
+  against `test/fake-biblioteca-client.ts`'s `FakeBibliotecaClient` rather
   than a live textbase-server, since one with real content isn't reliably
   reachable from a dev box. Serves fixture data from `test/res/paras.json`
   (recomputing each paragraph's `text_sha256` at load time, since some
@@ -225,7 +225,7 @@ pipeline itself (that's driven entirely by Kafka - see
 | Endpoint | What it does |
 | --- | --- |
 | `GET /api/info` | Name + version from `package.json` |
-| `POST /revectorize_all?shuffle=` | Walks every opus via `TextbaseClient` and re-vectorizes each one, optionally in random order; stoppable mid-run |
+| `POST /revectorize_all?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; stoppable mid-run |
 | `POST /stop_vectorizing` | Signals a running `revectorize_all` to halt after its current opus |
 | `POST /optimize` | Compacts the Milvus collection |
 
