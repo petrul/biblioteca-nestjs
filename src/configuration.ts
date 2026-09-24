@@ -16,12 +16,12 @@ function required(name: string): string {
 export const KAFKA_GROUP_ID = 'biblioteca_server_consumer';
 
 export default (): VectorizerConfiguration => ({
-    kafkaServers: required('KAFKA_SERVERS'),
+    kafkaServers: required('KAFKA_BROKERS'),
     kafkaGroupId: KAFKA_GROUP_ID,
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
-    miniMilvus: required('MINI_MILVUS'),
-    textbaseUrl: required('TEXTBASE_URL'),
+    miniMilvus: required('MILVUS_URL'),
+    textbaseUrl: required('BIBLIOTECA_EXTERNAL_URL'),
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
