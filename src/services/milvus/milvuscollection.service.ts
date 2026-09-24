@@ -11,6 +11,18 @@ export class MilvusCollection {
     static readonly SHA256 = 'sha256';
     static readonly URL: string = 'url';
 
+    /**
+     * What a write reports when there is genuinely nothing to write: Milvus
+     * rejects empty upserts/inserts outright ("The type of the `fields_data`
+     * should be an array and length > 0"), and the dedup in newOrModified()
+     * legitimately produces empty batches (every paragraph of a page already
+     * stored, unchanged) - those must succeed as no-ops, not bubble up as
+     * errors that wedge the Kafka consumer on the same event forever.
+     */
+    static readonly NOOP_MUTATION_RESULT = {
+        insert_cnt: '0', delete_cnt: '0', upsert_cnt: '0',
+    } as unknown as MutationResult;
+
     static readonly DIM_384 = 384;
     static readonly DIM_768 = 768;
     static readonly DIM_1024 = 1024;
@@ -94,12 +106,32 @@ export class MilvusCollection {
       return this.milvus.closeConnection();
     }
 
-    async insert(content: Content[]) {
-      const data: RowData[] = content.map(it => { return {
+    /**
+     * Maps Content to Milvus rows, dropping duplicate primary keys first:
+     * a batch whose paragraphs repeat a text (same sha256, e.g. an opus
+     * title appearing twice) carries duplicate PKs, and Milvus reports
+     * success for such a batch while persisting none of it (observed in
+     * production: the same page was "stored" hundreds of times, zero rows
+     * in the collection).
+     */
+    protected toRows(content: Content[]): RowData[] {
+      if (!content)
+        return [];
+      const bySha = new Map<string, Content>();
+      for (const it of content) {
+        bySha.set(it.sha256, it);
+      }
+      return [...bySha.values()].map(it => { return {
         sha256: it.sha256,
         url: it.url,
         embedding: it.embedding
       }});
+    }
+
+    async insert(content: Content[]) {
+      const data: RowData[] = this.toRows(content);
+      if (data.length === 0)
+        return MilvusCollection.NOOP_MUTATION_RESULT;
 
       return await this.milvus.insert({
         collection_name: this.name,
@@ -108,14 +140,9 @@ export class MilvusCollection {
     }
 
     async upsert(content: Content[]) : Promise<MutationResult> {
-      if (!content)
-        return;
-
-      const data: RowData[] = content.map(it => { return {
-        sha256: it.sha256,
-        url: it.url,
-        embedding: it.embedding
-      }});
+      const data: RowData[] = this.toRows(content);
+      if (data.length === 0)
+        return MilvusCollection.NOOP_MUTATION_RESULT;
 
       return await this.milvus.upsert({
         collection_name: this.name,
@@ -123,13 +150,24 @@ export class MilvusCollection {
       })
     }
 
-    /** Delete exactly one opus root and its descendants, never a similarly-prefixed sibling. */
+    /**
+     * Delete exactly one opus root and its descendants, never a
+     * similarly-prefixed sibling. The stored urls are whatever host the
+     * server built them with - the vectorizer fetches paragraphs through
+     * the internal service address and gets absolute http://host/author/opus
+     * urls, while anything vectorized via an external request carries the
+     * public host - so the opus path cannot be anchored at the start of the
+     * url; it is matched at the end instead, with the path itself as the
+     * delimiter (the '/authority/opus' path is unique per opus, so a
+     * longer sibling path like 'author/opus-longa' still never matches).
+     */
     async deleteByUrlPrefix(opusPath: string): Promise<MutationResult> {
       if (!opusPath?.trim()) throw new Error("Cannot delete Milvus vectors for an empty opus path");
       const escaped = opusPath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      const url = MilvusCollection.URL;
       return await this.milvus.deleteEntities({
         collection_name: this.name,
-        expr: `${MilvusCollection.URL} == '${escaped}' || ${MilvusCollection.URL} like '${escaped}/%'`,
+        expr: `${url} == '${escaped}' || ${url} like '${escaped}/%' || ${url} like '%/${escaped}' || ${url} like '%/${escaped}/%'`,
       });
     }
 
