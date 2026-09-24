@@ -4,6 +4,12 @@ import { VectorizerConfiguration } from '../../configuration';
 import { Content } from 'src/model/model';
 import { log } from 'console';
 
+// This suite talks to the real integration Milvus, and creating/validating
+// a collection legitimately takes longer than jest's 5s default hook
+// timeout when the Milvus host is busy (observed twice: stable builds
+// #7168 and #7174 failed solely on this beforeEach under load).
+jest.setTimeout(60_000);
+
 async function waitForRows(col: MilvusCollection, expected: number): Promise<any[]> {
     for (let attempt = 0; attempt < 40; attempt++) {
         const rows = await col.findAll([MilvusCollection.SHA256, MilvusCollection.URL]);
