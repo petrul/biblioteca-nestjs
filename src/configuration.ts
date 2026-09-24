@@ -13,7 +13,7 @@ function required(name: string): string {
 // topic name is what's shared, and that comes from PROVIDER_SHARED_CONFIG --
 // see KafkaListenerService), so it's hardcoded here rather than externalized
 // into the pass store as a KAFKA_GROUP_ID secret.
-export const KAFKA_GROUP_ID = 'biblioteca_server_consumer';
+export const KAFKA_GROUP_ID = 'biblioteca_nestjs';
 
 export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_BROKERS'),

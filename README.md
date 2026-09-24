@@ -78,7 +78,7 @@ and a `KAFKA_GROUP_ID` — but
 the Milvus/topic/page-size ones are now decided by textbase-server (see
 [Shared config](#shared-config-the-important-part)), and the consumer
 group id is the worker's own identity, the same in every environment, so
-it's the hardcoded `biblioteca_server_consumer` constant in
+it's the hardcoded `biblioteca_nestjs` constant in
 `src/configuration.ts` instead of an env var — in all cases the variables
 were removed rather than left around unused.
 
