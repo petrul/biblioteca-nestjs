@@ -2,7 +2,7 @@ import { Controller, Get, Logger, Post, Query } from '@nestjs/common';
 import { TextbaseClient } from './services/textbase_client.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { StopWatch, Util } from './util';
-import { EntityModelTeiDiv } from './textbase.api';
+import { EntityModelTeiDiv } from './biblioteca.api';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
 
 const packageInfo: { name: string; version: string } = require('../package.json');

@@ -1,7 +1,7 @@
-# textbase api
-SWAGGER_FILE=textbase-api.json
-curl  https://textbase.scriptorium.ro/api/docs -H 'Accept:application/json' > "$SWAGGER_FILE"
-npx swagger-typescript-api generate -p "$SWAGGER_FILE" -o src -n textbase.api.ts
+# biblioteca-server api
+SWAGGER_FILE=biblioteca-api.json
+curl  https://biblioteca.scriptorium.ro/api/docs -H 'Accept:application/json' > "$SWAGGER_FILE"
+npx swagger-typescript-api generate -p "$SWAGGER_FILE" -o src -n biblioteca.api.ts
 
 
 # sentence transformers api

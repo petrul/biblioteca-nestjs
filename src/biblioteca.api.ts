@@ -45,13 +45,9 @@ export interface Author {
   avatar?: {
     binaryStream?: any;
   };
-  visualName?: string;
-  anonymous?: boolean;
-}
-
-export interface EntityModelTeiElem {
-  xpath?: string;
-  lang?:
+  bio?: string;
+  bioSourceUrl?: string;
+  nativeLanguage?:
     | "BG"
     | "BR"
     | "CA"
@@ -71,73 +67,32 @@ export interface EntityModelTeiElem {
     | "RO"
     | "RU"
     | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  leaf?: boolean;
-  author?: Author;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface PageMetadata {
-  /** @format int64 */
-  size?: number;
-  /** @format int64 */
-  totalElements?: number;
-  /** @format int64 */
-  totalPages?: number;
-  /** @format int64 */
-  number?: number;
-}
-
-export interface PagedModelEntityModelTeiElem {
-  _embedded?: {
-    teiElems?: EntityModelTeiElem[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface EntityModelAuthor {
-  /** @format int64 */
-  id?: number;
-  strId?: string;
-  lastName?: string;
-  firstName?: string;
-  displayName?: string;
-  avatar?: {
-    binaryStream?: any;
-  };
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  writingLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  country?: string;
   visualName?: string;
   anonymous?: boolean;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelAuthor {
-  _embedded?: {
-    authors?: EntityModelAuthor[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelAuthor {
-  _embedded?: {
-    authors?: EntityModelAuthor[];
-  };
-  _links?: Links;
 }
 
 export interface EntityModelTeiDiv {
@@ -183,9 +138,11 @@ export interface EntityModelTeiDiv {
    * @maxLength 3000
    */
   head?: string;
+  summary?: string;
+  summarySourceUrl?: string;
   leaf?: boolean;
-  author?: Author;
   completePath?: string;
+  author?: Author;
   _links?: Links;
 }
 
@@ -232,9 +189,22 @@ export interface TeiDiv {
    * @maxLength 3000
    */
   head?: string;
+  summary?: string;
+  summarySourceUrl?: string;
   leaf?: boolean;
-  author?: Author;
   completePath?: string;
+  author?: Author;
+}
+
+export interface PageMetadata {
+  /** @format int64 */
+  size?: number;
+  /** @format int64 */
+  totalElements?: number;
+  /** @format int64 */
+  totalPages?: number;
+  /** @format int64 */
+  number?: number;
 }
 
 export interface PagedModelEntityModelTeiDiv {
@@ -286,6 +256,164 @@ export interface TeiFile {
   /** @format date-time */
   timestamp?: string;
   author?: Author;
+}
+
+export interface EntityModelTeiElem {
+  xpath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
+  author?: Author;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiElem {
+  _embedded?: {
+    teiElems?: EntityModelTeiElem[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelAuthor {
+  /** @format int64 */
+  id?: number;
+  strId?: string;
+  lastName?: string;
+  firstName?: string;
+  displayName?: string;
+  avatar?: {
+    binaryStream?: any;
+  };
+  bio?: string;
+  bioSourceUrl?: string;
+  nativeLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  writingLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  country?: string;
+  visualName?: string;
+  anonymous?: boolean;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
+}
+
+export interface SaveRequest {
+  divPath?: string;
+}
+
+export interface ReadingProgressDto {
+  opusPath?: string;
+  divPath?: string;
+  divHead?: string;
+  /** @format date-time */
+  updatedAt?: string;
+  /** @format int32 */
+  touchCount?: number;
+  read?: boolean;
+  /** @format int64 */
+  attentionSeconds?: number;
+  /** @format double */
+  scrollFraction?: number;
+}
+
+export interface ScrollRequest {
+  opusPath?: string;
+  divPath?: string;
+  /** @format double */
+  scrollFraction?: number;
+}
+
+export interface AttentionRequest {
+  opusPath?: string;
+  /** @format int64 */
+  secondsDelta?: number;
 }
 
 export interface RegisterRequest {
@@ -1573,6 +1701,72 @@ export class Api<
     /**
      * No description
      *
+     * @tags reading-progress-rest-controller
+     * @name Mine
+     * @request GET:/api/reading-progress
+     */
+    mine: (params: RequestParams = {}) =>
+      this.request<ReadingProgressDto[], any>({
+        path: `/api/reading-progress`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags reading-progress-rest-controller
+     * @name Save
+     * @request PUT:/api/reading-progress
+     */
+    save: (data: SaveRequest, params: RequestParams = {}) =>
+      this.request<ReadingProgressDto, any>({
+        path: `/api/reading-progress`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags reading-progress-rest-controller
+     * @name UpdateScrollPosition
+     * @request PUT:/api/reading-progress/scroll
+     */
+    updateScrollPosition: (data: ScrollRequest, params: RequestParams = {}) =>
+      this.request<ReadingProgressDto, any>({
+        path: `/api/reading-progress/scroll`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags reading-progress-rest-controller
+     * @name AddAttention
+     * @request PUT:/api/reading-progress/attention
+     */
+    addAttention: (data: AttentionRequest, params: RequestParams = {}) =>
+      this.request<ReadingProgressDto, any>({
+        path: `/api/reading-progress/attention`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags user-rest-controller
      * @name Register
      * @request POST:/api/users/register
@@ -1591,10 +1785,10 @@ export class Api<
      * No description
      *
      * @tags div-collection-rest-controller
-     * @name Mine
+     * @name Mine1
      * @request GET:/api/collections/mine
      */
-    mine: (params: RequestParams = {}) =>
+    mine1: (params: RequestParams = {}) =>
       this.request<DivCollectionDto[], any>({
         path: `/api/collections/mine`,
         method: "GET",
@@ -1632,6 +1826,21 @@ export class Api<
         method: "POST",
         body: data,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags user-rest-controller
+     * @name Me
+     * @request GET:/api/users/me
+     */
+    me: (params: RequestParams = {}) =>
+      this.request<Record<string, any>, any>({
+        path: `/api/users/me`,
+        method: "GET",
         format: "json",
         ...params,
       }),
@@ -1803,6 +2012,27 @@ export class Api<
     ) =>
       this.request<Hits, any>({
         path: `/api/search/ann`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags reading-progress-rest-controller
+     * @name One
+     * @request GET:/api/reading-progress/one
+     */
+    one: (
+      query: {
+        opusPath: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ReadingProgressDto, any>({
+        path: `/api/reading-progress/one`,
         method: "GET",
         query: query,
         format: "json",

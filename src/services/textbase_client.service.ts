@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { Api, AuthorDto, EntityModelTeiDiv } from "../textbase.api";
+import { Api, AuthorDto, EntityModelTeiDiv } from "../biblioteca.api";
 import { AppConfService, PROVIDER_CONF, SharedTextbaseConfig } from "../configuration";
 import { assert } from "console";
 import { StopWatch } from "../util";
@@ -41,7 +41,7 @@ export class TextbaseClient {
       // executeSearchTeidivGetN's numeric suffix is Spring Data REST's own
       // generated name for this un-annotated search endpoint - it shifts
       // whenever a sibling /api/drest/teiDivs/search/* endpoint is added or
-      // removed elsewhere, so it has to be re-checked (grep textbase.api.ts
+      // removed elsewhere, so it has to be re-checked (grep biblioteca.api.ts
       // for `findOpera`) every time the client gets regenerated.
       const resp = await this.tb.api.executeSearchTeidivGet7({ page: pageNr, size: pageSize});
       const divs = resp.data._embedded.teiDivs;

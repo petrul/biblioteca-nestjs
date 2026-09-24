@@ -1,7 +1,7 @@
 import { Inject, Injectable, LoggerService, OnModuleInit } from "@nestjs/common";
 import { TextbaseClient } from "./textbase_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
-import { TeiElemDto } from "../textbase.api";
+import { TeiElemDto } from "../biblioteca.api";
 import { assert } from "console";
 import { PROVIDER_VECTOR_STORE, VectorStore } from "./vector_store";
 import { StopWatch, Util } from "../util";

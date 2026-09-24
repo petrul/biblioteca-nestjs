@@ -5,7 +5,7 @@
  * and a sha256 
  */
 
-// import { AuthorDto } from "src/textbase.api";
+// import { AuthorDto } from "src/biblioteca.api";
 
 // export interface ContentDto {
 //     url: string

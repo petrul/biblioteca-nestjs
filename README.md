@@ -68,10 +68,13 @@ rake docker:publish    # also push to mini.local:5000
 ## Configuration: what's actually load-bearing
 
 `.env.example` lists the complete set of environment variables
-`src/configuration.ts` requires at startup: `KAFKA_SERVERS`,
-`STS_SERVER`, `OLLAMA_SERVER`, `MINI_MILVUS`, `TEXTBASE_URL`. There used
-to be more of these — a per-collection env var for each Milvus collection,
-a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE`, and a `KAFKA_GROUP_ID` — but
+`src/configuration.ts` requires at startup: `KAFKA_BROKERS`,
+`STS_SERVER`, `OLLAMA_SERVER`, `MILVUS_URL`, `BIBLIOTECA_EXTERNAL_URL` —
+the shared pass-store names the whole Biblioteca family uses, so the worker
+boots directly off a sourced `biblioteca/<stage>` environment with no
+renaming in between. There used to be more of these — a per-collection env
+var for each Milvus collection, a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE`,
+and a `KAFKA_GROUP_ID` — but
 the Milvus/topic/page-size ones are now decided by textbase-server (see
 [Shared config](#shared-config-the-important-part)), and the consumer
 group id is the worker's own identity, the same in every environment, so
@@ -232,15 +235,15 @@ checked-in export like textbase-server's, since this surface is small and
 purely operational (no external client generates against it the way the
 reader generates against textbase-server's).
 
-## Regenerating the textbase-server API client
+## Regenerating the biblioteca-server API client
 
 `swagger-typescript-api` generates this project's typed client from
-textbase-server's own OpenAPI spec:
+biblioteca-server's own OpenAPI spec:
 
 ```bash
-./gen-tb-api.sh
+./gen-biblioteca-api.sh
 ```
 
 Downloads the live spec from the production server and regenerates
-`src/textbase.api.ts` (and the sentence-transformers client alongside it)
+`src/biblioteca.api.ts` (and the sentence-transformers client alongside it)
 — run this after textbase-server's API surface changes.
