@@ -69,11 +69,14 @@ rake docker:publish    # also push to mini.local:5000
 
 `.env.example` lists the complete set of environment variables
 `src/configuration.ts` requires at startup: `KAFKA_SERVERS`,
-`KAFKA_GROUP_ID`, `STS_SERVER`, `OLLAMA_SERVER`, `MINI_MILVUS`,
-`TEXTBASE_URL`. There used to be more of these — a per-collection env var
-for each Milvus collection, a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE` —
-but all of that is now decided by textbase-server instead (see
-[Shared config](#shared-config-the-important-part)), so those variables
+`STS_SERVER`, `OLLAMA_SERVER`, `MINI_MILVUS`, `TEXTBASE_URL`. There used
+to be more of these — a per-collection env var for each Milvus collection,
+a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE`, and a `KAFKA_GROUP_ID` — but
+the Milvus/topic/page-size ones are now decided by textbase-server (see
+[Shared config](#shared-config-the-important-part)), and the consumer
+group id is the worker's own identity, the same in every environment, so
+it's the hardcoded `biblioteca_server_consumer` constant in
+`src/configuration.ts` instead of an env var — in all cases the variables
 were removed rather than left around unused.
 
 ### Shared config (the important part)

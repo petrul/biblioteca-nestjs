@@ -16,8 +16,9 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
   constructor(protected ks: KafkaService,
     protected tbc: TextbaseClient,
     protected vectorizer: VectorizerService,
-    // kafkaGroupId is nestjs's own internal consumer identity -- textbase-server
-    // never needs to agree on it, so it stays local/env-driven (PROVIDER_CONF).
+    // kafkaGroupId is this worker's own internal consumer identity -- textbase-server
+    // never needs to agree on it, so it's a hardcoded application default
+    // (KAFKA_GROUP_ID in configuration.ts), not an env var (PROVIDER_CONF).
     // The topic name it subscribes to DOES need cross-service agreement, so
     // that comes from PROVIDER_SHARED_CONFIG instead (see configuration.ts).
     @Inject(PROVIDER_CONF) protected conf: VectorizerConfiguration,

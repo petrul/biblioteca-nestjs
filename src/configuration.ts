@@ -8,9 +8,16 @@ function required(name: string): string {
     return value;
 }
 
+// This worker's own Kafka consumer group id. A stable product convention, not
+// a per-environment value: no other service ever needs to agree on it (the
+// topic name is what's shared, and that comes from PROVIDER_SHARED_CONFIG --
+// see KafkaListenerService), so it's hardcoded here rather than externalized
+// into the pass store as a KAFKA_GROUP_ID secret.
+export const KAFKA_GROUP_ID = 'biblioteca_server_consumer';
+
 export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_SERVERS'),
-    kafkaGroupId: required('KAFKA_GROUP_ID'),
+    kafkaGroupId: KAFKA_GROUP_ID,
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
     miniMilvus: required('MINI_MILVUS'),
