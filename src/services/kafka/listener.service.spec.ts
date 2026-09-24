@@ -104,17 +104,20 @@ describe('KafkaListenerService', () => {
         expect(typeof eachMessage).toBe('function');
     });
 
-    it('skips the event when the server answers 404 - offset commits, no retry, no vectorizing', async () => {
-        // the generated client throws the raw Response on non-OK
-        getElemByPath.mockRejectedValue({ status: 404, ok: false });
+    it.each([404, 400])('skips the event when the server answers %s - offset commits, no retry, no vectorizing', async (status) => {
+      // 404: the opus is gone (deleted book, or re-import removed it).
+      // 400: the server rejects the request for good - seen in production
+      // with legacy pre-/author/opus event paths (getByPath's shape guard).
+      // The generated client throws the raw Response on non-OK either way.
+      getElemByPath.mockRejectedValue({ status, ok: false });
 
-        await consumeImported(); // must settle - falling out of eachMessage lets KafkaJS commit the offset
+      await consumeImported(); // must settle - falling out of eachMessage lets KafkaJS commit the offset
 
-        expect(getElemByPath).toHaveBeenCalledTimes(1);
-        expect(removeOpus).toHaveBeenCalledTimes(1); // the pre-vectorizing purge still ran
-        expect(removeOpus).toHaveBeenCalledWith(OPUS_PATH);
-        expect(vectorize).not.toHaveBeenCalled();
-        expect(delaySpy).not.toHaveBeenCalledWith(10 * 1000); // no retry back-off happened
+      expect(getElemByPath).toHaveBeenCalledTimes(1);
+      expect(removeOpus).toHaveBeenCalledTimes(1); // the pre-vectorizing purge still ran
+      expect(removeOpus).toHaveBeenCalledWith(OPUS_PATH);
+      expect(vectorize).not.toHaveBeenCalled();
+      expect(delaySpy).not.toHaveBeenCalledWith(10 * 1000); // no retry back-off happened
     });
 
     it.each([404])('also skips a 404 raised while fetching paragraphs', async () => {

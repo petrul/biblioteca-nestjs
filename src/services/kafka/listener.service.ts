@@ -90,16 +90,20 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
             this.log.log(`done vectorizing for ${obj.id}`, asJson);
             return;
           } catch(err: any) {
-            // The generated client throws the raw Response on non-OK, so a
-            // clean 404 from the server means the opus is gone for good -
-            // a stale Kafka event for a book that was deleted, or whose
-            // re-import removed it from under us. Retrying can never
-            // succeed and this loop otherwise wedges the consumer on the
-            // same event forever - log once, fall out of eachMessage so
-            // KafkaJS commits the offset, and move on. Everything else
-            // (embedder down, Milvus down, fetch failed) stays retryable.
-            if (err && err.status === 404) {
-              this.log.warn(`opus ${obj?.path ?? '<unknown>'} no longer exists on the server (404) - skipping Kafka event`,
+            // The generated client throws the raw Response on non-OK. A
+            // 404 means the opus is gone for good - a stale Kafka event
+            // for a book that was deleted, or whose re-import removed it
+            // from under us; a 400 means the server rejects the request
+            // for good - observed in production with pre-/author/opus
+            // legacy event paths (getByPath throws "path must be of the
+            // form /author/opus"). Both are definitive server verdicts
+            // that an identical retry can never change, and this loop
+            // otherwise wedges the consumer on the same event forever -
+            // log once, fall out of eachMessage so KafkaJS commits the
+            // offset, and move on. Everything else (embedder down,
+            // Milvus down, fetch failed, 5xx) stays retryable.
+            if (err && (err.status === 404 || err.status === 400)) {
+              this.log.warn(`opus ${obj?.path ?? '<unknown>'} rejected by the server (${err.status}) - skipping Kafka event`,
                 message.value.toString());
               return;
             }
