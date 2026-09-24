@@ -99,13 +99,22 @@ task :npminstall do
     sh 'npm ci'
 end
 
+# rake clean removes node_modules; rake run/test on a cleaned checkout
+# would otherwise die with "nest: not found"-style errors - install on
+# demand only when they're actually absent, so day-to-day runs don't pay
+# a full npm ci every time.
+desc 'npminstall, but only when node_modules is absent'
+task :ensure_deps do
+    Rake::Task[:npminstall].invoke unless File.directory?('node_modules')
+end
+
 desc 'Compile the NestJS application'
-task build: [:npminstall] do
+task build: [:ensure_deps] do
     sh 'npm run build'
 end
 
 desc 'Run the complete test suite with a profile (dev by default)'
-task :test, [:profile] do |_task, args|
+task :test, [:profile] => [:ensure_deps] do |_task, args|
     profile = selected_profile(args)
     load_profile!(profile)
     if ENV['TEAMCITY_VERSION']
@@ -116,7 +125,7 @@ task :test, [:profile] do |_task, args|
 end
 
 desc 'Run the application using a profile (dev by default)'
-task :run, [:profile] do |_task, args|
+task :run, [:profile] => [:ensure_deps] do |_task, args|
     load_profile!(selected_profile(args))
     sh 'npm run start'
 end
