@@ -1,6 +1,6 @@
 {
   "name": "biblioteca-nestjs",
-  "version": "0.9.6-SNAPSHOT",
+  "version": "0.9.6",
   "description": "",
   "main": "dist/main.js",
   "bin": {
