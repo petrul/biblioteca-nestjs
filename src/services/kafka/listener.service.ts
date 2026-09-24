@@ -90,6 +90,19 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
             this.log.log(`done vectorizing for ${obj.id}`, asJson);
             return;
           } catch(err: any) {
+            // The generated client throws the raw Response on non-OK, so a
+            // clean 404 from the server means the opus is gone for good -
+            // a stale Kafka event for a book that was deleted, or whose
+            // re-import removed it from under us. Retrying can never
+            // succeed and this loop otherwise wedges the consumer on the
+            // same event forever - log once, fall out of eachMessage so
+            // KafkaJS commits the offset, and move on. Everything else
+            // (embedder down, Milvus down, fetch failed) stays retryable.
+            if (err && err.status === 404) {
+              this.log.warn(`opus ${obj?.path ?? '<unknown>'} no longer exists on the server (404) - skipping Kafka event`,
+                message.value.toString());
+              return;
+            }
             this.log.error('failed to process opus event; retaining the Kafka offset and retrying in 10 seconds', err);
             await Util.delay(10 * 1000);
             await heartbeat();
