@@ -47,6 +47,15 @@ export interface SharedTextbaseConfig {
     milvus: {
         collection: string;
     };
+    // Paragraph size window for vectorization - the server's
+    // application.properties vectorizer.para.* pair (exported alongside the
+    // rest by GET /api/admin/config): paragraphs strictly shorter than
+    // minChars are skipped as noise; longer than maxChars they are
+    // truncated to maxChars, not dropped.
+    paragraph: {
+        minChars: number;
+        maxChars: number;
+    };
     embedder: {
         // canonical Milvus-collection-naming-convention identifier, e.g. "BGE_M3"
         model: string;

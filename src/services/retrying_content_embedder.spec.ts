@@ -11,7 +11,7 @@ describe('RetryingContentEmbedder', () => {
     const POLL_INTERVAL_MS = 5;
 
     it('returns the inner embedder result immediately when it succeeds first try', async () => {
-        const inner: ContentEmbedder = { embeddings: jest.fn().mockResolvedValue(embedded), supportedLanguages: 'all' };
+        const inner: ContentEmbedder = { embeddings: jest.fn().mockResolvedValue(embedded), supportedLanguages: 'all', maxContextChars: 16384 };
         const retrying = new RetryingContentEmbedder(inner, new ConsoleLogger(), POLL_INTERVAL_MS);
 
         const result = await retrying.embeddings(content);
@@ -27,6 +27,7 @@ describe('RetryingContentEmbedder', () => {
                 .mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
                 .mockResolvedValueOnce(embedded),
             supportedLanguages: 'all',
+            maxContextChars: 16384,
         };
         const retrying = new RetryingContentEmbedder(inner, new ConsoleLogger(), POLL_INTERVAL_MS);
 
@@ -48,7 +49,7 @@ describe('RetryingContentEmbedder', () => {
             mockFn.mockRejectedValueOnce(new Error('down'));
         }
         mockFn.mockResolvedValueOnce(embedded);
-        const inner: ContentEmbedder = { embeddings: mockFn, supportedLanguages: 'all' };
+        const inner: ContentEmbedder = { embeddings: mockFn, supportedLanguages: 'all', maxContextChars: 16384 };
         const retrying = new RetryingContentEmbedder(inner, new ConsoleLogger(), POLL_INTERVAL_MS);
 
         const result = await retrying.embeddings(content);

@@ -29,4 +29,8 @@ export class RetryingContentEmbedder implements ContentEmbedder {
     get supportedLanguages(): string[] | 'all' {
         return this.inner.supportedLanguages;
     }
+
+    get maxContextChars(): number {
+        return this.inner.maxContextChars;
+    }
 }

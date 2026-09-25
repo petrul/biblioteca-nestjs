@@ -1,6 +1,7 @@
 import { Inject, Injectable, LoggerService, OnModuleInit } from "@nestjs/common";
 import { BibliotecaClient } from "./biblioteca_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
+import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from "../configuration";
 import { TeiElemDto } from "../biblioteca.api";
 import { assert } from "console";
 import { PROVIDER_VECTOR_STORE, VectorStore } from "./vector_store";
@@ -46,6 +47,7 @@ export class VectorizerService implements OnModuleInit {
         @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder,
         @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
         protected log: LoggerService,
+        @Inject(PROVIDER_SHARED_CONFIG) protected shared: SharedTextbaseConfig,
         pageSize = 2000) {
             this.pageSize = pageSize;
         }
@@ -110,12 +112,28 @@ export class VectorizerService implements OnModuleInit {
                 url:      it.url,
                 language: it.language,
             }});
+            // Paragraph size window from the server's shared config
+            // (vectorizer.para.* in its application.properties): the
+            // too-short are corpus noise and get skipped; the too-long are
+            // truncated to maxChars - NOT dropped - so long expository
+            // paragraphs and <table> blocks stay searchable. The effective
+            // max also clamps to this embedder's context window, so a
+            // raised maxChars can never overflow the model with inputs it
+            // would silently truncate or reject on its own. The sha256
+            // stays the FULL source paragraph's hash either way: it is the
+            // row's identity for the reimport dedup, not a digest of what
+            // got embedded.
+            const minChars = this.shared.paragraph.minChars;
+            const maxChars = Math.min(this.shared.paragraph.maxChars, this.embedder.maxContextChars);
             const filtered = contentArr.filter(it =>
                     it.text != null
                     && it.sha256 != null
                     && it.url != null
-                    && it.text.length > 20
-                    && it.text.length < 3000
+                    && it.text.length > minChars
+            ).map(it =>
+                it.text.length > maxChars
+                    ? { ...it, text: it.text.slice(0, maxChars) }
+                    : it
             );
 
             assert (filtered.length <= this.pageSize);

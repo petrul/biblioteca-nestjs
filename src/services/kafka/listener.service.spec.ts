@@ -65,6 +65,7 @@ describe('KafkaListenerService', () => {
             },
             milvus: { collection: 'test-collection' },
             embedder: { model: 'TEST', dimension: 3 },
+            paragraph: { minChars: 20, maxChars: 3000 },
         };
 
         const listener = new KafkaListenerService(

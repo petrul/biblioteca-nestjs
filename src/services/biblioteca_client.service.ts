@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { Api, AuthorDto, EntityModelTeiDiv } from "../biblioteca.api";
+import { Api, AuthorDto, EntityModelTeiDiv, SharedConfigDto } from "../biblioteca.api";
 import { AppConfService, PROVIDER_CONF, SharedTextbaseConfig } from "../configuration";
 import { assert } from "console";
 import { StopWatch } from "../util";
@@ -67,7 +67,13 @@ export class BibliotecaClient {
      */
     async getConfig(): Promise<SharedTextbaseConfig> {
       const resp = await this.tb.api.config();
-      const cfg = resp.data;
+      // The generated SharedConfigDto only knows the fields of whichever
+      // server version biblioteca.api.ts was generated from - servers
+      // older than the paragraph-section addition don't send it - so read
+      // the response through a widened type here (until the next
+      // gen-biblioteca-api.sh regeneration makes the cast redundant) and
+      // fall back to the values that generation hardcoded in the filter.
+      const cfg = resp.data as SharedConfigDto & { paragraph?: { minChars?: number; maxChars?: number } };
       if (!cfg.kafka?.newOpusImportedTopic || !cfg.kafka?.opusReimportedTopic || !cfg.kafka?.opusRemovedTopic) {
         throw new Error(`GET ${this.conf.bibliotecaUrl}/api/admin/config: missing kafka topic name(s): ${JSON.stringify(cfg.kafka)}`);
       }
@@ -85,6 +91,15 @@ export class BibliotecaClient {
         },
         milvus: {
           collection: cfg.milvus.collection,
+        },
+        // A server older than the SharedConfigDto.Paragraph addition
+        // (biblioteca-server 0.9.6) simply omits the whole section - fall
+        // back to the very values that server generation hardcoded in the
+        // vectorizer's filter, so running against it behaves identically
+        // to how it always did.
+        paragraph: {
+          minChars: cfg.paragraph?.minChars ?? 20,
+          maxChars: cfg.paragraph?.maxChars ?? 3000,
         },
         embedder: {
           model: cfg.embedder.model,
