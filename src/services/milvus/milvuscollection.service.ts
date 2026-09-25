@@ -252,15 +252,29 @@ export class MilvusCollection {
         collection_name: this.name,
         index_name:'index',
         field_name: MilvusCollection.EMBEDDING,
-        extra_params: MilvusCollection.idx_ivfsq8_l2_256(),
+        extra_params: MilvusCollection.idx_ivfsq8_l2_8192(),
       });
     }
 
-  protected static idx_ivfsq8_l2_256() : CreateIndexParam {
+  /**
+   * IVF_SQ8 (int8-quantized vectors, L2): ~1.1KB/row of index on disk and
+   * ~7G resident in Milvus once the full ~6.5M-paragraph corpus is indexed,
+   * which is what fits this deployment's host - a full-precision HNSW
+   * index would need ~27G of RAM loaded, more than the box has total.
+   * nlist follows the 4*sqrt(N) rule of thumb for the target corpus
+   * (4*sqrt(6.5M) ~= 10K; 8192 chosen as the round power of two below it).
+   * An index is created only together with a collection, so nlist takes
+   * effect at the truncate step of a revectorize_all (or any manual
+   * drop+recreate) - an already-existing collection keeps the index it
+   * was built with. The search side (biblioteca-server's
+   * MilvusCollection.DEFAULT_NPROBE) must stay in a sane relation to this
+   * nlist - see the README's "Vector-related configuration" section.
+   */
+  protected static idx_ivfsq8_l2_8192() : CreateIndexParam {
     return {
       "index_type": "IVF_SQ8",
       "metric_type": "L2",
-      "params": '{"nlist": "256"}'
+      "params": '{"nlist": "8192"}'
     };
   }
 
