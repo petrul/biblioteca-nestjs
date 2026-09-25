@@ -114,7 +114,7 @@ export class VectorizerService implements OnModuleInit {
                     it.text != null
                     && it.sha256 != null
                     && it.url != null
-                    && it.text.length > 10
+                    && it.text.length > 20
                     && it.text.length < 3000
             );
 
