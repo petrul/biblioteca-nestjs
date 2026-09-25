@@ -164,6 +164,43 @@ nlist all come along) before re-embedding everything — re-running onto a
 stale collection would layer fresh append-only binlogs on top of the old
 rows', which Milvus only reaps lazily.
 
+### How IVF_SQ8 works (and what nlist/nprobe trade off)
+
+The name is two orthogonal ideas stacked:
+
+- **IVF — inverted file.** At index-build time, k-means clusters the
+  collection's vectors into `nlist` buckets (centroids); every vector is
+  stored on the bucket list of its nearest centroid. At query time: embed
+  the query, find its `nprobe` nearest centroids, and scan only the
+  vectors in those buckets — instead of all N. The cost of one search is
+  roughly `nprobe × (rows / nlist)` distance computations.
+- **SQ8 — scalar quantization to 8 bits.** Every 32-bit float component
+  of a vector is compressed to one byte (4x smaller; bge-m3's components
+  are in [-1, 1] so a linear scale fits comfortably). Distances are
+  computed on the quantized bytes: a 1024-dim vector costs ~1KB instead
+  of 4KB, at the price of a small distance error that perturbs ranking
+  near-ties.
+
+The parameters, and their failure modes:
+
+- `nlist` (build-time, once per collection): bucket count. Too few →
+  giant buckets, slow scans; too many → centroid-distance overhead and
+  sparse buckets. Rule of thumb 4·√N, hence 8192 for the ~6.5M-row target
+  (~800 rows per bucket).
+- `nprobe` (per-query): buckets scanned. Recall rises with nprobe,
+  latency with it; √nlist (64, biblioteca-server's DEFAULT_NPROBE) is
+  the balanced default. Raise it for recall-critical evaluation runs,
+  not permanently.
+- **L2** as the metric loses nothing here: bge-m3 emits L2-normalized
+  vectors, for which L2 ordering is identical to cosine ordering.
+
+Expected quality at this scale: roughly 85–95% recall@10 — SQ8's
+quantization noise plus vectors that landed just outside the probed
+buckets. Full-precision HNSW would reach ~97%+ but needs ~27G resident
+(see above). If recall ever becomes the binding constraint, the upgrade
+path is DiskANN or a Qdrant-style quantized-HNSW with reranking — not
+raising nprobe forever.
+
 ## Kafka contract (AsyncAPI)
 
 `KafkaListenerService` (`src/services/kafka/listener.service.ts`) is this
