@@ -48,6 +48,10 @@ export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
     // only (sentence-transformers' own model card) - not multilingual.
     readonly supportedLanguages: string[] | 'all' = ['en'];
 
+    // all-mpnet-base-v2: 512-token (word-piece) context - a very
+    // conservative ~2 chars per token for English text.
+    readonly maxContextChars = 1024;
+
     constructor(private stsService: SentenceTransformersService) {}
 
     /**
@@ -83,6 +87,9 @@ export class AllMiniLmL6V2_StsService implements StsEncoder, ContentEmbedder {
     // (sentence-transformers' own model card) - not multilingual, despite
     // being the current production-default embedder (see app.module.ts).
     readonly supportedLanguages: string[] | 'all' = ['en'];
+
+    // all-MiniLM-L6-v2: 256-token (word-piece) context.
+    readonly maxContextChars = 512;
 
     constructor(private stsService: SentenceTransformersService) {}
 

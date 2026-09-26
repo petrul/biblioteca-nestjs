@@ -93,12 +93,113 @@ textbase-server (`app.module.ts`'s `PROVIDER_SHARED_CONFIG`, wrapped in
 - which Milvus collection to write to, and its vector dimension
   (`shared.milvus.collection`, `shared.embedder.dimension`)
 - which embedding model to actually call (`shared.embedder.ollamaModel`)
+- the paragraph size window to filter/truncate by
+  (`shared.paragraph.minChars`/`maxChars` — see
+  [Vector-related configuration](#vector-related-configuration-the-whole-picture))
 
 This means textbase-server is the single source of truth for that naming
 convention — this service structurally cannot disagree with it about
 which collection or topic to use, because it never makes its own decision
 about either. `SharedTextbaseConfig` (`src/configuration.ts`) documents
 the exact shape fetched.
+
+## Vector-related configuration (the whole picture)
+
+Everything that shapes what ends up in Milvus, and how it can be searched,
+lives in exactly four places. In reading order of "who decides what":
+
+1. **The collection's identity and the paragraph size window** live in
+   biblioteca-server's `application.properties` and flow to this worker
+   through the shared config (see above):
+   - `milvus.collection` (default `biblioteca_paras_bge_m3`) — which
+     collection to write into. Per-stage override stays possible through
+     that property; the default is what prod uses.
+   - `vectorizer.para.minChars` / `vectorizer.para.maxChars` (default
+     20 / 3000) — the paragraph window. Paragraphs at or below minChars
+     are skipped entirely (measured corpus noise: BOMs, reference ids,
+     bare numerals, speaker labels); paragraphs above maxChars are
+     **truncated to maxChars, not dropped**, so long expository
+     paragraphs and `<table>` blocks stay searchable. The sha256 stored
+     as the row's identity is always the *full* source paragraph's hash
+     — it drives the reimport dedup, not what got embedded. Against a
+     server older than the `paragraph` shared-config section, the worker
+     falls back to these same values hardcoded in
+     `biblioteca_client.service.ts`.
+
+2. **The embedder's context clamp** lives here, per model
+   (`ContentEmbedder.maxContextChars`): bge-m3 16384 (its 8192-token
+   context at a conservative ~2 chars/token for the corpus's
+   Latin/Cyrillic text), qwen3-embedding 32768, nomic-embed-text 8192,
+   the STS models 512/1024. The effective per-paragraph cap is
+   `min(shared.paragraph.maxChars, embedder.maxContextChars)` — raising
+   maxChars on the server can never produce inputs the active model
+   would silently truncate or reject on its own, and switching embedders
+   auto-tightens the clamp to the new model's real limit.
+
+3. **The index** is created only together with a collection (see
+   `MilvusCollection.idx_ivfsq8_l2_8192`): IVF_SQ8, L2, `nlist=8192`
+   (the 4·√N rule of thumb for the target ~6.5M-paragraph corpus).
+   IVF_SQ8 was chosen over full-precision HNSW on purpose: the index
+   costs ~1.1KB/row (~7G resident once the whole corpus is indexed)
+   where HNSW would need ~27G of RAM loaded — more than the deployment
+   host has in total. Since an index is created with its collection,
+   nlist changes take effect at the next truncate/recreate, never
+   in place. The query side must stay in relation to it:
+   biblioteca-server's `MilvusCollection.DEFAULT_NPROBE` (64 — roughly
+   √nlist buckets scanned per query) is that counterpart; change the
+   two together.
+
+4. **The Milvus instance's own reclamation behavior** is not Milvus
+   defaults anymore: the standalone instance's config is versioned at
+   `scripts/docker/milvus/milvus.yaml` (in the `editii/scripts` repo)
+   and mounted straight into the container by the compose file there.
+   Its `dataCoord.gc` is tightened (sweep every 10m, drop/missing
+   tolerances 10m/1h, orphan-file scan every 24h instead of weekly) —
+   stock defaults let append-only binlog garbage accumulate for days
+   (observed: 40G of binlogs behind a 217K-row collection).
+
+Related, same theme: `POST /revectorize_all` **truncates the collection
+first** (drop + recreate via the same startup path, so schema, index and
+nlist all come along) before re-embedding everything — re-running onto a
+stale collection would layer fresh append-only binlogs on top of the old
+rows', which Milvus only reaps lazily.
+
+### How IVF_SQ8 works (and what nlist/nprobe trade off)
+
+The name is two orthogonal ideas stacked:
+
+- **IVF — inverted file.** At index-build time, k-means clusters the
+  collection's vectors into `nlist` buckets (centroids); every vector is
+  stored on the bucket list of its nearest centroid. At query time: embed
+  the query, find its `nprobe` nearest centroids, and scan only the
+  vectors in those buckets — instead of all N. The cost of one search is
+  roughly `nprobe × (rows / nlist)` distance computations.
+- **SQ8 — scalar quantization to 8 bits.** Every 32-bit float component
+  of a vector is compressed to one byte (4x smaller; bge-m3's components
+  are in [-1, 1] so a linear scale fits comfortably). Distances are
+  computed on the quantized bytes: a 1024-dim vector costs ~1KB instead
+  of 4KB, at the price of a small distance error that perturbs ranking
+  near-ties.
+
+The parameters, and their failure modes:
+
+- `nlist` (build-time, once per collection): bucket count. Too few →
+  giant buckets, slow scans; too many → centroid-distance overhead and
+  sparse buckets. Rule of thumb 4·√N, hence 8192 for the ~6.5M-row target
+  (~800 rows per bucket).
+- `nprobe` (per-query): buckets scanned. Recall rises with nprobe,
+  latency with it; √nlist (64, biblioteca-server's DEFAULT_NPROBE) is
+  the balanced default. Raise it for recall-critical evaluation runs,
+  not permanently.
+- **L2** as the metric loses nothing here: bge-m3 emits L2-normalized
+  vectors, for which L2 ordering is identical to cosine ordering.
+
+Expected quality at this scale: roughly 85–95% recall@10 — SQ8's
+quantization noise plus vectors that landed just outside the probed
+buckets. Full-precision HNSW would reach ~97%+ but needs ~27G resident
+(see above). If recall ever becomes the binding constraint, the upgrade
+path is DiskANN or a Qdrant-style quantized-HNSW with reranking — not
+raising nprobe forever.
 
 ## Kafka contract (AsyncAPI)
 
@@ -227,9 +328,9 @@ pipeline itself (that's driven entirely by Kafka - see
 | `GET /api/info` | Name + version from `package.json` |
 | `GET /api/status` | General status surface - today reports the vectorizing job under `vectorizing`, plus future flags/configs/information |
 | `GET /api/vectorizing` | Status of the bulk vectorizing job: `state` (`idle`/`running`/`pausing`/`paused`/`finished`), progress (`totalOpera`, `completedOpera`, `currentOpus`, `processedParas`), `pauseRequested`, `canResume` |
-| `POST /api/vectorizing/start?shuffle=` | Starts a fresh full run - walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes |
+| `POST /api/vectorizing/start?shuffle=` | **Truncates the collection first** (drop + recreate, see [Vector-related configuration](#vector-related-configuration-the-whole-picture)), then walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes |
 | `POST /api/vectorizing/pause` | Halts the running job after its current batch |
-| `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead) |
+| `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead; does not truncate, so the partial collection keeps its already-vectorized rows) |
 | `POST /revectorize_all?shuffle=` | Deprecated alias for `POST /api/vectorizing/start` |
 | `POST /stop_vectorizing` | Deprecated alias for `POST /api/vectorizing/pause` |
 | `POST /optimize` | Compacts the Milvus collection |

@@ -126,6 +126,62 @@ describe('MilvuscollectionService', () => {
         expect(remaining[0].url).toEqual('seneca/de-vita-longa/chapter-1/p-1');
     }, TestUtils.TIMEOUT_TWO_MINUTES);
 
+    it('deletes one opus stored with host-prefixed urls, without touching a sibling', async () => {
+        // Production stores absolute urls whose host depends on who fetched
+        // the paragraphs (internal http://server:8080/... here, the public
+        // host for anything vectorized via an external request).
+        const data = TestUtils.randomContent(4, MilvusCollection.DIM_384, 200);
+        data[0].url = 'http://server:8080/seneca/de-vita';
+        data[1].url = 'http://server:8080/seneca/de-vita/chapter-1/p-1';
+        data[2].url = 'https://biblioteca.scriptorium.ro/seneca/de-vita/chapter-2/p-1';
+        data[3].url = 'http://server:8080/seneca/de-vita-longa/chapter-1/p-1';
+        await col.upsert(data);
+        await col.flush();
+        await col.load();
+        await waitForRows(col, 4);
+
+        await col.deleteByUrlPrefix('seneca/de-vita');
+        await col.flush();
+
+        const remaining = await waitForRows(col, 1);
+        expect(remaining).toHaveLength(1);
+        expect(remaining[0].url).toEqual('http://server:8080/seneca/de-vita-longa/chapter-1/p-1');
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
+
+    it('upsertNewOrModified is a no-op, not an error, when nothing is new or modified', async () => {
+        // A page whose every paragraph is already stored unchanged used to
+        // end in milvus.upsert([]) -> "fields_data should be an array and
+        // length > 0", which the Kafka listener treats as a retryable
+        // error, wedging the consumer on the same event forever.
+        const data = TestUtils.randomContent(5, MilvusCollection.DIM_384, 200);
+        await col.upsert(data);
+        await col.flush();
+        await col.load();
+        await waitForRows(col, 5);
+
+        const resp = await col.upsertNewOrModified(data);
+        expect(parseInt(resp.insert_cnt)).toEqual(0);
+        expect(await col.count()).toEqual(5);
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
+
+    it('upsert persists a batch containing duplicate sha256 primary keys', async () => {
+        // The same text appearing twice in one batch (e.g. a repeated opus
+        // title) carries duplicate PKs; Milvus reports success for such a
+        // batch while persisting none of it, so the batch is deduplicated
+        // to one row per sha256 before being sent.
+        const data = TestUtils.randomContent(5, MilvusCollection.DIM_384, 200);
+        const repeated = { ...data[1] };
+        repeated.url = TestUtils.randomAlphanumeric();
+        data.push(repeated);
+
+        const resp = await col.upsert(data);
+        expect(parseInt(resp.insert_cnt)).toEqual(5);
+        await col.flush();
+        await col.load();
+        await waitForRows(col, 5);
+        expect(await col.count()).toEqual(5);
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
+
     it('getVectorDimension reflects the actual collection, assertVectorDimensionMatches throws on mismatch', async () => {
         expect(await col.getVectorDimension()).toEqual(MilvusCollection.DIM_384);
         await expect(col.assertVectorDimensionMatches(MilvusCollection.DIM_384)).resolves.toBeUndefined();

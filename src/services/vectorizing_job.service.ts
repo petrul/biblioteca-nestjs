@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
+import { MilvusCollection } from './milvus/milvuscollection.service';
 import { StopWatch, Util } from '../util';
 import { EntityModelTeiDiv } from '../biblioteca.api';
 
@@ -67,7 +68,8 @@ export class VectorizingJobService {
   /** Opera completed by the current/most recent run - in memory only. */
   protected completedOpusIds = new Set<number>();
 
-  constructor(protected tbc: BibliotecaClient, protected vectorizer: VectorizerService) {}
+  constructor(protected tbc: BibliotecaClient, protected vectorizer: VectorizerService,
+    protected col: MilvusCollection) {}
 
   private readonly log = new Logger(VectorizingJobService.name);
 
@@ -92,6 +94,23 @@ export class VectorizingJobService {
   /** Starts a fresh full run, optionally in random order; resolves when it completes. */
   async start(shuffle = false): Promise<VectorizingStatus> {
     this.vectorizer.clearStop();
+
+    // Truncate before the run: drop and recreate the collection so the pass
+    // starts from an empty one. Re-vectorizing into the existing collection
+    // would layer this run's insert binlogs on top of the previous rows' -
+    // Milvus binlogs are append-only and delete/upsert deltas are only
+    // reaped by a lazy GC - so a full re-run onto a stale collection leaves
+    // tens of GB of unreclaimed MinIO objects (observed in prod: 40G of
+    // binlogs for a collection holding ~3% of the corpus). drop() releases
+    // the collection from memory first; createAndLoadIfNotExists() then
+    // rebuilds it with the same schema, index and load state as at startup.
+    // A stop requested mid-run leaves the collection partial - by design:
+    // a truncated revectorize is exactly that until it completes (and
+    // resume() then continues that partial collection, without truncating).
+    this.log.log('start: truncating collection...');
+    await this.col.drop();
+    await this.col.createAndLoadIfNotExists();
+    this.log.log('start: collection truncated.');
 
     const opera = await this.collectOpera();
     if (shuffle) {

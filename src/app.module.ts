@@ -116,12 +116,12 @@ import { log } from 'console';
     MilvusColVectorStore,
     {
       provide: VectorizerService,
-      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, 
-        conf: VectorizerConfiguration, logger: LoggerService ) => {
+      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore,
+        conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService ) => {
         log(conf);
-        return new VectorizerService(tbc, embedder, vecstore, logger, TB_GETPARAS_PAGE_SIZE);
+        return new VectorizerService(tbc, embedder, vecstore, logger, shared, TB_GETPARAS_PAGE_SIZE);
       },
-      inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_LOGGER]
+      inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
     
   ],

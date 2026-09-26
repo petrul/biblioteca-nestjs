@@ -35,6 +35,16 @@ export interface ContentEmbedder {
      * embedding it anyway with a model that was never trained on it.
      */
     readonly supportedLanguages: string[] | 'all';
+
+    /**
+     * The largest text (in characters) this encoder can embed in one call
+     * without exceeding its underlying model's context window. The
+     * vectorizer truncates each paragraph to min(this, the shared config's
+     * paragraph.maxChars) BEFORE embedding, so a generously-configured
+     * maxChars can never produce inputs the model silently truncates or
+     * rejects on its own.
+     */
+    readonly maxContextChars: number;
 }
 
 export const PROVIDER_EMBEDDER = Symbol('ContentEmbedder');

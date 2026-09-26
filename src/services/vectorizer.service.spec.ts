@@ -58,7 +58,16 @@ describe('VectorizerService', () => {
           {
             provide: VectorizerService,
             useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore, logger: LoggerService) => {
-              return new VectorizerService(tbc, embedder, vecstore, logger);
+              return new VectorizerService(tbc, embedder, vecstore, logger, {
+                kafka: {
+                    newOpusImportedTopic: 'test-opus-new',
+                    opusReimportedTopic: 'test-opus-reimported',
+                    opusRemovedTopic: 'test-opus-removed',
+                },
+                milvus: { collection: 'test-collection' },
+                embedder: { model: 'TEST', dimension: 3 },
+                paragraph: { minChars: 20, maxChars: 3000 },
+              });
             },
             inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_LOGGER]
           }

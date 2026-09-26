@@ -58,6 +58,14 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
     abstract readonly supportedLanguages: string[] | 'all';
 
     /**
+     * Per-model context-window floor in characters - each subclass pins
+     * this to (its model's token context) x (a conservative ~2 chars/token
+     * for the corpus's Latin/Cyrillic text), so the vectorizer's
+     * truncation can never hand the model more than it accepts.
+     */
+    abstract readonly maxContextChars: number;
+
+    /**
      * this is the actual api call
      */
     encode(sentences: string[]): Promise<number[][]> {
@@ -100,6 +108,13 @@ export abstract class OllamaContentEmbedderBase implements OllamaEncoder, Conten
 export class DynamicOllamaEmbedder extends OllamaContentEmbedderBase {
     readonly supportedLanguages: string[] | 'all' = 'all';
 
+    // bge-m3 (8192-token context) is the server's current default and the
+    // smallest-context model this can be constructed with; qwen3-embedding
+    // (32K) only accepts more, so its own floor is covered by this too.
+    // Revisit if the server's active embedder ever switches to a
+    // smaller-context model (nomic has its own pinned class below).
+    readonly maxContextChars = 16384;
+
     constructor(ollama: OllamaService, private readonly ollamaModelName: string) {
         super(ollama);
     }
@@ -115,6 +130,9 @@ export class BgeM3OllamaService extends OllamaContentEmbedderBase {
     static readonly modelName = 'bge-m3';
 
     readonly supportedLanguages: string[] | 'all' = 'all';
+
+    // bge-m3: 8192-token context, ~2 chars/token conservative.
+    readonly maxContextChars = 16384;
 
     constructor(ollama: OllamaService) {
         super(ollama);
@@ -133,6 +151,9 @@ export class Qwen3EmbeddingOllamaService extends OllamaContentEmbedderBase {
     // for and evaluated on 100+ languages - genuinely multilingual, unlike
     // the STS models above.
     readonly supportedLanguages: string[] | 'all' = 'all';
+
+    // qwen3-embedding: 32K-token context.
+    readonly maxContextChars = 32768;
 
     // explicit constructor required even though it just forwards to super():
     // NestJS's DI resolves constructor params via TypeScript's emitted
@@ -155,6 +176,9 @@ export class NomicEmbedOllamaService extends OllamaContentEmbedderBase {
     // card calls out separate multilingual variants as different models) -
     // conservative default until verified otherwise.
     readonly supportedLanguages: string[] | 'all' = ['en'];
+
+    // nomic-embed-text: 8192-token context.
+    readonly maxContextChars = 8192;
 
     constructor(ollama: OllamaService) {
         super(ollama);
