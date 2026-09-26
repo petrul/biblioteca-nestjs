@@ -230,7 +230,7 @@ pipeline itself (that's driven entirely by Kafka - see
 | `POST /optimize` | Compacts the Milvus collection |
 
 `@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
-at `/api/docs` - same mechanism, one instance per this app rather than a
+at `/api/ui` - same mechanism, one instance per this app rather than a
 checked-in export like textbase-server's, since this surface is small and
 purely operational (no external client generates against it the way the
 reader generates against textbase-server's).

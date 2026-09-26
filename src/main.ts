@@ -16,7 +16,7 @@ async function bootstrap() {
     .addTag('textbase')
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/ui', app, document);
 
   await app.listen(3000);
 }
