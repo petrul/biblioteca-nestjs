@@ -8,7 +8,11 @@ import { MilvusCollection } from './milvus/milvuscollection.service';
 import { log } from 'console';
 import { Content } from 'src/model/model';
 
-describe('VectorStore', () => {
+// Milvus is retired infrastructure: this spec exercises MilvusColVectorStore
+// against a live milvus instance that no longer exists. The store path is
+// qdrant now - see qdrantcollection.service.spec.ts. Skipped (not deleted)
+// in case a milvus instance is ever stood up again.
+xdescribe('VectorStore', () => {
     jest.setTimeout(TestUtils.TIMEOUT_TWO_MINUTES * 2);
     const conf = TestUtils.milvusTestConf;
     let vectorStore: MilvusColVectorStore;

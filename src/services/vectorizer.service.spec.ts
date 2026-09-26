@@ -13,7 +13,11 @@ import { ConsoleLogger, LoggerService } from '@nestjs/common';
 import { PROVIDER_LOGGER } from '../util';
 import { log } from 'console';
 
-describe('VectorizerService', () => {
+// Milvus is retired infrastructure: this spec vectorizes into a real
+// MilvusCollection on a live milvus instance that no longer exists. The
+// store path is qdrant now - see qdrantcollection.service.spec.ts. Skipped
+// (not deleted) in case a milvus instance is ever stood up again.
+xdescribe('VectorizerService', () => {
   
   jest.setTimeout(TestUtils.TIMEOUT_TWO_MINUTES);
   const conf = TestUtils.milvusTestConf;

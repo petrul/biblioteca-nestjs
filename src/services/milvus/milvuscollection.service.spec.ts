@@ -19,7 +19,11 @@ async function waitForRows(col: MilvusCollection, expected: number): Promise<any
     throw new Error(`Timed out waiting for ${expected} visible Milvus rows`);
 }
 
-describe('MilvuscollectionService', () => {
+// Milvus is retired infrastructure: this spec talks to a live milvus
+// instance that no longer exists. The store path is qdrant now - see
+// qdrantcollection.service.spec.ts. Skipped (not deleted) in case a milvus
+// instance is ever stood up again.
+xdescribe('MilvuscollectionService', () => {
     
     const conf = TestUtils.milvusTestConf;
     let col: MilvusCollection;
