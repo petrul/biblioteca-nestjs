@@ -1,7 +1,7 @@
 import { VectorizingJobService } from './vectorizing_job.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
-import { MilvusCollection } from './milvus/milvuscollection.service';
+import { VectorStore } from './vector_store';
 
 describe('VectorizingJobService', () => {
   let job: VectorizingJobService;
@@ -9,15 +9,14 @@ describe('VectorizingJobService', () => {
   const vectorizeMock = jest.fn();
   const opera: any[] = [];
   let tbcMock: any;
-  const colMock = { drop: jest.fn(), createAndLoadIfNotExists: jest.fn() };
+  const colMock = { reset: jest.fn() };
 
   beforeEach(() => {
     stopRequested = false;
     opera.length = 0;
     vectorizeMock.mockReset();
     vectorizeMock.mockResolvedValue(0);
-    colMock.drop.mockReset().mockResolvedValue(undefined);
-    colMock.createAndLoadIfNotExists.mockReset().mockResolvedValue(undefined);
+    colMock.reset.mockReset().mockResolvedValue(undefined);
     tbcMock = {
       allOperaGen: async function* () {
         for (const op of opera) {
@@ -34,7 +33,7 @@ describe('VectorizingJobService', () => {
       },
       isStopRequested: () => stopRequested,
       vectorize: vectorizeMock,
-    } as unknown as VectorizerService, colMock as unknown as MilvusCollection);
+    } as unknown as VectorizerService, colMock as unknown as VectorStore);
   });
 
   it('status is idle before any run', () => {
@@ -169,18 +168,15 @@ describe('VectorizingJobService', () => {
     });
 
     await job.start(false);
-    expect(colMock.drop).toHaveBeenCalledTimes(1);
-    expect(colMock.createAndLoadIfNotExists).toHaveBeenCalledTimes(1);
+    expect(colMock.reset).toHaveBeenCalledTimes(1);
 
     stopRequested = false;
     vectorizeMock.mockReset();
     vectorizeMock.mockResolvedValue(7);
-    colMock.drop.mockClear();
-    colMock.createAndLoadIfNotExists.mockClear();
+    colMock.reset.mockClear();
 
     await job.resume();
-    expect(colMock.drop).not.toHaveBeenCalled();
-    expect(colMock.createAndLoadIfNotExists).not.toHaveBeenCalled();
+    expect(colMock.reset).not.toHaveBeenCalled();
   });
 
   it('resume refuses when there is no previous run', async () => {

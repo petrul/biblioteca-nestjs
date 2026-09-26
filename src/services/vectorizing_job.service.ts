@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
-import { MilvusCollection } from './milvus/milvuscollection.service';
+import { PROVIDER_VECTOR_STORE, VectorStore } from './vector_store';
 import { StopWatch, Util } from '../util';
 import { EntityModelTeiDiv } from '../biblioteca.api';
 
@@ -69,7 +69,7 @@ export class VectorizingJobService {
   protected completedOpusIds = new Set<number>();
 
   constructor(protected tbc: BibliotecaClient, protected vectorizer: VectorizerService,
-    protected col: MilvusCollection) {}
+    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore) {}
 
   private readonly log = new Logger(VectorizingJobService.name);
 
@@ -108,8 +108,7 @@ export class VectorizingJobService {
     // a truncated revectorize is exactly that until it completes (and
     // resume() then continues that partial collection, without truncating).
     this.log.log('start: truncating collection...');
-    await this.col.drop();
-    await this.col.createAndLoadIfNotExists();
+    await this.vectorStore.reset();
     this.log.log('start: collection truncated.');
 
     const opera = await this.collectOpera();

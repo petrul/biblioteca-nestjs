@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
-import { MilvusCollection } from './services/milvus/milvuscollection.service';
+import { Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
 import { VectorizingJobService, VectorizingStatus } from './services/vectorizing_job.service';
 import { EntityModelTeiDiv } from './biblioteca.api';
 
@@ -24,7 +24,7 @@ function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
 export class AppController {
 
   constructor(protected job: VectorizingJobService,
-    protected col: MilvusCollection) {}
+    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore) {}
 
   @Get('/api/info')
   info(): AppInfo {
@@ -59,6 +59,6 @@ export class AppController {
 
   @Post('/optimize')
   async optimize() {
-    return await this.col.compact();
+    return await this.vectorStore.compact();
   }
 }

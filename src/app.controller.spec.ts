@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { VectorizingJobService } from './services/vectorizing_job.service';
-import { MilvusCollection } from './services/milvus/milvuscollection.service';
+import { PROVIDER_VECTOR_STORE } from './services/vector_store';
 
 const packageInfo: { name: string; version: string } = require('../package.json');
 
@@ -30,7 +30,7 @@ describe('AppController', () => {
           useValue: jobMock,
         },
         {
-          provide: MilvusCollection,
+          provide: PROVIDER_VECTOR_STORE,
           useValue: { compact },
         },
       ],

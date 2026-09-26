@@ -9,6 +9,17 @@ export interface VectorStore {
     storeNewOrUpdated(data: Content[]): Promise<any>
     flush(): Promise<any>;
     removeOpus(opusPath: string): Promise<any>;
+    // Drop and recreate the underlying collection - see
+    // VectorizingJobService.start() for why a full re-vectorize truncates
+    // first rather than layering onto the existing collection.
+    reset(): Promise<any>;
+    // Manually reclaim storage from deleted/updated rows - a real, needed
+    // operation on Milvus (append-only binlogs, only lazily GC'd otherwise -
+    // see VectorizingJobService.start()'s own comment on the 40G-of-stale-
+    // binlogs incident). Qdrant compacts automatically in the background,
+    // so its implementation is a no-op - AppController's /api/optimize
+    // stays callable regardless of which store is active.
+    compact(): Promise<any>;
 }
 
 @Injectable()
@@ -36,6 +47,15 @@ export class MilvusColVectorStore implements VectorStore {
 
     async removeOpus(opusPath: string): Promise<any> {
         return await this.col.deleteByUrlPrefix(opusPath);
+    }
+
+    async reset(): Promise<any> {
+        await this.col.drop();
+        await this.col.createAndLoadIfNotExists();
+    }
+
+    async compact(): Promise<any> {
+        return await this.col.compact();
     }
 
 }
@@ -70,6 +90,15 @@ export class QdrantVectorStore implements VectorStore {
 
     async removeOpus(opusPath: string): Promise<any> {
         return await this.col.deleteByOpusPath(opusPath);
+    }
+
+    async reset(): Promise<any> {
+        await this.col.drop();
+        await this.col.createAndLoadIfNotExists();
+    }
+
+    async compact(): Promise<any> {
+        return { skipped: 'Qdrant compacts automatically; no manual action needed.' };
     }
 }
 

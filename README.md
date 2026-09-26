@@ -111,7 +111,7 @@ lives in exactly four places. In reading order of "who decides what":
 1. **The collection's identity and the paragraph size window** live in
    biblioteca-server's `application.properties` and flow to this worker
    through the shared config (see above):
-   - `milvus.collection` (default `biblioteca_paras_bge_m3`) — which
+   - `milvus.collection` (default `biblioteca_paragraphs_bge_m3`) — which
      collection to write into. Per-stage override stays possible through
      that property; the default is what prod uses.
    - `vectorizer.para.minChars` / `vectorizer.para.maxChars` (default
