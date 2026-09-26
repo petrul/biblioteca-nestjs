@@ -225,8 +225,13 @@ pipeline itself (that's driven entirely by Kafka - see
 | Endpoint | What it does |
 | --- | --- |
 | `GET /api/info` | Name + version from `package.json` |
-| `POST /revectorize_all?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; stoppable mid-run |
-| `POST /stop_vectorizing` | Signals a running `revectorize_all` to halt after its current opus |
+| `GET /api/status` | General status surface - today reports the vectorizing job under `vectorizing`, plus future flags/configs/information |
+| `GET /api/vectorizing` | Status of the bulk vectorizing job: `state` (`idle`/`running`/`pausing`/`paused`/`finished`), progress (`totalOpera`, `completedOpera`, `currentOpus`, `processedParas`), `pauseRequested`, `canResume` |
+| `POST /api/vectorizing/start?shuffle=` | Starts a fresh full run - walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes |
+| `POST /api/vectorizing/pause` | Halts the running job after its current batch |
+| `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead) |
+| `POST /revectorize_all?shuffle=` | Deprecated alias for `POST /api/vectorizing/start` |
+| `POST /stop_vectorizing` | Deprecated alias for `POST /api/vectorizing/pause` |
 | `POST /optimize` | Compacts the Milvus collection |
 
 `@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this

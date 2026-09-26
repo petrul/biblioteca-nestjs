@@ -1,5 +1,7 @@
 import { ConsoleLogger, LoggerService, Module } from '@nestjs/common';
 import { AppController } from './app.controller';
+import { VectorizingController } from './vectorizing.controller';
+import { VectorizingJobService } from './services/vectorizing_job.service';
 import { ProducerService } from './services/kafka/producer.service';
 import { KafkaListenerService } from './services/kafka/listener.service';
 import { KafkaService } from './services/kafka/kafka.service';
@@ -27,7 +29,8 @@ import { log } from 'console';
   ],
 
   controllers: [
-    AppController
+    AppController,
+    VectorizingController
   ],
 
   providers: [
@@ -43,6 +46,7 @@ import { log } from 'console';
     KafkaListenerService,
     KafkaService,
     BibliotecaClient,
+    VectorizingJobService,
     {
       // The non-secret shared-resource naming convention (Kafka topics,
       // Milvus collection, embedding model) textbase-server is the source
