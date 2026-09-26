@@ -50,7 +50,7 @@ export class MilvusCollection {
       protected description: string = `embeddings storage, collection ${name}`) {
         this.milvus = new MilvusClient({
             logLevel:  'info',
-            address: conf.miniMilvus,
+            address: conf.vectorStoreUrl,
           });
     }
 

@@ -8,7 +8,8 @@ import { ConfigModule } from '@nestjs/config';
 import { BibliotecaClient } from './services/biblioteca_client.service';
 import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
 import { MilvusCollection } from './services/milvus/milvuscollection.service';
-import { MilvusColVectorStore } from './services/vector_store';
+import { QdrantCollection } from './services/qdrant/qdrantcollection.service';
+import { MilvusColVectorStore, QdrantVectorStore, PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
 import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
 import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
 import { BgeM3OllamaService, DynamicOllamaEmbedder, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
@@ -60,7 +61,13 @@ import { log } from 'console';
       inject: [BibliotecaClient, PROVIDER_LOGGER]
     },
     {
-      provide: MilvusCollection,
+      // Whichever vector store VECTOR_STORE selects, behind the
+      // VectorStore interface - MilvusColVectorStore over MilvusCollection
+      // (the historic default) or QdrantVectorStore over QdrantCollection.
+      // Same convention-carrying collection name and data shape either way
+      // (the name comes from the server's shared config), so the
+      // vectorizer pipeline below never knows which store it writes to.
+      provide: PROVIDER_VECTOR_STORE,
       useFactory: async (conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService) => {
         const name = shared.milvus.collection;
         const vectorDim = shared.embedder.dimension;
@@ -69,19 +76,31 @@ import { log } from 'console';
         }
         const description = shared.embedder.description
           ?? `Textbase paragraph embeddings created by embedder "${shared.embedder.model}"; dim=${vectorDim}.`;
-        const col = new MilvusCollection(name, conf, vectorDim, description);
+
         // checked at startup (this factory runs during app bootstrap, before
-        // anything depending on MilvusCollection - including the Kafka
-        // listener - is constructed): wait and retry instead of crashing
-        // the whole app the moment Milvus happens to be unreachable.
+        // anything depending on the store - including the Kafka listener -
+        // is constructed): wait and retry instead of crashing the whole app
+        // the moment the store happens to be unreachable.
+        if (conf.vectorStoreType === 'qdrant') {
+          // The one VECTORSTORE_URL addresses whichever store is active -
+          // here that is the shared qdrant instance (one instance serves
+          // every environment; the collection name above carries the
+          // per-environment prefix from the server's shared config).
+          const col = new QdrantCollection(name, conf.vectorStoreUrl, vectorDim, description);
+          await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Qdrant');
+          // A freshly-created collection is trivially self-consistent (create()
+          // uses this same vectorDim) - this only ever catches a genuine
+          // pre-existing mismatch (stale collection, config typo), and does so
+          // loudly at startup instead of at the first confusing insert/search
+          // failure.
+          await col.assertVectorDimensionMatches(vectorDim);
+          return new QdrantVectorStore(col);
+        }
+
+        const col = new MilvusCollection(name, conf, vectorDim, description);
         await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Milvus');
-        // A freshly-created collection is trivially self-consistent (create()
-        // uses this same vectorDim) - this only ever catches a genuine
-        // pre-existing mismatch (stale collection, config typo), and does so
-        // loudly at startup instead of at the first confusing insert/search
-        // failure.
         await col.assertVectorDimensionMatches(vectorDim);
-        return col;
+        return new MilvusColVectorStore(col);
       },
       inject: [PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
@@ -109,15 +128,14 @@ import { log } from 'console';
       },
       inject: [PROVIDER_SHARED_CONFIG, OllamaService, PROVIDER_LOGGER]
     },
-    MilvusColVectorStore,
     {
       provide: VectorizerService,
-      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: MilvusColVectorStore,
+      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: VectorStore,
         conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService ) => {
         log(conf);
         return new VectorizerService(tbc, embedder, vecstore, logger, shared, TB_GETPARAS_PAGE_SIZE);
       },
-      inject: [BibliotecaClient, PROVIDER_EMBEDDER, MilvusColVectorStore, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
+      inject: [BibliotecaClient, PROVIDER_EMBEDDER, PROVIDER_VECTOR_STORE, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
     
   ],
