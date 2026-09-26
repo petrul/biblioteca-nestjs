@@ -20,8 +20,19 @@ export default (): VectorizerConfiguration => ({
     kafkaGroupId: KAFKA_GROUP_ID,
     sentenceTransformersServer: required('STS_SERVER'),
     ollamaServer: required('OLLAMA_SERVER'),
-    miniMilvus: required('MILVUS_URL'),
+    // The address of whichever vector store is active - one env var for
+    // all stores on purpose: switching stores (vectorStoreType) must
+    // never require also remembering to switch address variables.
+    // VECTORSTORE_URL is the canonical name; the MILVUS_URL fallback
+    // keeps every existing deployment/pass-store entry working
+    // unchanged until its key is renamed.
+    vectorStoreUrl: process.env.VECTORSTORE_URL || required('MILVUS_URL'),
     bibliotecaUrl: required('BIBLIOTECA_EXTERNAL_URL'),
+    // Which store backs VectorStore: 'qdrant' (the default - the shared
+    // prod instance serves every environment, with per-environment
+    // collection names that the server's shared config carries) or
+    // 'milvus' (the historic store, still fully supported).
+    vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
@@ -83,14 +94,18 @@ export interface VectorizerConfiguration {
     sentenceTransformersServer: string;
 
     // the Ollama server backing BGE-M3, Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
-    // one fixed instance, unlike sentenceTransformersServer/miniMilvus which vary per environment.
+    // one fixed instance, unlike sentenceTransformersServer/vectorStoreUrl which vary per environment.
     ollamaServer: string;
 
     // this is the mini milvus server: mini.local:xxx
-    miniMilvus: string;
+    vectorStoreUrl: string;
 
     // this is the textbase url (i.e. https://textbase.scriptorium.ro)
     bibliotecaUrl: string;
+
+    // which store backs VectorStore: 'qdrant' (the default - see the
+    // default-export comment above) or 'milvus' (the historic store).
+    vectorStoreType: 'milvus' | 'qdrant';
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
@@ -118,11 +133,16 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('ollamaServer');
     }
 
-    get miniMilvus(): string {
-        return this.conf.get<string>('miniMilvus');
+    get vectorStoreUrl(): string {
+        return this.conf.get<string>('vectorStoreUrl');
     }
 
     get bibliotecaUrl(): string {
         return this.conf.get<string>('bibliotecaUrl');
     }
+
+    get vectorStoreType(): 'milvus' | 'qdrant' {
+        return this.conf.get<'milvus' | 'qdrant'>('vectorStoreType');
+    }
+
 }

@@ -69,7 +69,7 @@ rake docker:publish    # also push to mini.local:5000
 
 `.env.example` lists the complete set of environment variables
 `src/configuration.ts` requires at startup: `KAFKA_BROKERS`,
-`STS_SERVER`, `OLLAMA_SERVER`, `MILVUS_URL`, `BIBLIOTECA_EXTERNAL_URL` —
+`STS_SERVER`, `OLLAMA_SERVER`, `VECTORSTORE_URL`, `BIBLIOTECA_EXTERNAL_URL` —
 the shared pass-store names the whole Biblioteca family uses, so the worker
 boots directly off a sourced `biblioteca/<stage>` environment with no
 renaming in between. There used to be more of these — a per-collection env

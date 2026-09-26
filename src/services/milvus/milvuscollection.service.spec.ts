@@ -21,7 +21,7 @@ async function waitForRows(col: MilvusCollection, expected: number): Promise<any
 
 describe('MilvuscollectionService', () => {
     
-    const conf = TestUtils.testConf;
+    const conf = TestUtils.milvusTestConf;
     let col: MilvusCollection;
 
     beforeEach(async () => {

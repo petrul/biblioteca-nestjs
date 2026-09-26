@@ -16,7 +16,7 @@ import { log } from 'console';
 describe('VectorizerService', () => {
   
   jest.setTimeout(TestUtils.TIMEOUT_TWO_MINUTES);
-  const conf = TestUtils.testConf;
+  const conf = TestUtils.milvusTestConf;
 
   let vectServ: VectorizerService;
   let tbc: BibliotecaClient;
