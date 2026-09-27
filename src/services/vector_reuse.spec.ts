@@ -45,6 +45,10 @@ class FakeTbc {
     // the served pages move, exactly like a real reimport.
     pages: TeiElemDto[][] = [];
     constructor(pages: TeiElemDto[][] = []) { this.pages = pages; }
+    // No-op stand-ins: these two just report stats to biblioteca-server,
+    // never touched by any assertion in this file.
+    async recordEmbeddingBatchStat(): Promise<void> { /* no-op */ }
+    async recordOpusVectorizingStat(): Promise<void> { /* no-op */ }
     getParagraphs(_divId: number, pageSize: number): AsyncGenerator<TeiElemDto> {
         const flat = this.pages.flat();
         return (async function* () {

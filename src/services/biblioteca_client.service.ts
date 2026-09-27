@@ -199,4 +199,47 @@ export class BibliotecaClient {
 
   }
 
+    /**
+     * Fire-and-forget-ish, but awaited: raw fetch (not this.tb.api), since
+     * neither of these two endpoints is in the generated client yet -
+     * regenerating it needs a prod redeploy first (gen-biblioteca-api.sh
+     * pulls from biblioteca-server's own live /api/docs). Failures are
+     * only ever logged, never thrown: a stats-recording hiccup must not
+     * interrupt the actual vectorizing run it is reporting on.
+     */
+    async recordEmbeddingBatchStat(stat: {
+      batchSize: number; totalChars: number; vectorDimension: number; embedderModel: string; durationMs: number;
+    }): Promise<void> {
+      try {
+        const res = await fetch(`${this.conf.bibliotecaUrl}/api/drest/embeddingBatchStats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(stat),
+        });
+        if (!res.ok) {
+          this.log.warn(`failed to record embedding batch stat: HTTP ${res.status}`);
+        }
+      } catch (err: any) {
+        this.log.warn(`failed to record embedding batch stat: ${err.message}`);
+      }
+    }
+
+    /** Same reasoning as recordEmbeddingBatchStat above - the opus-level counterpart. */
+    async recordOpusVectorizingStat(stat: {
+      opusId: number; totalParas: number; totalBatches: number; embedderModel: string; durationMs: number;
+    }): Promise<void> {
+      try {
+        const res = await fetch(`${this.conf.bibliotecaUrl}/api/drest/opusVectorizingStats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(stat),
+        });
+        if (!res.ok) {
+          this.log.warn(`failed to record opus vectorizing stat: HTTP ${res.status}`);
+        }
+      } catch (err: any) {
+        this.log.warn(`failed to record opus vectorizing stat: ${err.message}`);
+      }
+    }
+
 }

@@ -116,4 +116,10 @@ export class FakeBibliotecaClient {
     allOperaGen(pageNr = 0, pageSize = 1000, limit = Number.POSITIVE_INFINITY) {
         return this.gen((p, s) => this.getAllOpera(p, s), pageNr, pageSize, limit);
     }
+
+    // No-op stand-ins for the real BibliotecaClient's stats-reporting
+    // calls - nothing here asserts on them, and there's no live
+    // biblioteca-server to actually report to.
+    async recordEmbeddingBatchStat(): Promise<void> { /* no-op */ }
+    async recordOpusVectorizingStat(): Promise<void> { /* no-op */ }
 }

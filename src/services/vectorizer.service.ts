@@ -82,6 +82,8 @@ export class VectorizerService implements OnModuleInit {
     ) : Promise<number> {
 
         var processed = 0;
+        var totalBatches = 0;
+        const opusWatch = new StopWatch();
 
         var hasMore = true;
         const gen = this.tbc.getParagraphs(divId, this.pageSize, offset, limit);
@@ -189,6 +191,14 @@ export class VectorizerService implements OnModuleInit {
                     await this.embedder.embeddings(toEmbed);
                     const embedMs = watch.elapsedMs();
                     this.log.log(`embedding ${toEmbed.length} paras took ${watch}`);
+                    totalBatches++;
+                    await this.tbc.recordEmbeddingBatchStat({
+                        batchSize: toEmbed.length,
+                        totalChars: toEmbed.reduce((sum, it) => sum + it.text.length, 0),
+                        vectorDimension: toEmbed[0]?.embedding?.length ?? 0,
+                        embedderModel: this.shared.embedder.model,
+                        durationMs: embedMs,
+                    });
 
                     watch = new StopWatch();
                     await this.vecstore.storeNewOrUpdated(toEmbed);
@@ -220,6 +230,14 @@ export class VectorizerService implements OnModuleInit {
 
         // flush at the end of the opus
         await this.vecstore.flush();
+
+        await this.tbc.recordOpusVectorizingStat({
+            opusId: divId,
+            totalParas: processed,
+            totalBatches,
+            embedderModel: this.shared.embedder.model,
+            durationMs: opusWatch.elapsedMs(),
+        });
 
         return processed;
     }
