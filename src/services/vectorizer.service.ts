@@ -157,30 +157,57 @@ export class VectorizerService implements OnModuleInit {
 
             if (embeddable.length > 0) {
 
-                var watch = new StopWatch();
+                // "Vectors are precious": a full corpus embed takes days,
+                // not an index rebuild - so before embedding anything, ask
+                // the store which of this page's paragraphs already have a
+                // vector (by sha256, the row's identity). A reimport that
+                // renames the book changes every url but no text: all those
+                // paragraphs are repointed to their new urls below and NONE
+                // of them re-embedded; only genuinely new/changed paragraphs
+                // cost an embedder call.
+                const stored = await this.vecstore.alreadyStored(embeddable);
+                const storedUrlBySha = new Map(stored.map(it => [it.sha256, it.url]));
+                const toEmbed = embeddable.filter(it => !storedUrlBySha.has(it.sha256));
+                const toRepoint = embeddable.filter(it => {
+                    const oldUrl = storedUrlBySha.get(it.sha256);
+                    return oldUrl !== undefined && oldUrl !== it.url; // renamed book: url moved, text did not
+                });
+                if (stored.length > 0) {
+                    this.log.log(`reusing ${stored.length - toRepoint.length} already-stored vectors, `
+                        + `repointing ${toRepoint.length} renamed ones, embedding ${toEmbed.length} new paras`);
+                }
 
-                await this.embedder.embeddings(embeddable);
-                const embedMs = watch.elapsedMs();
-                this.log.log(`embedding ${embeddable.length} paras took ${watch}`);
+                if (toRepoint.length > 0) {
+                    var watch = new StopWatch();
+                    await this.vecstore.repointUrls(toRepoint);
+                    this.log.log(`repointing ${toRepoint.length} reused vectors took ${watch}`);
+                }
 
-                watch = new StopWatch();
-                // await this.vecstore.store(embeddable);
-                await this.vecstore.storeNewOrUpdated(embeddable);
-                this.log.log(`storing ${embeddable.length} vectors took ${watch}`);
+                if (toEmbed.length > 0) {
+                    var watch = new StopWatch();
 
-                await this.vecstore.flush();
+                    await this.embedder.embeddings(toEmbed);
+                    const embedMs = watch.elapsedMs();
+                    this.log.log(`embedding ${toEmbed.length} paras took ${watch}`);
 
-                // Keep the encoder's CPU from being pegged continuously - wait
-                // roughly as long as that batch's embedding call itself took
-                // (e.g. 100 paragraphs taking 20s means a ~20s pause) before
-                // starting the next one, deliberately trading throughput for
-                // not exhausting the (shared, CPU-bound) sentence-transformers
-                // server. Timed off the embed call specifically, not the
-                // store+flush steps above, since those run against Milvus,
-                // not the encoder.
-                if (embedMs > 0) {
-                    this.log.log(`pausing ${embedMs}ms before the next batch`);
-                    await Util.delay(embedMs);
+                    watch = new StopWatch();
+                    await this.vecstore.storeNewOrUpdated(toEmbed);
+                    this.log.log(`storing ${toEmbed.length} vectors took ${watch}`);
+
+                    await this.vecstore.flush();
+
+                    // Keep the encoder's CPU from being pegged continuously - wait
+                    // roughly as long as that batch's embedding call itself took
+                    // (e.g. 100 paragraphs taking 20s means a ~20s pause) before
+                    // starting the next one, deliberately trading throughput for
+                    // not exhausting the (shared, CPU-bound) sentence-transformers
+                    // server. Timed off the embed call specifically, not the
+                    // store+flush steps above, since those run against the store,
+                    // not the encoder.
+                    if (embedMs > 0) {
+                        this.log.log(`pausing ${embedMs}ms before the next batch`);
+                        await Util.delay(embedMs);
+                    }
                 }
             }
 

@@ -115,8 +115,10 @@ describe('KafkaListenerService', () => {
       await consumeImported(); // must settle - falling out of eachMessage lets KafkaJS commit the offset
 
       expect(getElemByPath).toHaveBeenCalledTimes(1);
-      expect(removeOpus).toHaveBeenCalledTimes(1); // the pre-vectorizing purge still ran
-      expect(removeOpus).toHaveBeenCalledWith(OPUS_PATH);
+      // No pre-vectorizing purge: "vectors are precious" - nothing drops
+      // stored content on its own (see VectorizerService.vectorize's
+      // sha-based reuse); the event is simply skipped as before.
+      expect(removeOpus).not.toHaveBeenCalled();
       expect(vectorize).not.toHaveBeenCalled();
       expect(delaySpy).not.toHaveBeenCalledWith(10 * 1000); // no retry back-off happened
     });

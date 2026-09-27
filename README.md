@@ -201,6 +201,43 @@ buckets. Full-precision HNSW would reach ~97%+ but needs ~27G resident
 path is DiskANN or a Qdrant-style quantized-HNSW with reranking — not
 raising nprobe forever.
 
+## Vectors are precious: reuse by sha256, never auto-drop
+
+Embedding the full corpus takes **days**, not an index rebuild — vectors
+are a multi-day asset, and the pipeline treats them accordingly
+(`VectorizerService.vectorize`, `KafkaListenerService`,
+`vector_reuse.spec.ts`):
+
+- **Reuse before embedding.** For every page fetched from
+  biblioteca-server, the store is asked which paragraph sha256s already
+  have vectors (`VectorStore.alreadyStored`). Only the missing ones cost
+  an embedder call — a reimport of a book with two corrected paragraphs
+  embeds exactly those two.
+- **Renames repoint, they never re-embed.** A book's url embeds the
+  author/work-title, so renaming a book moves every paragraph's url while
+  no text — and so no sha256 — changes. Those vectors are *reused*:
+  `VectorStore.repointUrls` updates the stored `url` and derived
+  `opus_path` payloads (Qdrant `set`-style point update, the embedding
+  bytes untouched). A rename is therefore cheap regardless of the book's
+  size.
+- **Nothing drops vectors automatically.** Import/reimport events no
+  longer purge the opus's old vectors first; `opusRemoved` events are
+  logged and *retained*, not deleted. The vectorizing job never
+  truncates. The only drops are the explicit, manual admin endpoints:
+
+| Endpoint | What it does |
+| --- | --- |
+| `POST /api/vector-store/remove-opus` | Manually removes one opus's vectors (body: `{"path": "author/work"}`) |
+| `POST /api/vector-store/reset` | Manually drops and recreates the whole collection — the nuclear option |
+
+- **Stale data is reported, not silently dropped.** A removed book's (or
+  a changed edition's vanished paragraphs') vectors stay in the store.
+  A scheduled stale-data reporter will identify them and publish their
+  ids to a Kafka topic (e.g. `biblioteca-events`), so removal happens
+  only as a manual, explicitly approved operation. Until then, stale rows
+  are harmless to the user: biblioteca-server filters search hits whose
+  urls no longer resolve (see its Search docs).
+
 ## Kafka contract (AsyncAPI)
 
 `KafkaListenerService` (`src/services/kafka/listener.service.ts`) is this
@@ -328,12 +365,14 @@ pipeline itself (that's driven entirely by Kafka - see
 | `GET /api/info` | Name + version from `package.json` |
 | `GET /api/status` | General status surface - today reports the vectorizing job under `vectorizing`, plus future flags/configs/information |
 | `GET /api/vectorizing` | Status of the bulk vectorizing job: `state` (`idle`/`running`/`pausing`/`paused`/`finished`), progress (`totalOpera`, `completedOpera`, `currentOpus`, `processedParas`), `pauseRequested`, `canResume` |
-| `POST /api/vectorizing/start?shuffle=` | **Truncates the collection first** (drop + recreate, see [Vector-related configuration](#vector-related-configuration-the-whole-picture)), then walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes |
+| `POST /api/vectorizing/start?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes. **Does not truncate** (see [Vectors are precious](#vectors-are-precious-reuse-by-sha256-never-auto-drop)): already-stored sha256s are reused, only genuinely new paragraphs get embedded |
 | `POST /api/vectorizing/pause` | Halts the running job after its current batch |
 | `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead; does not truncate, so the partial collection keeps its already-vectorized rows) |
 | `POST /revectorize_all?shuffle=` | Deprecated alias for `POST /api/vectorizing/start` |
 | `POST /stop_vectorizing` | Deprecated alias for `POST /api/vectorizing/pause` |
-| `POST /optimize` | Compacts the Milvus collection |
+| `POST /optimize` | Compacts the store's storage (Milvus only; a deliberate no-op on qdrant, which compacts on its own) |
+| `POST /api/vector-store/remove-opus` | **Manual-only** drop: removes one opus's vectors (body: `{"path": "author/work"}`) |
+| `POST /api/vector-store/reset` | **Manual-only** drop: drops and recreates the whole collection |
 
 `@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
 at `/api/ui` - same mechanism, one instance per this app rather than a

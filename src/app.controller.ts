@@ -1,6 +1,7 @@
-import { Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
 import { PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
 import { VectorizingJobService, VectorizingStatus } from './services/vectorizing_job.service';
+import { VectorizerService } from './services/vectorizer.service';
 import { EntityModelTeiDiv } from './biblioteca.api';
 
 const packageInfo: { name: string; version: string } = require('../package.json');
@@ -24,7 +25,8 @@ function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
 export class AppController {
 
   constructor(protected job: VectorizingJobService,
-    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore) {}
+    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore,
+    protected vectorizer: VectorizerService) {}
 
   @Get('/api/info')
   info(): AppInfo {
@@ -60,5 +62,22 @@ export class AppController {
   @Post('/optimize')
   async optimize() {
     return await this.vectorStore.compact();
+  }
+
+  /**
+   * The EXPLICIT manual vector-dropping operations - by policy ("vectors
+   * are precious": a full corpus embed takes days), nothing in the
+   * automatic flow (kafka import/remove events, the vectorizing job) ever
+   * drops or truncates vectors; these endpoints are the only entry points
+   * that do, on purpose.
+   */
+  @Post('/api/vector-store/remove-opus')
+  async removeOpus(@Body('path') path: string): Promise<any> {
+    return await this.vectorizer.removeOpus(path);
+  }
+
+  @Post('/api/vector-store/reset')
+  async reset(): Promise<any> {
+    return await this.vectorStore.reset();
   }
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { VectorizingJobService } from './services/vectorizing_job.service';
+import { VectorizerService } from './services/vectorizer.service';
 import { PROVIDER_VECTOR_STORE } from './services/vector_store';
 
 const packageInfo: { name: string; version: string } = require('../package.json');
@@ -14,6 +15,7 @@ describe('AppController', () => {
     resume: jest.fn(),
   };
   const compact = jest.fn();
+  const removeOpus = jest.fn();
 
   beforeEach(async () => {
     jobMock.status.mockReset();
@@ -21,6 +23,7 @@ describe('AppController', () => {
     jobMock.pause.mockReset();
     jobMock.resume.mockReset();
     compact.mockReset();
+    removeOpus.mockReset();
 
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
@@ -30,8 +33,12 @@ describe('AppController', () => {
           useValue: jobMock,
         },
         {
+          provide: VectorizerService,
+          useValue: { removeOpus },
+        },
+        {
           provide: PROVIDER_VECTOR_STORE,
-          useValue: { compact },
+          useValue: { compact, reset: jest.fn() },
         },
       ],
     }).compile();

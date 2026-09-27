@@ -64,15 +64,22 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
             if (!obj.path) throw new Error(`Kafka event on ${topic} has no opus path: ${asJson}`);
 
             if (topic === this.sharedConfig.kafka.opusRemovedTopic) {
-              await this.vectorizer.removeOpus(obj.path);
+              // "Vectors are precious": a removed book's vectors are
+              // RETAINED, never auto-deleted - the paragraph texts and
+              // their embeddings stay valid, only the source is gone.
+              // Stale rows will be identified by the planned stale-data
+              // reporter and removed only through the explicit, manual
+              // POST /api/vector-store/remove-opus operation.
               await heartbeat();
-              this.log.log(`removed Milvus vectors for ${obj.path}`, asJson);
+              this.log.log(`opus ${obj.path} removed from the repo - retaining its vectors (removal is manual-only)`, asJson);
               return;
             }
 
-            // An import can replace an existing book. Purge the old vectors
-            // first so paragraphs removed by the new edition do not linger.
-            await this.vectorizer.removeOpus(obj.path);
+            // No purge of the old vectors before re-vectorizing: the
+            // vectorizer reuses everything already stored by sha256
+            // (see VectorizerService.vectorize) - unchanged paragraphs are
+            // not re-embedded even when the book was renamed (their urls
+            // get repointed instead), and nothing is ever dropped.
             if (obj.path) {
               // some older kafka messages have the id already obsolete.
               // so get the div again just to make sure.

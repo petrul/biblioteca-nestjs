@@ -165,6 +165,51 @@ export class QdrantCollection {
     }
 
     /**
+     * Repoint already-stored points (identified by their sha256-derived
+     * id) to a renamed url WITHOUT re-embedding and without deleting
+     * anything: the stored vector is fetched and re-upserted verbatim
+     * under the new payload (url + its derived opus_path; the sha256 and
+     * the embedding stay exactly as they were). "Vectors are precious":
+     * a book rename changes every paragraph's url but no paragraph text,
+     * so every existing embedding must be reused, not recomputed.
+     */
+    async repointUrls(items: { sha256: string; url: string }[]): Promise<any> {
+        const bySha = new Map<string, string>();
+        for (const it of items)
+            if (it?.sha256?.trim())
+                bySha.set(it.sha256, it.url);
+        if (bySha.size === 0)
+            return QdrantCollection.NOOP_MUTATION_RESULT;
+
+        const resp = await this.request('POST', `/collections/${this.name}/points`, {
+            ids: [...bySha.keys()].map(it => QdrantCollection.pointIdOf(it)),
+            with_payload: true,
+            with_vector: true,
+        });
+        const points = (resp?.result ?? [])
+            .filter((point: any) => point?.vector
+                && point?.payload?.[QdrantCollection.SHA256]
+                && bySha.has(point.payload[QdrantCollection.SHA256]))
+            .map((point: any) => {
+                const sha256 = point.payload[QdrantCollection.SHA256];
+                const url = bySha.get(sha256);
+                return {
+                    id: point.id,
+                    vector: point.vector,
+                    payload: {
+                        [QdrantCollection.SHA256]: sha256,
+                        [QdrantCollection.URL]: url,
+                        [QdrantCollection.OPUS_PATH]: QdrantCollection.opusPathOf(url),
+                    },
+                };
+            });
+        if (points.length === 0)
+            return QdrantCollection.NOOP_MUTATION_RESULT;
+        return await this.request('PUT', `/collections/${this.name}/points?wait=true`,
+            { points });
+    }
+
+    /**
      * The stored {sha256, url} of the given hashes - only the ones that
      * exist (Qdrant omits unknown ids, same semantics as
      * MilvusCollection.findById's query results).
