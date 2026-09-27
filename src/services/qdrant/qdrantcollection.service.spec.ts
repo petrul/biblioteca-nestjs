@@ -126,6 +126,62 @@ describe('QdrantCollection', () => {
         expect(kept.map(it => it.sha256)).toEqual([sha(2), sha(3)]);
     });
 
+    it('repointUrls fetches the existing points by id and re-upserts them under the new url, vector untouched', async () => {
+        const calls = mockFetch([
+            // fetch-by-id: sha(1) exists with its original vector; sha(2)
+            // was never embedded, so Qdrant simply omits it - same
+            // "unknown ids are dropped" semantics as newOrModified's fetch.
+            { body: { result: [
+                { id: QdrantCollection.pointIdOf(sha(1)), vector: { embedding: [0.1, 0.2] }, payload: { sha256: sha(1), url: 'http://s/creanga/amintiri/c1', opus_path: 'creanga/amintiri' } },
+            ] } },
+            { body: { result: {} } },
+        ]);
+
+        const col = new QdrantCollection('test_bge_m3', 'http://q', 2);
+        const result = await col.repointUrls([
+            { sha256: sha(1), url: 'http://s/creanga/amintiri-din-copilarie/c1' },
+            { sha256: sha(2), url: 'http://s/creanga/amintiri-din-copilarie/c2' },
+        ]);
+
+        // First call: fetch by the deterministic ids, vector+payload requested.
+        expect(calls[0].url).toBe('http://q/collections/test_bge_m3/points');
+        expect(calls[0].body.ids).toEqual([QdrantCollection.pointIdOf(sha(1)), QdrantCollection.pointIdOf(sha(2))]);
+        expect(calls[0].body.with_payload).toBe(true);
+        expect(calls[0].body.with_vector).toBe(true);
+
+        // Second call: only the point Qdrant actually returned gets
+        // re-upserted - same id, same original vector, new url and the
+        // opus_path re-derived from it; sha(2) (never embedded) is simply
+        // absent, not an error.
+        expect(calls[1].url).toBe('http://q/collections/test_bge_m3/points?wait=true');
+        expect(calls[1].body.points).toHaveLength(1);
+        expect(calls[1].body.points[0]).toEqual({
+            id: QdrantCollection.pointIdOf(sha(1)),
+            vector: { embedding: [0.1, 0.2] },
+            payload: {
+                sha256: sha(1),
+                url: 'http://s/creanga/amintiri-din-copilarie/c1',
+                opus_path: 'creanga/amintiri-din-copilarie',
+            },
+        });
+        expect(result).not.toEqual(QdrantCollection.NOOP_MUTATION_RESULT);
+    });
+
+    it('repointUrls is a no-op when nothing is passed, or when none of the ids are actually stored', async () => {
+        const col = new QdrantCollection('x', 'http://q', 2);
+
+        const emptyCalls = mockFetch([{ body: { result: {} } }]);
+        expect(await col.repointUrls([])).toEqual(QdrantCollection.NOOP_MUTATION_RESULT);
+        expect(emptyCalls).toHaveLength(0);
+
+        // Qdrant answers the fetch but finds none of the requested ids -
+        // no PUT re-upsert should ever be attempted.
+        const noneStoredCalls = mockFetch([{ body: { result: [] } }]);
+        const result = await col.repointUrls([{ sha256: sha(9), url: 'http://s/x/y/c1' }]);
+        expect(result).toEqual(QdrantCollection.NOOP_MUTATION_RESULT);
+        expect(noneStoredCalls).toHaveLength(1); // only the fetch, no PUT
+    });
+
     it('removeOpus deletes by an exact opus_path match, never a scan', async () => {
         const calls = mockFetch([{ body: { result: {} } }]);
         const col = new QdrantCollection('x', 'http://q', 2);
