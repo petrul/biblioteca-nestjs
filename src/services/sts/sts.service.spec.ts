@@ -8,6 +8,10 @@ import { BgeM3OllamaService, OllamaService } from '../ollama/ollama.service';
 // ollama.service.spec.ts) - never run unattended in CI.
 const describeOllama = process.env.RUN_OLLAMA_INTEGRATION === 'true' ? describe : describe.skip;
 
+// The embeddings-adaptation test below is real-network too: it encodes
+// against STS_SERVER, which is only defined where an STS server exists.
+const itSts = process.env.RUN_STS_INTEGRATION === 'true' ? it : it.skip;
+
 describe('StsService', () => {
 
     const conf : Partial<VectorizerConfiguration> = {
@@ -85,7 +89,8 @@ describe('StsService', () => {
 
     });
 
-    it('AllMiniLmL6V2_StsService.embeddings() adapts Content the same way AllMpnetBaseV2_StsService does', async () => {
+    itSts('AllMiniLmL6V2_StsService.embeddings() adapts Content the same way AllMpnetBaseV2_StsService does', async () => {
+        expect(conf.sentenceTransformersServer).toBeTruthy();
         expect(all_minilm_l6_v2.supportedLanguages).toEqual(['en']);
 
         const content = [
