@@ -142,20 +142,6 @@ describe('EnrichmentService', () => {
     });
   });
 
-  it('authenticates the persistence POST with the configured internal token', async () => {
-    const tbc = new FakeTbc();
-    tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri' }];
-    const fetchMock = new FakeFetch();
-    fetchMock.pages['wiki'] = wikiSummaryPage();
-    (global as any).fetch = fetchMock.stub;
-    const conf = { bibliotecaUrl: 'http://biblioteca.test', internalApiToken: 's3cret' } as any;
-    await new EnrichmentService(tbc as any, conf).dailySweep();
-
-    const persistCall = fetchMock.calls.find(c => c.url.includes('/api/internal/enrichment'));
-    expect(persistCall?.init?.headers).toMatchObject({ 'X-Internal-Token': 's3cret' });
-    expect(fetchMock.persisted()).toHaveLength(1);
-  });
-
   it('enriches an opus with the Wikipedia extract and image', async () => {
     const tbc = new FakeTbc();
     tbc.opera = [{ id: 7, head: 'Lume Rdicată' }];

@@ -28,11 +28,6 @@ export default (): VectorizerConfiguration => ({
     // unchanged until its key is renamed.
     vectorStoreUrl: process.env.VECTORSTORE_URL || required('MILVUS_URL'),
     bibliotecaUrl: required('BIBLIOTECA_EXTERNAL_URL'),
-    // see the VectorizerConfiguration.internalApiToken comment - blank
-    // default rather than required() so environments that never run the
-    // enrichment sweep don't fail boot; biblioteca-server denies the
-    // endpoint closed when the token is blank.
-    internalApiToken: process.env.INTERNAL_API_TOKEN || '',
     // Which store backs VectorStore: 'qdrant' (the default - the shared
     // prod instance serves every environment, with per-environment
     // collection names that the server's shared config carries) or
@@ -108,13 +103,6 @@ export interface VectorizerConfiguration {
     // this is the textbase url (i.e. https://textbase.scriptorium.ro)
     bibliotecaUrl: string;
 
-    // the shared secret the enrichment worker presents as X-Internal-Token
-    // on biblioteca-server's /api/internal/** persistence boundary (same
-    // INTERNAL_API_TOKEN value biblioteca-server reads). Blank is valid -
-    // the server fails those requests closed, so a deployment that runs
-    // the sweep simply must set it on both sides.
-    internalApiToken: string;
-
     // which store backs VectorStore: 'qdrant' (the default - see the
     // default-export comment above) or 'milvus' (the historic store).
     vectorStoreType: 'milvus' | 'qdrant';
@@ -151,10 +139,6 @@ export class AppConfService implements VectorizerConfiguration {
 
     get bibliotecaUrl(): string {
         return this.conf.get<string>('bibliotecaUrl');
-    }
-
-    get internalApiToken(): string {
-        return this.conf.get<string>('internalApiToken');
     }
 
     get vectorStoreType(): 'milvus' | 'qdrant' {
