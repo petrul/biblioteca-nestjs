@@ -158,11 +158,12 @@ lives in exactly four places. In reading order of "who decides what":
    stock defaults let append-only binlog garbage accumulate for days
    (observed: 40G of binlogs behind a 217K-row collection).
 
-Related, same theme: `POST /revectorize_all` **truncates the collection
-first** (drop + recreate via the same startup path, so schema, index and
-nlist all come along) before re-embedding everything — re-running onto a
-stale collection would layer fresh append-only binlogs on top of the old
-rows', which Milvus only reaps lazily.
+Related, same theme: `POST /revectorize_all` is a deprecated alias for the
+incremental vectorizing run. It **never truncates, drops, or deletes the
+collection**. It walks every opus and embeds only paragraphs whose content
+hash is not already stored. Collection resets and opus removal are deliberate,
+manual-only operations exposed by the vector store, never a routine
+consequence of starting a run.
 
 ### How IVF_SQ8 works (and what nlist/nprobe trade off)
 

@@ -91,7 +91,6 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
             const opId = obj.id;
             this.log.log(`starting vectorizing for ${obj.id}`, asJson);
             await this.vectorizer.vectorize(opId, () => {
-              this.log.debug('kafka heartbeat');
               return heartbeat();
             });
             this.log.log(`done vectorizing for ${obj.id}`, asJson);

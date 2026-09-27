@@ -21,6 +21,7 @@ import { log } from 'console';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health/health.controller';
 import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
+import { EnrichmentService } from './services/enrichment.service';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
     ProducerService,
     KafkaListenerService,
     KafkaService,
+    EnrichmentService,
     BibliotecaClient,
     VectorizingJobService,
     {
