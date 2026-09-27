@@ -255,10 +255,15 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * The persistence call. Routed through the shared bibliotecaUrl but on
    * plain fetch for now: the endpoint postdates the generated client
    * (biblioteca.api.ts) - once that is regenerated this should move onto
-   * the generated Api like every other server call.
+   * the generated Api like every other server call. Authenticated with the
+   * X-Internal-Token shared secret when one is configured - the server
+   * denies /api/internal closed otherwise.
    */
   private async persist(body: EnrichmentUpdate) {
-    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    const token = this.conf.internalApiToken;
+    if (token) headers['X-Internal-Token'] = token;
+    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers, body: JSON.stringify(body) });
     if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`);
   }
 
