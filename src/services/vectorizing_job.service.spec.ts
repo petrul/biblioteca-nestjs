@@ -1,7 +1,6 @@
 import { VectorizingJobService } from './vectorizing_job.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
-import { VectorStore } from './vector_store';
 
 describe('VectorizingJobService', () => {
   let job: VectorizingJobService;
@@ -9,14 +8,12 @@ describe('VectorizingJobService', () => {
   const vectorizeMock = jest.fn();
   const opera: any[] = [];
   let tbcMock: any;
-  const colMock = { reset: jest.fn() };
 
   beforeEach(() => {
     stopRequested = false;
     opera.length = 0;
     vectorizeMock.mockReset();
     vectorizeMock.mockResolvedValue(0);
-    colMock.reset.mockReset().mockResolvedValue(undefined);
     tbcMock = {
       allOperaGen: async function* () {
         for (const op of opera) {
@@ -33,7 +30,7 @@ describe('VectorizingJobService', () => {
       },
       isStopRequested: () => stopRequested,
       vectorize: vectorizeMock,
-    } as unknown as VectorizerService, colMock as unknown as VectorStore);
+    } as unknown as VectorizerService);
   });
 
   it('status is idle before any run', () => {
@@ -160,23 +157,25 @@ describe('VectorizingJobService', () => {
     });
   });
 
-  it('start truncates the collection first; resume does not', async () => {
+  it('start resets in-memory progress but never touches the vector store itself', async () => {
+    // Regression test for a real production incident: start() used to
+    // drop and recreate the whole vector collection before every run
+    // (see git history), which was correct for Milvus's append-only
+    // binlog storage but wiped hours of already-computed Qdrant vectors
+    // for nothing once Qdrant became the default store - Qdrant's own
+    // upsertNewOrModified() already dedups by content hash, so a re-run
+    // needs no truncation at all. As a hard rule, this service must never
+    // drop/truncate a collection automatically - VectorizingJobService no
+    // longer even holds a VectorStore reference (see its constructor).
     opera.push({ id: 1 }, { id: 2 }, { id: 3 });
-    vectorizeMock.mockImplementation(() => {
-      stopRequested = true;
-      return Promise.resolve(2);
-    });
+    vectorizeMock.mockResolvedValue(2);
 
     await job.start(false);
-    expect(colMock.reset).toHaveBeenCalledTimes(1);
+    expect(job.status().completedOpera).toBe(3);
 
-    stopRequested = false;
-    vectorizeMock.mockReset();
-    vectorizeMock.mockResolvedValue(7);
-    colMock.reset.mockClear();
-
-    await job.resume();
-    expect(colMock.reset).not.toHaveBeenCalled();
+    await job.start(false);
+    expect(job.status().completedOpera).toBe(3);
+    expect(job.status().totalOpera).toBe(3);
   });
 
   it('resume refuses when there is no previous run', async () => {

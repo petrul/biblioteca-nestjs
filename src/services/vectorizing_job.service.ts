@@ -1,7 +1,6 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
-import { PROVIDER_VECTOR_STORE, VectorStore } from './vector_store';
 import { StopWatch, Util } from '../util';
 import { EntityModelTeiDiv } from '../biblioteca.api';
 
@@ -68,8 +67,7 @@ export class VectorizingJobService {
   /** Opera completed by the current/most recent run - in memory only. */
   protected completedOpusIds = new Set<number>();
 
-  constructor(protected tbc: BibliotecaClient, protected vectorizer: VectorizerService,
-    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore) {}
+  constructor(protected tbc: BibliotecaClient, protected vectorizer: VectorizerService) {}
 
   private readonly log = new Logger(VectorizingJobService.name);
 
@@ -95,22 +93,24 @@ export class VectorizingJobService {
   async start(shuffle = false): Promise<VectorizingStatus> {
     this.vectorizer.clearStop();
 
-    // Truncate before the run: drop and recreate the collection so the pass
-    // starts from an empty one. Re-vectorizing into the existing collection
-    // would layer this run's insert binlogs on top of the previous rows' -
-    // Milvus binlogs are append-only and delete/upsert deltas are only
-    // reaped by a lazy GC - so a full re-run onto a stale collection leaves
-    // tens of GB of unreclaimed MinIO objects (observed in prod: 40G of
-    // binlogs for a collection holding ~3% of the corpus). drop() releases
-    // the collection from memory first; createAndLoadIfNotExists() then
-    // rebuilds it with the same schema, index and load state as at startup.
-    // A stop requested mid-run leaves the collection partial - by design:
-    // a truncated revectorize is exactly that until it completes (and
-    // resume() then continues that partial collection, without truncating).
-    this.log.log('start: truncating collection...');
-    await this.vectorStore.reset();
-    this.log.log('start: collection truncated.');
-
+    // Deliberately does NOT truncate the collection first anymore (that
+    // used to live here - see git history). It was load-bearing for
+    // Milvus's append-only binlog storage (a full re-run onto a stale
+    // collection left tens of GB of unreclaimed MinIO objects, observed in
+    // prod: 40G of binlogs for a collection holding ~3% of the corpus),
+    // but Qdrant's upsertNewOrModified() already dedups by content hash -
+    // re-walking every opus just re-confirms what's already embedded and
+    // writes only what's actually new, no garbage accumulates. Dropping a
+    // vector collection is real, uncapped GPU/embedding cost to
+    // regenerate (observed in production: an in-memory-only nestjs
+    // restart plus a `start()` call here wiped tens of thousands of
+    // already-computed vectors, hours of re-embedding lost for nothing).
+    // As a hard rule this app now never truncates a collection on its own
+    // under any code path - VectorStore.reset()/drop() remain available
+    // as explicit, manual-only operations for anyone who really means to
+    // wipe one (e.g. after an encoder change makes old vectors
+    // incompatible), never something a routine "start a run" call does
+    // for you.
     const opera = await this.collectOpera();
     if (shuffle) {
       Util.shuffleArray(opera);
