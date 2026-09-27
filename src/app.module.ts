@@ -18,6 +18,9 @@ import { BgeM3OllamaService, DynamicOllamaEmbedder, NomicEmbedOllamaService, Oll
 import { RetryingContentEmbedder } from './services/retrying_content_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
 import { log } from 'console';
+import { TerminusModule } from '@nestjs/terminus';
+import { HealthController } from './health/health.controller';
+import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
 
 @Module({
   imports: [
@@ -26,15 +29,18 @@ import { log } from 'console';
       cache: true,
       ignoreEnvFile: true,
       load: [ configuration ]
-    })
+    }),
+    TerminusModule
   ],
 
   controllers: [
     AppController,
-    VectorizingController
+    VectorizingController,
+    HealthController
   ],
 
   providers: [
+      UpstreamHealthIndicator,
       {
         provide: PROVIDER_LOGGER,
         useClass: ConsoleLogger
