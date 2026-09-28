@@ -98,6 +98,10 @@ class FakeTbc {
   opera: any[] = [];
   async getAuthors() { return this.authors; }
   async getAllOpera() { return this.opera; }
+  // dailySweep() paginates through allOperaGen() now (no more fixed
+  // page-size cap) - the fake doesn't need real pagination, just to
+  // satisfy the same shape by yielding everything in one go.
+  async *allOperaGen() { for (const opus of this.opera) yield opus; }
 }
 
 function service(tbc: FakeTbc, fetch: FakeFetch) {

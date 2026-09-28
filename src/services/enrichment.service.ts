@@ -79,19 +79,21 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy() { if (this.timer) { clearTimeout(this.timer); clearInterval(this.timer); } }
 
   /**
-   * Once a day at 03:00, a bounded batch of not-yet-enriched authors and
-   * opera. Idempotent by construction on both ends: the worker only
-   * picks entities whose bio/summary is missing, and the server's
-   * persistence endpoint only fills blank fields - so a crashed sweep
-   * rerun never overwrites anything. One entity failing never aborts
-   * the rest of the batch.
+   * Once a day at 03:00, every not-yet-enriched author and opus - no
+   * batch cap (was 25 of each; with the per-opus enrichment listener now
+   * covering steady-state imports, this sweep only needs to be a
+   * backstop, not a slow trickle). Idempotent by construction on both
+   * ends: the worker only picks entities whose bio/summary is missing,
+   * and the server's persistence endpoint only fills blank fields - so a
+   * crashed sweep rerun never overwrites anything. One entity failing
+   * never aborts the rest of the sweep.
    */
   async dailySweep() {
     if (this.running) return;
     this.running = true;
     try {
       const authors = await this.client.getAuthors();
-      for (const author of (authors as any[]).filter(a => !a.bio).slice(0, 25)) {
+      for (const author of (authors as any[]).filter(a => !a.bio)) {
         try {
           this.log.log(`enrichment candidate author ${author.strId}`);
           await this.enrichAuthor(author);
@@ -99,13 +101,16 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
           this.log.warn(`author enrichment failed for ${author.strId}: ${e?.message ?? e}`);
         }
       }
-      const opera = await this.client.getAllOpera(0, 25);
-      for (const opus of opera.filter((o: any) => !o.summary).slice(0, 25)) {
+      // getAllOpera(pageNr, pageSize) is one page only - allOperaGen()
+      // paginates through every opus on the server, not just the first
+      // page, now that nothing here caps how many get considered.
+      for await (const opus of this.client.allOperaGen()) {
+        if ((opus as any).summary) continue;
         try {
-          this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
+          this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
           await this.enrichWork(opus);
         } catch (e: any) {
-          this.log.warn(`opus enrichment failed for ${opus.id} ${opus.head}: ${e?.message ?? e}`);
+          this.log.warn(`opus enrichment failed for ${(opus as any).id} ${(opus as any).head}: ${e?.message ?? e}`);
         }
       }
     } catch (e: any) { this.log.warn(`daily enrichment sweep failed: ${e?.message ?? e}`); }
