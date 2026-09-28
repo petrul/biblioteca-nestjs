@@ -21,7 +21,7 @@ export class OllamaService {
     constructor(@Inject(PROVIDER_CONF) protected conf: VectorizerConfiguration) {}
 
     async encode(model: string, sentences: string[]): Promise<number[][]> {
-        const resp = await fetch(`${this.conf.ollamaServer}/api/embed`, {
+        const resp = await fetch(`${this.conf.ollamaUrl}/api/embed`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model, input: sentences }),

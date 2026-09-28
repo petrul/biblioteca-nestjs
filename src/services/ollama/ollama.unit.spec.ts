@@ -20,7 +20,7 @@ describe('OllamaService unit behavior', () => {
       ok: true,
       json: async () => ({ model: 'test-model', embeddings }),
     } as Response);
-    const service = new OllamaService({ ollamaServer: 'http://ollama.test' } as any);
+    const service = new OllamaService({ ollamaUrl: 'http://ollama.test' } as any);
 
     await expect(service.encode('test-model', ['one', 'two'])).resolves.toEqual(embeddings);
     expect(global.fetch).toHaveBeenCalledWith('http://ollama.test/api/embed', {
@@ -36,7 +36,7 @@ describe('OllamaService unit behavior', () => {
       status: 503,
       text: async () => 'busy',
     } as Response);
-    const service = new OllamaService({ ollamaServer: 'http://ollama.test' } as any);
+    const service = new OllamaService({ ollamaUrl: 'http://ollama.test' } as any);
 
     await expect(service.encode('test-model', ['one'])).rejects.toThrow(
       "Ollama /api/embed failed for model 'test-model': HTTP 503 busy",

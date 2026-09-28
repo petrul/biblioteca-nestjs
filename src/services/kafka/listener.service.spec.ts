@@ -53,7 +53,7 @@ describe('KafkaListenerService', () => {
             kafkaServers: 'test:9092',
             kafkaGroupId: 'test-group',
             sentenceTransformersServer: 'test:1234',
-            ollamaServer: 'test:11434',
+            ollamaUrl: 'test:11434',
             vectorStoreUrl: 'test:19530',
             bibliotecaUrl: 'http://test:8080',
         } as VectorizerConfiguration;

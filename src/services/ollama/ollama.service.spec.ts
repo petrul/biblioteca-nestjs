@@ -12,7 +12,7 @@ const describeOllama = process.env.RUN_OLLAMA_INTEGRATION === 'true' ? describe 
 describeOllama('OllamaService', () => {
 
     const conf: Partial<VectorizerConfiguration> = {
-        ollamaServer: 'http://zmeu.local:11434',
+        ollamaUrl: 'http://zmeu.local:11434',
     }
 
     let qwen3: Qwen3EmbeddingOllamaService;
@@ -48,7 +48,7 @@ describeOllama('OllamaService', () => {
     }, TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('qwen3-embedding produces 2560-dim vectors', async () => {
-        expect(conf.ollamaServer).toBeTruthy();
+        expect(conf.ollamaUrl).toBeTruthy();
 
         const sentences = ['foaie verde', 'la 5eme republique vous remercie ce que vous faite pentru ea'];
         const vects = await qwen3.encode(sentences);

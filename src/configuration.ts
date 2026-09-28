@@ -19,7 +19,7 @@ export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_BROKERS'),
     kafkaGroupId: KAFKA_GROUP_ID,
     sentenceTransformersServer: required('STS_SERVER'),
-    ollamaServer: required('OLLAMA_SERVER'),
+    ollamaUrl: required('OLLAMA_URL'),
     // The address of whichever vector store is active - one env var for
     // all stores on purpose: switching stores (vectorStoreType) must
     // never require also remembering to switch address variables.
@@ -95,7 +95,7 @@ export interface VectorizerConfiguration {
 
     // the Ollama server backing BGE-M3, Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
     // one fixed instance, unlike sentenceTransformersServer/vectorStoreUrl which vary per environment.
-    ollamaServer: string;
+    ollamaUrl: string;
 
     // this is the mini milvus server: mini.local:xxx
     vectorStoreUrl: string;
@@ -129,8 +129,8 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('sentenceTransformersServer');
     }
 
-    get ollamaServer(): string {
-        return this.conf.get<string>('ollamaServer');
+    get ollamaUrl(): string {
+        return this.conf.get<string>('ollamaUrl');
     }
 
     get vectorStoreUrl(): string {

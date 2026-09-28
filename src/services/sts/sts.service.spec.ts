@@ -114,7 +114,7 @@ describe('StsService', () => {
 describeOllama('active embedding service (bge-m3 via zmeu Ollama)', () => {
 
     const conf: Partial<VectorizerConfiguration> = {
-        ollamaServer: 'http://zmeu.local:11434',
+        ollamaUrl: 'http://zmeu.local:11434',
     };
 
     let bgeM3: BgeM3OllamaService;
