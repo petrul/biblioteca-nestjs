@@ -99,6 +99,8 @@ task :'check-env', [:profile] do |_task, args|
     profile = selected_profile(args)
     load_profile!(profile)
 
+    # STS_SERVER is deliberately absent: sentenceTransformersServer is
+    # retired/optional in configuration.ts, not required() anymore.
     required = [
         'KAFKA_BROKERS', 'OLLAMA_URL',
         %w[VECTORSTORE_URL MILVUS_URL],
