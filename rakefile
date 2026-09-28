@@ -14,7 +14,8 @@ def load_profile!(profile)
     store_dir = ENV.fetch('PASSWORD_STORE_DIR', File.expand_path('~/.password-store'))
     loader = File.join(store_dir, 'load-env.sh')
     abort "Password-store environment loader not found: #{loader}" unless File.file?(loader)
-    output, status = Open3.capture2('bash', '-c', "source #{Shellwords.escape(loader)} #{Shellwords.escape(profile)} && env -0")
+    profile_path = "biblioteca/#{profile}"
+    output, status = Open3.capture2('bash', '-c', "source #{Shellwords.escape(loader)} #{Shellwords.escape(profile_path)} && env -0")
     abort "Could not load biblioteca/#{profile} from pass store" unless status.success?
     output.split("\0").each do |entry|
         key, value = entry.split('=', 2)
