@@ -13,7 +13,9 @@ export class SentenceTransformersService {
     static readonly NAME_ALL_MPNET_BASE_V2 = 'all-mpnet-base-v2';
 
     constructor(@Inject(PROVIDER_CONF) protected conf: VectorizerConfiguration) {
-        const baseUrl = this.conf.sentenceTransformersServer
+        // Optional since STS was retired (see configuration.ts) - never
+        // selected as the active embedder today.
+        const baseUrl = this.conf.sentenceTransformersServer ?? ''
         this.sts = new StsApi({
             baseUrl: baseUrl,
             baseApiParams: {

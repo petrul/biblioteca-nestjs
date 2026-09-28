@@ -18,7 +18,6 @@ export const KAFKA_GROUP_ID = 'biblioteca_nestjs';
 export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_BROKERS'),
     kafkaGroupId: KAFKA_GROUP_ID,
-    sentenceTransformersServer: required('STS_SERVER'),
     ollamaUrl: required('OLLAMA_URL'),
     // The address of whichever vector store is active - one env var for
     // all stores on purpose: switching stores (vectorStoreType) must
@@ -90,8 +89,11 @@ export interface VectorizerConfiguration {
 
     kafkaGroupId: string;
 
-    // this is the address of the STS server, i.e. mini.local:xxx
-    sentenceTransformersServer: string;
+    // The address of the STS (sentence-transformers) server - RETIRED:
+    // not a required env var anymore, and unset in every environment
+    // (the sts.service classes stay for the day a per-language STS
+    // encoder is needed again, they are never selected today).
+    sentenceTransformersServer?: string;
 
     // the Ollama server backing BGE-M3, Qwen3-Embedding-4B and nomic-embed-text (see services/ollama) -
     // one fixed instance, unlike sentenceTransformersServer/vectorStoreUrl which vary per environment.
@@ -125,7 +127,7 @@ export class AppConfService implements VectorizerConfiguration {
         return this.conf.get<string>('kafkaGroupId');
     }
 
-    get sentenceTransformersServer(): string {
+    get sentenceTransformersServer(): string | undefined {
         return this.conf.get<string>('sentenceTransformersServer');
     }
 

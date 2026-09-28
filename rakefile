@@ -100,7 +100,7 @@ task :'check-env', [:profile] do |_task, args|
     load_profile!(profile)
 
     required = [
-        'KAFKA_BROKERS', 'STS_SERVER', 'OLLAMA_URL',
+        'KAFKA_BROKERS', 'OLLAMA_URL',
         %w[VECTORSTORE_URL MILVUS_URL],
         'BIBLIOTECA_EXTERNAL_URL'
     ]
