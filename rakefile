@@ -88,6 +88,38 @@ def selected_profile(args)
     args[:profile] || ENV.fetch('PROFILE', 'dev')
 end
 
+# Mirrors biblioteca-server's rakefile check-env task: verifies the pass
+# store actually carries what src/configuration.ts's required() calls
+# demand, instead of only finding out when Nest's DI container throws deep
+# into app bootstrap. Required lists are the same across dev/ci/prod
+# because that's what's actually load-bearing in configuration.ts - EMBEDDER_URL,
+# TEI_REPOS, WORK_DIR etc are biblioteca-server-only and never read here.
+desc 'Verify required environment variables are available from the pass store'
+task :'check-env', [:profile] do |_task, args|
+    profile = selected_profile(args)
+    load_profile!(profile)
+
+    required = [
+        'KAFKA_BROKERS', 'STS_SERVER', 'OLLAMA_SERVER',
+        %w[VECTORSTORE_URL MILVUS_URL],
+        'BIBLIOTECA_EXTERNAL_URL'
+    ]
+    missing = required.reject do |entry|
+        keys = entry.is_a?(Array) ? entry : [entry]
+        keys.any? { |key| ENV[key] && !ENV[key].strip.empty? }
+    end
+    unless missing.empty?
+        labels = missing.map { |entry| entry.is_a?(Array) ? entry.join(' or ') : entry }
+        abort "Missing required #{profile} environment value(s) from pass store: #{labels.join(', ')}"
+    end
+    # No "unused pass-store key" warning here, unlike biblioteca-server's
+    # check-env: biblioteca/<profile> is one flat store shared across this
+    # app, biblioteca-server, and biblioteca-reader, so most keys present
+    # are legitimately owned by a sibling app, not stale - a diff against
+    # only this app's own required list would false-positive on every run.
+    puts "> #{profile} environment is complete (#{required.length} required value(s) present)"
+end
+
 desc 'Remove compiled application output and node_modules'
 task :clean do
     sh 'npm run clean'
@@ -117,6 +149,7 @@ desc 'Run the complete test suite with a profile (dev by default)'
 task :test, [:profile] => [:ensure_deps] do |_task, args|
     profile = selected_profile(args)
     load_profile!(profile)
+    Rake::Task[:'check-env'].invoke(profile)
     if ENV['TEAMCITY_VERSION']
         sh 'npm', 'test', '--', '--reporters=jest-teamcity'
     else
