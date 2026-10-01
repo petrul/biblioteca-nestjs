@@ -381,15 +381,33 @@ checked-in export like textbase-server's, since this surface is small and
 purely operational (no external client generates against it the way the
 reader generates against textbase-server's).
 
-## Regenerating the biblioteca-server API client
+## Regenerating the typed API clients
 
-`swagger-typescript-api` generates this project's typed client from
-biblioteca-server's own OpenAPI spec:
+`rake gen-client` regenerates every typed client from the live OpenAPI spec
+of the running servers. It is an umbrella only — the work lives in the
+specialized tasks it calls, and each can be run on its own:
 
 ```bash
-./gen-biblioteca-api.sh
+rake gen-client                 # both clients, dev profile (localhost:8080)
+rake gen-client[yoga]          # any pass-store profile; PROFILE env works too
+rake gen-biblioteca-client     # src/biblioteca.api.ts, from biblioteca-server
+rake gen-sts-client            # src/sts.api.ts, from the sentence-transformers server
 ```
 
-Downloads the live spec from the production server and regenerates
-`src/biblioteca.api.ts` (and the sentence-transformers client alongside it)
-— run this after textbase-server's API surface changes.
+Like every other rake task they load the profile's environment from the
+pass store (`biblioteca/<profile>`), so `BIBLIOTECA_EXTERNAL_URL` decides
+which biblioteca-server is asked; `STS_SERVER` decides the STS server when
+the profile defines one (falling back to the mini.local instance
+`./gen-biblioteca-api.sh` always used — `sentenceTransformersServer` is
+retired/optional, the sts.service classes are never selected today, but
+`sts.api.ts` is still imported and compiled). Each task downloads the
+spec, runs `swagger-typescript-api` through `npx -y` (the generator is
+not a project dependency — the `-y` keeps npx from stopping to ask before
+caching it), writes the client, and removes the downloaded spec json:
+only the generated clients are checked in.
+
+Run this after biblioteca-server's API surface changes, with the target
+server actually running — the regen picks up whatever that server currently
+serves, so the diff against the checked-in client is real upstream API
+change, not editor noise. `./gen-biblioteca-api.sh` is the older hand-rolled
+equivalent; prefer the rake task.

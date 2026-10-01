@@ -99,6 +99,7 @@ export interface EntityModelTeiDiv {
   /** @format int64 */
   id?: number;
   xpath?: string;
+  domPath?: string;
   lang?:
     | "BG"
     | "BR"
@@ -144,56 +145,6 @@ export interface EntityModelTeiDiv {
   completePath?: string;
   author?: Author;
   _links?: Links;
-}
-
-export interface TeiDiv {
-  /** @format int64 */
-  id?: number;
-  xpath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
-  summary?: string;
-  summarySourceUrl?: string;
-  leaf?: boolean;
-  completePath?: string;
-  author?: Author;
 }
 
 export interface PageMetadata {
@@ -260,6 +211,7 @@ export interface TeiFile {
 
 export interface EntityModelTeiElem {
   xpath?: string;
+  domPath?: string;
   lang?:
     | "BG"
     | "BR"
@@ -303,6 +255,52 @@ export interface EntityModelTeiElem {
 export interface PagedModelEntityModelTeiElem {
   _embedded?: {
     teiElems?: EntityModelTeiElem[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelEmbeddingBatchStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
+  /** @format int64 */
+  totalChars?: number;
+  /** @format int32 */
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelEmbeddingBatchStat {
+  _embedded?: {
+    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelOpusVectorizingStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int64 */
+  opusId?: number;
+  /** @format int32 */
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelOpusVectorizingStat {
+  _embedded?: {
+    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
   };
   _links?: Links;
   page?: PageMetadata;
@@ -384,6 +382,193 @@ export interface CollectionModelEntityModelAuthor {
   _links?: Links;
 }
 
+export interface AuthorRequestBody {
+  /** @format int64 */
+  id?: number;
+  strId?: string;
+  lastName?: string;
+  firstName?: string;
+  displayName?: string;
+  avatar?: {
+    binaryStream?: any;
+  };
+  bio?: string;
+  bioSourceUrl?: string;
+  nativeLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  writingLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  country?: string;
+  visualName?: string;
+  anonymous?: boolean;
+}
+
+export interface EmbeddingBatchStatRequestBody {
+  /** @format int64 */
+  id?: number;
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
+  /** @format int64 */
+  totalChars?: number;
+  /** @format int32 */
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+}
+
+export interface OpusVectorizingStatRequestBody {
+  /** @format int64 */
+  id?: number;
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int64 */
+  opusId?: number;
+  /** @format int32 */
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+}
+
+export interface TeiDivRequestBody {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
+  summary?: string;
+  summarySourceUrl?: string;
+  leaf?: boolean;
+  completePath?: string;
+  author?: Author;
+}
+
+export interface TeiElemRequestBody {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
+  author?: Author;
+}
+
 export interface SaveRequest {
   divPath?: string;
 }
@@ -419,6 +604,22 @@ export interface AttentionRequest {
 export interface RegisterRequest {
   username?: string;
   password?: string;
+}
+
+export interface EnrichmentUpdateDto {
+  authorStrId?: string;
+  /** @format int64 */
+  opusId?: number;
+  bio?: string;
+  bioSourceUrl?: string;
+  summary?: string;
+  summarySourceUrl?: string;
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  country?: string;
+  writingLanguage?: string;
+  imageUrls?: string[];
 }
 
 export interface CreateCollectionRequest {
@@ -484,6 +685,19 @@ export interface PagingDto {
   number?: number;
 }
 
+export interface RebuildStatus {
+  indexExists?: boolean;
+  running?: boolean;
+  /** @format int64 */
+  startedAtMillis?: number;
+  /** @format int64 */
+  totalOpera?: number;
+  /** @format int64 */
+  processedOpera?: number;
+  /** @format int64 */
+  indexedDocs?: number;
+}
+
 export interface TeiElemDto {
   /** @format int64 */
   id?: number;
@@ -508,6 +722,7 @@ export interface AuthorDto {
   firstName?: string;
   displayName?: string;
   description?: string;
+  bio?: string;
   opera?: OpusDto[];
   image_href?: string;
 }
@@ -583,10 +798,18 @@ export interface Milvus {
   collection?: string;
 }
 
+export interface Paragraph {
+  /** @format int32 */
+  minChars?: number;
+  /** @format int32 */
+  maxChars?: number;
+}
+
 export interface SharedConfigDto {
   kafka?: Kafka;
   milvus?: Milvus;
   embedder?: Embedder;
+  paragraph?: Paragraph;
 }
 
 export interface Link {
@@ -900,6 +1123,26 @@ export class Api<
       }),
 
     /**
+     * @description create-author
+     *
+     * @tags author-entity-controller
+     * @name PostCollectionResourceAuthorPost
+     * @request POST:/api/drest/authors
+     */
+    postCollectionResourceAuthorPost: (
+      data: AuthorRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelAuthor, any>({
+        path: `/api/drest/authors`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * No description
      *
      * @tags author-search-controller
@@ -1161,6 +1404,392 @@ export class Api<
       }),
 
     /**
+     * @description update-author
+     *
+     * @tags author-entity-controller
+     * @name PutItemResourceAuthorPut
+     * @request PUT:/api/drest/authors/{id}
+     */
+    putItemResourceAuthorPut: (
+      id: string,
+      data: AuthorRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelAuthor, any>({
+        path: `/api/drest/authors/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-author
+     *
+     * @tags author-entity-controller
+     * @name DeleteItemResourceAuthorDelete
+     * @request DELETE:/api/drest/authors/{id}
+     */
+    deleteItemResourceAuthorDelete: (id: string, params: RequestParams = {}) =>
+      this.request<void, void>({
+        path: `/api/drest/authors/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-author
+     *
+     * @tags author-entity-controller
+     * @name PatchItemResourceAuthorPatch
+     * @request PATCH:/api/drest/authors/{id}
+     */
+    patchItemResourceAuthorPatch: (
+      id: string,
+      data: AuthorRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelAuthor, any>({
+        path: `/api/drest/authors/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name GetCollectionResourceEmbeddingbatchstatGet
+     * @request GET:/api/drest/embeddingBatchStats
+     */
+    getCollectionResourceEmbeddingbatchstatGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelEmbeddingBatchStat, any>({
+        path: `/api/drest/embeddingBatchStats`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description create-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name PostCollectionResourceEmbeddingbatchstatPost
+     * @request POST:/api/drest/embeddingBatchStats
+     */
+    postCollectionResourceEmbeddingbatchstatPost: (
+      data: EmbeddingBatchStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelEmbeddingBatchStat, any>({
+        path: `/api/drest/embeddingBatchStats`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags embedding-batch-stat-search-controller
+     * @name ExecuteSearchEmbeddingbatchstatGet
+     * @request GET:/api/drest/embeddingBatchStats/search/findAllByOrderByIdDesc
+     */
+    executeSearchEmbeddingbatchstatGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelEmbeddingBatchStat, void>({
+        path: `/api/drest/embeddingBatchStats/search/findAllByOrderByIdDesc`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name GetItemResourceEmbeddingbatchstatGet
+     * @request GET:/api/drest/embeddingBatchStats/{id}
+     */
+    getItemResourceEmbeddingbatchstatGet: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelEmbeddingBatchStat, void>({
+        path: `/api/drest/embeddingBatchStats/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name PutItemResourceEmbeddingbatchstatPut
+     * @request PUT:/api/drest/embeddingBatchStats/{id}
+     */
+    putItemResourceEmbeddingbatchstatPut: (
+      id: string,
+      data: EmbeddingBatchStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelEmbeddingBatchStat, any>({
+        path: `/api/drest/embeddingBatchStats/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name DeleteItemResourceEmbeddingbatchstatDelete
+     * @request DELETE:/api/drest/embeddingBatchStats/{id}
+     */
+    deleteItemResourceEmbeddingbatchstatDelete: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/embeddingBatchStats/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-embeddingbatchstat
+     *
+     * @tags embedding-batch-stat-entity-controller
+     * @name PatchItemResourceEmbeddingbatchstatPatch
+     * @request PATCH:/api/drest/embeddingBatchStats/{id}
+     */
+    patchItemResourceEmbeddingbatchstatPatch: (
+      id: string,
+      data: EmbeddingBatchStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelEmbeddingBatchStat, any>({
+        path: `/api/drest/embeddingBatchStats/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name GetCollectionResourceOpusvectorizingstatGet
+     * @request GET:/api/drest/opusVectorizingStats
+     */
+    getCollectionResourceOpusvectorizingstatGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelOpusVectorizingStat, any>({
+        path: `/api/drest/opusVectorizingStats`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description create-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name PostCollectionResourceOpusvectorizingstatPost
+     * @request POST:/api/drest/opusVectorizingStats
+     */
+    postCollectionResourceOpusvectorizingstatPost: (
+      data: OpusVectorizingStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelOpusVectorizingStat, any>({
+        path: `/api/drest/opusVectorizingStats`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags opus-vectorizing-stat-search-controller
+     * @name ExecuteSearchOpusvectorizingstatGet
+     * @request GET:/api/drest/opusVectorizingStats/search/findAllByOrderByIdDesc
+     */
+    executeSearchOpusvectorizingstatGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelOpusVectorizingStat, void>({
+        path: `/api/drest/opusVectorizingStats/search/findAllByOrderByIdDesc`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name GetItemResourceOpusvectorizingstatGet
+     * @request GET:/api/drest/opusVectorizingStats/{id}
+     */
+    getItemResourceOpusvectorizingstatGet: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelOpusVectorizingStat, void>({
+        path: `/api/drest/opusVectorizingStats/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name PutItemResourceOpusvectorizingstatPut
+     * @request PUT:/api/drest/opusVectorizingStats/{id}
+     */
+    putItemResourceOpusvectorizingstatPut: (
+      id: string,
+      data: OpusVectorizingStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelOpusVectorizingStat, any>({
+        path: `/api/drest/opusVectorizingStats/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name DeleteItemResourceOpusvectorizingstatDelete
+     * @request DELETE:/api/drest/opusVectorizingStats/{id}
+     */
+    deleteItemResourceOpusvectorizingstatDelete: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/opusVectorizingStats/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-opusvectorizingstat
+     *
+     * @tags opus-vectorizing-stat-entity-controller
+     * @name PatchItemResourceOpusvectorizingstatPatch
+     * @request PATCH:/api/drest/opusVectorizingStats/{id}
+     */
+    patchItemResourceOpusvectorizingstatPatch: (
+      id: string,
+      data: OpusVectorizingStatRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelOpusVectorizingStat, any>({
+        path: `/api/drest/opusVectorizingStats/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * No description
      *
      * @tags profile-controller
@@ -1195,9 +1824,39 @@ export class Api<
      *
      * @tags profile-controller
      * @name Descriptor1
-     * @request GET:/api/drest/profile/teiDivs
+     * @request GET:/api/drest/profile/embeddingBatchStats
      */
     descriptor1: (params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/api/drest/profile/embeddingBatchStats`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags profile-controller
+     * @name Descriptor2
+     * @request GET:/api/drest/profile/opusVectorizingStats
+     */
+    descriptor2: (params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/api/drest/profile/opusVectorizingStats`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags profile-controller
+     * @name Descriptor3
+     * @request GET:/api/drest/profile/teiDivs
+     */
+    descriptor3: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiDivs`,
         method: "GET",
@@ -1209,10 +1868,10 @@ export class Api<
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor2
+     * @name Descriptor4
      * @request GET:/api/drest/profile/teiElems
      */
-    descriptor2: (params: RequestParams = {}) =>
+    descriptor4: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiElems`,
         method: "GET",
@@ -1250,6 +1909,26 @@ export class Api<
         path: `/api/drest/teiDivs`,
         method: "GET",
         query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description create-teidiv
+     *
+     * @tags tei-div-entity-controller
+     * @name PostCollectionResourceTeidivPost
+     * @request POST:/api/drest/teiDivs
+     */
+    postCollectionResourceTeidivPost: (
+      data: TeiDivRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, any>({
+        path: `/api/drest/teiDivs`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -1432,7 +2111,7 @@ export class Api<
     executeSearchTeidivGet6: (
       query?: {
         urlFragment?: string;
-        parent?: TeiDiv;
+        parent?: TeiDivRequestBody;
       },
       params: RequestParams = {},
     ) =>
@@ -1650,6 +2329,62 @@ export class Api<
       }),
 
     /**
+     * @description update-teidiv
+     *
+     * @tags tei-div-entity-controller
+     * @name PutItemResourceTeidivPut
+     * @request PUT:/api/drest/teiDivs/{id}
+     */
+    putItemResourceTeidivPut: (
+      id: string,
+      data: TeiDivRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, any>({
+        path: `/api/drest/teiDivs/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-teidiv
+     *
+     * @tags tei-div-entity-controller
+     * @name DeleteItemResourceTeidivDelete
+     * @request DELETE:/api/drest/teiDivs/{id}
+     */
+    deleteItemResourceTeidivDelete: (id: string, params: RequestParams = {}) =>
+      this.request<void, void>({
+        path: `/api/drest/teiDivs/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-teidiv
+     *
+     * @tags tei-div-entity-controller
+     * @name PatchItemResourceTeidivPatch
+     * @request PATCH:/api/drest/teiDivs/{id}
+     */
+    patchItemResourceTeidivPatch: (
+      id: string,
+      data: TeiDivRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, any>({
+        path: `/api/drest/teiDivs/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * @description get-teielem
      *
      * @tags tei-elem-entity-controller
@@ -1684,6 +2419,26 @@ export class Api<
       }),
 
     /**
+     * @description create-teielem
+     *
+     * @tags tei-elem-entity-controller
+     * @name PostCollectionResourceTeielemPost
+     * @request POST:/api/drest/teiElems
+     */
+    postCollectionResourceTeielemPost: (
+      data: TeiElemRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiElem, any>({
+        path: `/api/drest/teiElems`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * @description get-teielem
      *
      * @tags tei-elem-entity-controller
@@ -1694,6 +2449,62 @@ export class Api<
       this.request<EntityModelTeiElem, void>({
         path: `/api/drest/teiElems/${id}`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-teielem
+     *
+     * @tags tei-elem-entity-controller
+     * @name PutItemResourceTeielemPut
+     * @request PUT:/api/drest/teiElems/{id}
+     */
+    putItemResourceTeielemPut: (
+      id: string,
+      data: TeiElemRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiElem, any>({
+        path: `/api/drest/teiElems/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-teielem
+     *
+     * @tags tei-elem-entity-controller
+     * @name DeleteItemResourceTeielemDelete
+     * @request DELETE:/api/drest/teiElems/{id}
+     */
+    deleteItemResourceTeielemDelete: (id: string, params: RequestParams = {}) =>
+      this.request<void, void>({
+        path: `/api/drest/teiElems/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-teielem
+     *
+     * @tags tei-elem-entity-controller
+     * @name PatchItemResourceTeielemPatch
+     * @request PATCH:/api/drest/teiElems/{id}
+     */
+    patchItemResourceTeielemPatch: (
+      id: string,
+      data: TeiElemRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiElem, any>({
+        path: `/api/drest/teiElems/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -1784,6 +2595,23 @@ export class Api<
     /**
      * No description
      *
+     * @tags enrichment-rest-controller
+     * @name Update
+     * @request POST:/api/internal/enrichment
+     */
+    update: (data: EnrichmentUpdateDto, params: RequestParams = {}) =>
+      this.request<object, any>({
+        path: `/api/internal/enrichment`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags div-collection-rest-controller
      * @name Mine1
      * @request GET:/api/collections/mine
@@ -1849,10 +2677,10 @@ export class Api<
      * No description
      *
      * @tags search-rest-controller
-     * @name SearchMilvus
-     * @request GET:/api/search/milvus
+     * @name SearchVector
+     * @request GET:/api/search/vector
      */
-    searchMilvus: (
+    searchVector: (
       query: {
         /**
          * @minLength 3
@@ -1868,7 +2696,7 @@ export class Api<
       params: RequestParams = {},
     ) =>
       this.request<HitDto[], any>({
-        path: `/api/search/milvus`,
+        path: `/api/search/vector`,
         method: "GET",
         query: query,
         format: "json",
@@ -2035,6 +2863,36 @@ export class Api<
         path: `/api/reading-progress/one`,
         method: "GET",
         query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags status-rest-controller
+     * @name LuceneStatus
+     * @request GET:/api/lucene/status
+     */
+    luceneStatus: (params: RequestParams = {}) =>
+      this.request<RebuildStatus, any>({
+        path: `/api/lucene/status`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags info-rest-controller
+     * @name Info
+     * @request GET:/api/info
+     */
+    info: (params: RequestParams = {}) =>
+      this.request<Record<string, string>, any>({
+        path: `/api/info`,
+        method: "GET",
         format: "json",
         ...params,
       }),

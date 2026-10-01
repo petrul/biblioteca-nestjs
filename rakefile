@@ -165,6 +165,44 @@ task :run, [:profile] => [:ensure_deps] do |_task, args|
     load_profile!(selected_profile(args))
     sh 'npm run start'
 end
+
+# -y on both npx calls: swagger-typescript-api is not a project dependency,
+# so npx would otherwise stop and ask before installing it into its cache.
+desc 'Regenerate the biblioteca-server typed client (src/biblioteca.api.ts) from the running server'
+task :'gen-biblioteca-client', [:profile] => [:ensure_deps] do |_task, args|
+    load_profile!(selected_profile(args))
+    base = ENV.fetch('BIBLIOTECA_EXTERNAL_URL').sub(%r{/$}, '')
+    spec = 'biblioteca-api.json'
+    sh 'curl', '--fail', '--silent', '--show-error', "#{base}/api/docs", '-H', 'Accept: application/json', '-o', spec
+    sh 'npx', '-y', 'swagger-typescript-api', 'generate', '-p', spec, '-o', 'src', '-n', 'biblioteca.api.ts'
+    rm_f spec
+end
+
+# The sentence-transformers server's OpenAPI is at /openapi.json (FastAPI).
+# STS_SERVER comes from the profile's pass-store env when defined; the
+# fallback is the mini.local instance gen-biblioteca-api.sh always used
+# (sentenceTransformersServer is retired/optional in configuration.ts -
+# unset in most environments, the sts.service classes are never selected
+# today, but sts.api.ts is still imported and compiled).
+desc 'Regenerate the sentence-transformers (STS) typed client (src/sts.api.ts) from the running server'
+task :'gen-sts-client', [:profile] => [:ensure_deps] do |_task, args|
+    load_profile!(selected_profile(args))
+    base = (ENV['STS_SERVER'] || 'http://mini.local:11200').sub(%r{/$}, '')
+    spec = 'sts-api.json'
+    sh 'curl', '--fail', '--silent', '--show-error', "#{base}/openapi.json", '-H', 'Accept: application/json', '-o', spec
+    sh 'npx', '-y', 'swagger-typescript-api', 'generate', '-p', spec, '-o', 'src', '-n', 'sts.api.ts'
+    rm_f spec
+end
+
+# Umbrella only: the actual work lives in the specialized gen-*-client
+# tasks above (same shape as biblioteca-reader's rakefile).
+desc 'Regenerate every typed client from the running servers'
+task :'gen-client', [:profile] do |_task, args|
+    profile = selected_profile(args)
+    Rake::Task[:'gen-biblioteca-client'].invoke(profile)
+    Rake::Task[:'gen-sts-client'].invoke(profile)
+end
+
 task :start, [:profile] do |_task, args|
     Rake::Task[:run].invoke(selected_profile(args))
 end
