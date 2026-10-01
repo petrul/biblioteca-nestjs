@@ -411,3 +411,11 @@ server actually running — the regen picks up whatever that server currently
 serves, so the diff against the checked-in client is real upstream API
 change, not editor noise. `./gen-biblioteca-api.sh` is the older hand-rolled
 equivalent; prefer the rake task.
+
+This service's own document (`/api/ui-json`, served by SwaggerModule at
+`/api/ui`) is itself consumed downstream: **biblioteca-reader** generates
+`src/generated/vectorizer-api.d.ts` from it (`rake gen-vectorizer-client`
+in that repo, raw spec used directly — the vectorizer's admin surface has
+no allowlist layer of its own). So a change to this service's own API
+surface means regenerating there too, with this server running at the
+same commit — see biblioteca-reader's README, "Refresh the API clients".
