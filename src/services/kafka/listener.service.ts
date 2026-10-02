@@ -37,8 +37,12 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
        * If no heartbeats are received by the broker before the expiration of this session timeout, 
        * then the broker will remove this client from the group and initiate a rebalance. 
        */
-      sessionTimeout:  30 * 60 * 1000, // 30 min, group.max.session.timeout.ms configured on the broker
-      heartbeatInterval: 3 * 60 * 1000, // every 3 minutes, you should send a heartbeat
+      // Keep these comfortably below the broker's group timeout.  The old
+      // three-minute heartbeat caused Kafka to report stale coordinators
+      // during normal coordinator changes and made recovery unnecessarily
+      // slow.
+      sessionTimeout: 30 * 1000,
+      heartbeatInterval: 10 * 1000,
     })
     await this.consumer.connect();
     await this.consumer.subscribe({

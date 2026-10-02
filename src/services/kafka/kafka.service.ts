@@ -19,6 +19,7 @@ export class KafkaService {
     const kafkaBrokers = parseKafkaBrokers(this.config.kafkaServers);
     this.logger.log(`Kafka brokers: ${kafkaBrokers.join(', ')}`);
     this.kafka = new Kafka({
+      clientId: 'biblioteca-nestjs',
       brokers: kafkaBrokers,
     });
   }

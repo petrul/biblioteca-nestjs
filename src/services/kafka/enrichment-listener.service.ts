@@ -44,8 +44,8 @@ export class EnrichmentKafkaListenerService implements OnApplicationShutdown, On
   async initKafkaListener() {
     this.consumer = this.ks.kafka.consumer({
       groupId: ENRICHMENT_KAFKA_GROUP_ID,
-      sessionTimeout: 30 * 60 * 1000,
-      heartbeatInterval: 3 * 60 * 1000,
+      sessionTimeout: 30 * 1000,
+      heartbeatInterval: 10 * 1000,
     });
     await this.consumer.connect();
     await this.consumer.subscribe({
@@ -80,22 +80,25 @@ export class EnrichmentKafkaListenerService implements OnApplicationShutdown, On
             const opus = await this.tbc.getElemByPath(obj.path) as any;
             await heartbeat();
 
-            if (opus && !opus.summary) {
+            // Already enriched? The single-div projection never carries
+            // summary itself (a @JsonIgnore'd Derby LOB) - it carries
+            // summarySourceUrl, set together with summary on the one and
+            // only persistence pass, so that column is the wire-visible
+            // "enrichment has run" marker. Checking it is what keeps a
+            // replayed/duplicate event from re-running Wikipedia and
+            // Wikidata for a work that is already enriched.
+            if (opus && !(opus.summary || opus.summarySourceUrl)) {
               this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
               await this.enrichment.enrichWork(opus);
             }
 
-            const authorStrId = opus?.author?.strId;
-            if (authorStrId) {
-              // No single-author-by-strId lookup exposes bio (the DREST
-              // projection omits it) - the flat getAuthors() list is the
-              // same source dailySweep() already relies on for this.
-              const authors = await this.tbc.getAuthors();
-              const author = (authors as any[]).find(a => a.strId === authorStrId);
-              if (author && !author.bio) {
-                this.log.log(`enrichment candidate author ${author.strId}`);
-                await this.enrichment.enrichAuthor(author);
-              }
+            // The div response embeds its author as an AuthorDto, which
+            // carries bio (present-or-null) precisely so this check needs
+            // no second query - bio present means already enriched, skip.
+            const author = opus?.author;
+            if (author && !author.bio) {
+              this.log.log(`enrichment candidate author ${author.strId}`);
+              await this.enrichment.enrichAuthor(author);
             }
             return;
           } catch (err: any) {

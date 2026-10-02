@@ -104,8 +104,14 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       // getAllOpera(pageNr, pageSize) is one page only - allOperaGen()
       // paginates through every opus on the server, not just the first
       // page, now that nothing here caps how many get considered.
+      // Already-enriched check: this SDR findOpera projection never
+      // carries summary (a @JsonIgnore'd Derby LOB) - summarySourceUrl,
+      // persisted together with summary on the one and only enrichment
+      // pass, is the wire-visible marker for "already done". Without it
+      // this filter matched nothing and the sweep re-enriched every
+      // single opus, every night.
       for await (const opus of this.client.allOperaGen()) {
-        if ((opus as any).summary) continue;
+        if ((opus as any).summary || (opus as any).summarySourceUrl) continue;
         try {
           this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
           await this.enrichWork(opus);
@@ -134,7 +140,13 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   }
 
   async enrichWork(opus: any) {
-    if (!opus?.id || !opus.head || opus.summary) return;
+    // summarySourceUrl is the reliable already-enriched marker: summary
+    // itself is @JsonIgnore'd out of every projection the worker ever
+    // sees (single-div DTO and SDR findOpera), while its attribution
+    // column - persisted together with it, in the same single write -
+    // is not. Accept either, so a hand-crafted object with summary set
+    // still short-circuits.
+    if (!opus?.id || !opus.head || opus.summary || opus.summarySourceUrl) return;
     const page = await this.wikipedia(opus.head);
     if (!page?.extract) return;
     await this.persist({
