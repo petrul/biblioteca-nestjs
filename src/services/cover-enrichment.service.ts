@@ -136,7 +136,9 @@ export class CoverEnrichmentService {
           ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
           layout: theme.layout,
           foilEffect: 'none',
-          hardcover: false,
+          // The hardcover overlay's default config carries the 12px
+          // spine (HardcoverOverlay: spineVisible, spineWidthPx 12).
+          hardcover: true,
           format: 'png',
           pixelRatio: 2,
           theme: { paletteId: theme.paletteId, showBarcode: false },
