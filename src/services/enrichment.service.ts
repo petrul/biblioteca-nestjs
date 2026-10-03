@@ -120,11 +120,18 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       // Authors first, and not just for their bios: the art retrieved
       // here is the fallback for covers whose opus has no art of its own
       // (see the opus loop below), so it must be in hand before the first
-      // cover is ordered. Authors already enriched in a previous run are
-      // skipped without their art being recalled - covers for their
-      // opera then order art-less unless the opus itself yields art.
+      // cover is ordered. The map is seeded with every author's
+      // already-stored portrait before the fill-only loop below: an
+      // author enriched in a previous run is skipped there without their
+      // art being recalled, but their persisted portrait is exactly the
+      // art the cover order needs - without the seed, opera of
+      // previously enriched authors order text-only covers.
       const authors = await this.client.getAuthors();
       const artByAuthor = new Map<string, string>();
+      for (const author of (authors as any[])) {
+        const stored = (author as any).imageHref || (author as any).image_href;
+        if (author.strId && stored) artByAuthor.set(author.strId, stored);
+      }
       for (const author of (authors as any[]).filter(a => !a.bio)) {
         try {
           this.log.log(`enrichment candidate author ${author.strId}`);
@@ -204,6 +211,28 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
     };
     await this.persist(update, opts);
     return update.imageUrls;
+  }
+
+  /**
+   * The author's already-stored portrait (the authors API's image_href,
+   * a biblioteca-server /img/... URL) - the art a cover order falls
+   * back to when no fresh art was retrieved: fill-only enrichment skips
+   * an enriched author entirely, and a fresh run can also come up empty
+   * when the author's name form has no Wikipedia hit. Short-lived cache:
+   * the Kafka listener asks per event and the authors list is large.
+   */
+  private authorsArtCache?: { at: number; byStrId: Map<string, string> };
+  async storedAuthorArt(strId: string): Promise<string | undefined> {
+    const now = Date.now();
+    if (!this.authorsArtCache || now - this.authorsArtCache.at > 5 * 60_000) {
+      const byStrId = new Map<string, string>();
+      for (const author of (await this.client.getAuthors()) as any[]) {
+        const stored = author.imageHref || author.image_href;
+        if (author.strId && stored) byStrId.set(author.strId, stored);
+      }
+      this.authorsArtCache = { at: now, byStrId };
+    }
+    return this.authorsArtCache.byStrId.get(strId);
   }
 
   /**

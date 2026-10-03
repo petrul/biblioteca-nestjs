@@ -314,15 +314,21 @@ export class EnrichmentAdminService {
           // rule on its own; force is threaded through so the switch
           // does not have to rely on this caller's arithmetic. artUrl:
           // the work's own art when the work step ran above, else its
-          // author's portrait - absent on cover-only runs, which order
-          // art-less covers exactly as before.
+          // author's portrait - fresh from the author pass when that
+          // ran, else the author's already-stored portrait, so even a
+          // cover-only run orders an authored cover, not a text-only
+          // one.
+          const authorStrId = opus.author?.strId;
+          const portrait = artUrl
+            || (authorStrId ? artByAuthor.get(authorStrId) : undefined)
+            || (authorStrId ? await this.enrichment.storedAuthorArt(authorStrId) : undefined);
           this.covers.enqueue({
             id: opus.id,
             path: opus.completePath,
             title: opus.head,
             author: opus.author?.visualName || opus.author?.displayName || 'Anonymous',
             coverUrl: opus.coverUrl,
-            artUrl: artUrl || (opus.author?.strId ? artByAuthor.get(opus.author.strId) : undefined),
+            artUrl: portrait,
           }, { force });
         }
       }

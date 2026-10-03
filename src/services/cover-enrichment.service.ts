@@ -32,6 +32,35 @@ export class CoverEnrichmentService {
   private readonly minio?: MinioClient;
   private bucket = 'biblioteca';
 
+  /**
+   * A random layout archetype and palette per cover, discovered from the
+   * renderer's own /api/cover/meta so the id lists are never duplicated
+   * here (the covers service is their canonical home). Cached after the
+   * first successful fetch; any failure (renderer down, odd response in
+   * a test) falls back to one fixed, known-good combination - a themed
+   * cover is always better than none, but never at the cost of ordering
+   * one at all.
+   */
+  private coverMeta?: { layouts: string[]; palettes: string[] };
+  private async randomTheme(): Promise<{ layout: string; paletteId: string }> {
+    if (!this.coverMeta) {
+      try {
+        const resp = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover/meta`);
+        if (resp.ok) {
+          const meta = await resp.json();
+          const ids = (arr: unknown) =>
+            (Array.isArray(arr) ? arr : []).map((e: any) => e?.id ?? e).filter((id: any) => typeof id === 'string');
+          this.coverMeta = { layouts: ids(meta.layouts), palettes: ids(meta.palettes) };
+        }
+      } catch {
+        // best-effort discovery - the defaults below still order a cover
+      }
+    }
+    const pick = (ids: string[] | undefined, fallback: string) =>
+      ids && ids.length ? ids[Math.floor(Math.random() * ids.length)] : fallback;
+    return { layout: pick(this.coverMeta?.layouts, 'archival_monograph'), paletteId: pick(this.coverMeta?.palettes, 'archival_alabaster') };
+  }
+
   constructor(
     private readonly biblioteca: BibliotecaClient,
     @Inject(PROVIDER_CONF) private readonly conf: AppConfService,
@@ -91,6 +120,10 @@ export class CoverEnrichmentService {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
     try {
+      // Random layout + palette per cover (see randomTheme) - the point
+      // of the whole cover feature is a varied shelf, not one house
+      // design repeated two thousand times.
+      const theme = await this.randomTheme();
       const response = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover`, {
         method: 'POST',
         headers: { Accept: 'image/png', 'Content-Type': 'application/json', 'X-Biblioteca-Work-Id': candidate.path! },
@@ -101,12 +134,12 @@ export class CoverEnrichmentService {
           // remote https URL (auto-proxied, see biblioteca-covers'
           // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
           ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
-          layout: 'archival_monograph',
+          layout: theme.layout,
           foilEffect: 'none',
           hardcover: false,
           format: 'png',
           pixelRatio: 2,
-          theme: { paletteId: 'archival_alabaster', showBarcode: false },
+          theme: { paletteId: theme.paletteId, showBarcode: false },
         }),
         signal: AbortSignal.timeout(120_000),
       });

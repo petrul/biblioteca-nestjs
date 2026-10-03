@@ -76,6 +76,8 @@ describe('a new opus Kafka event', () => {
       // The real service returns the author's retrieved image URLs -
       // the listener threads the first into the cover order.
       enrichAuthor: jest.fn().mockResolvedValue(['https://upload.wikimedia.org/eminescu.jpg']),
+      // The stored-portrait fallback when no fresh art was retrieved.
+      storedAuthorArt: jest.fn().mockResolvedValue(undefined),
     };
     const covers: any = { enqueue: jest.fn() };
 

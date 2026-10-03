@@ -98,6 +98,13 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
               // ordered cover is never re-rendered with art later.
               artUrl = (await this.enrichment.enrichAuthor(author))?.[0];
             }
+            // No fresh art (the name form had no Wikipedia hit, or the
+            // server response skipped the bio check): the author's
+            // already-stored portrait still belongs on the cover, not a
+            // text-only render.
+            if (!artUrl && author?.strId) {
+              artUrl = await this.enrichment.storedAuthorArt(author.strId);
+            }
             // Cover generation is a separate slow job. It is triggered by the
             // same successful import notification but has its own dedupe set,
             // so it never blocks vectorization or Wikipedia enrichment.

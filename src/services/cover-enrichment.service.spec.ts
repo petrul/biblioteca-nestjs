@@ -41,6 +41,11 @@ describe('CoverEnrichmentService enqueue admission', () => {
     renderAttempts = [];
     renderBodies = [];
     (global as any).fetch = (async (url: any, init?: any) => {
+      // /api/cover/meta is randomTheme()'s discovery probe (see the
+      // service), not a render attempt - keep it out of renderAttempts.
+      if (String(url).endsWith('/api/cover/meta')) {
+        return { ok: false, status: 500, json: async () => ({}) };
+      }
       renderAttempts.push(String(url));
       if (init?.body) renderBodies.push(JSON.parse(String(init.body)));
       return { ok: false, status: 500, json: async () => ({}) };
