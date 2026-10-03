@@ -1,4 +1,4 @@
-import { KafkaListenerService } from './kafka/listener.service';
+import { VectorizerKafkaListenerService } from './kafka/vectorizer-listener.service';
 import { KafkaService } from './kafka/kafka.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
@@ -213,7 +213,7 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
     });
 
     it('a book removed from the repo RETAINS its vectors (removal is manual-only)', async () => {
-        // Real KafkaListenerService over the real VectorizerService and
+        // Real VectorizerKafkaListenerService over the real VectorizerService and
         // the fake store: the removal event flows through the exact
         // production decision path.
         buildVectorizer([BOOK_A_V1]);
@@ -232,7 +232,7 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
         };
         const ks = { kafka: { consumer: jest.fn(() => consumer) } } as unknown as KafkaService;
 
-        const listener = new KafkaListenerService(
+        const listener = new VectorizerKafkaListenerService(
             ks, listenerTbc, vectorizer,
             { kafkaGroupId: 'test-group' } as unknown as VectorizerConfiguration,
             shared);

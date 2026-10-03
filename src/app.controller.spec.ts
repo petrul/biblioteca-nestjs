@@ -63,16 +63,6 @@ describe('AppController', () => {
       expect(appController.status()).toEqual({ vectorizing: jobStatus });
     });
 
-    it('legacy revectorize_all delegates to the vectorizing job', async () => {
-      await appController.revectorizeAll(true);
-      expect(jobMock.start).toHaveBeenCalledWith(true);
-    });
-
-    it('legacy stop_vectorizing delegates to the vectorizing job pause', () => {
-      expect(appController.stopVectorizing()).toEqual({ stopped: true });
-      expect(jobMock.pause).toHaveBeenCalled();
-    });
-
     it('optimize compacts the Milvus collection', async () => {
       compact.mockResolvedValue('compacted');
       expect(await appController.optimize()).toBe('compacted');

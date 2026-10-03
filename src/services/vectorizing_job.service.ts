@@ -197,7 +197,14 @@ export class VectorizingJobService {
         this.vectorizing.currentOpus = { id: opid, head: op.head ?? null, path: op.completePath ?? null };
         this.vectorizing.updatedAt = Date.now();
 
-        this.log.log(`starting vectorizing for ${opid} - ${op.completePath} - ${op.author?.visualName} - '${op.head}'`);
+        // The generated Spring Data REST EntityModelTeiDiv type does not
+        // declare the optional author projection, although older server
+        // responses may include it. Keep the diagnostic useful without
+        // weakening the type of the whole vectorizing pipeline.
+        const author = (op as EntityModelTeiDiv & {
+          author?: { visualName?: string; displayName?: string };
+        }).author;
+        this.log.log(`starting vectorizing for ${opid} - ${op.completePath} - ${author?.visualName || author?.displayName || 'Anonymous'} - '${op.head}'`);
         const processed = await this.vectorizer.vectorize(opid);
         this.vectorizing.processedParas += processed || 0;
         this.completedOpusIds.add(opid);

@@ -14,6 +14,7 @@ async function bootstrap() {
     .setDescription('Textbase Vectorizer computes embeddings of text excerpts')
     .setVersion('0.1')
     .addTag('textbase')
+    .addTag('enrichment', 'Manual enrichment admin: retrigger author/work/cover/vectorize enrichment integrally or partially, fill-only by default')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/ui', app, document);

@@ -1,4 +1,4 @@
-import { KafkaListenerService } from './listener.service';
+import { VectorizerKafkaListenerService } from './vectorizer-listener.service';
 import { KafkaService } from './kafka.service';
 import { BibliotecaClient } from '../biblioteca_client.service';
 import { VectorizerService } from '../vectorizer.service';
@@ -9,7 +9,7 @@ import {
 import { Util } from 'src/util';
 
 /**
- * Unit test for the 404-vs-retryable decision in KafkaListenerService's
+ * Unit test for the 404-vs-retryable decision in VectorizerKafkaListenerService's
  * eachMessage loop - Kafka, biblioteca-server and the vectorizer are all
  * mocked, so nothing here touches the network.
  *
@@ -19,7 +19,7 @@ import { Util } from 'src/util';
  * eachMessage) while anything else - 5xx outages included - must be
  * retried without committing.
  */
-describe('KafkaListenerService', () => {
+describe('VectorizerKafkaListenerService', () => {
 
     const OPUS_PATH = '/en/gutenberg/saint_amand,imbert_de-the_happy_days_of_empress_marie_louise.xml';
     const OPUS_EVENT = { path: OPUS_PATH };
@@ -68,7 +68,7 @@ describe('KafkaListenerService', () => {
             paragraph: { minChars: 20, maxChars: 3000 },
         };
 
-        const listener = new KafkaListenerService(
+        const listener = new VectorizerKafkaListenerService(
             ks, tbc, vec,
             conf,
             sharedConfig,

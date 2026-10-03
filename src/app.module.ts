@@ -3,8 +3,8 @@ import { AppController } from './app.controller';
 import { VectorizingController } from './vectorizing.controller';
 import { VectorizingJobService } from './services/vectorizing_job.service';
 import { ProducerService } from './services/kafka/producer.service';
-import { KafkaListenerService } from './services/kafka/listener.service';
-import { EnrichmentKafkaListenerService } from './services/kafka/enrichment-listener.service';
+import { VectorizerKafkaListenerService } from './services/kafka/vectorizer-listener.service';
+import { AuthorEnrichmentKafkaListenerService } from './services/kafka/author-enrichment-listener.service';
 import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
@@ -23,6 +23,9 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health/health.controller';
 import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
 import { EnrichmentService } from './services/enrichment.service';
+import { EnrichmentAdminService } from './services/enrichment-admin.service';
+import { EnrichmentAdminController } from './enrichment-admin.controller';
+import { CoverEnrichmentService } from './services/cover-enrichment.service';
 
 @Module({
   imports: [
@@ -38,6 +41,7 @@ import { EnrichmentService } from './services/enrichment.service';
   controllers: [
     AppController,
     VectorizingController,
+    EnrichmentAdminController,
     HealthController
   ],
 
@@ -52,10 +56,12 @@ import { EnrichmentService } from './services/enrichment.service';
       useClass: AppConfService,
     },
     ProducerService,
-    KafkaListenerService,
-    EnrichmentKafkaListenerService,
+    VectorizerKafkaListenerService,
+    AuthorEnrichmentKafkaListenerService,
     KafkaService,
     EnrichmentService,
+    EnrichmentAdminService,
+    CoverEnrichmentService,
     BibliotecaClient,
     VectorizingJobService,
     {

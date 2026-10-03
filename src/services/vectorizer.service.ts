@@ -53,7 +53,7 @@ export class VectorizerService implements OnModuleInit {
         }
 
     /**
-     * KafkaListenerService depends on this service, so Nest constructs (and
+     * VectorizerKafkaListenerService depends on this service, so Nest constructs (and
      * runs onModuleInit on) this one first - meaning this blocks Kafka
      * message consumption from starting until the embedder is confirmed
      * reachable, not just Milvus (already checked in the MilvusCollection

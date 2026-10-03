@@ -1,17 +1,18 @@
-import { KafkaListenerService } from './listener.service';
-import { EnrichmentKafkaListenerService } from './enrichment-listener.service';
+import { VectorizerKafkaListenerService } from './vectorizer-listener.service';
+import { AuthorEnrichmentKafkaListenerService } from './author-enrichment-listener.service';
 import { Util } from '../../util';
 
 /**
- * Both KafkaListenerService (vectorizing) and EnrichmentKafkaListenerService
- * (enrichment) are independent consumers of the same newOpusImportedTopic,
- * in their own separate consumer groups (see enrichment-listener.service.ts's
- * own comment on why that separation matters). This exercises both against
- * the same simulated event end to end - real classes, everything they talk
- * to (Kafka, BibliotecaClient, VectorizerService, EnrichmentService) faked -
- * to prove a single new-opus event actually reaches both, and that
- * enrichment's own "already enriched?" guards behave correctly on both the
- * opus and the author.
+ * Both VectorizerKafkaListenerService (vectorizing) and
+ * AuthorEnrichmentKafkaListenerService (author enrichment) are independent
+ * consumers of the same newOpusImportedTopic, in their own separate consumer
+ * groups (see author-enrichment-listener.service.ts's own comment on why
+ * that separation matters). This exercises both against the same simulated
+ * event end to end - real classes, everything they talk to (Kafka,
+ * BibliotecaClient, VectorizerService, EnrichmentService) faked - to prove
+ * a single new-opus event actually reaches both, and that the enrichment
+ * listener only ever enriches the event's AUTHOR, never the work itself
+ * (works are dailySweep()'s job), and skips authors already carrying a bio.
  */
 describe('a new opus Kafka event', () => {
   let delaySpy: jest.SpyInstance;
@@ -74,9 +75,10 @@ describe('a new opus Kafka event', () => {
       enrichWork: jest.fn().mockResolvedValue(undefined),
       enrichAuthor: jest.fn().mockResolvedValue(undefined),
     };
+    const covers: any = { enqueue: jest.fn() };
 
     const vectorizingConsumer = fakeConsumer();
-    const vectorizingListener = new KafkaListenerService(
+    const vectorizingListener = new VectorizerKafkaListenerService(
       fakeKafkaService(vectorizingConsumer),
       tbc,
       vectorizer,
@@ -86,10 +88,11 @@ describe('a new opus Kafka event', () => {
     await vectorizingListener.initKafkaListener();
 
     const enrichmentConsumer = fakeConsumer();
-    const enrichmentListener = new EnrichmentKafkaListenerService(
+    const enrichmentListener = new AuthorEnrichmentKafkaListenerService(
       fakeKafkaService(enrichmentConsumer),
       tbc,
       enrichment,
+      covers,
       sharedConfig,
     );
     await enrichmentListener.initKafkaListener();
@@ -98,62 +101,66 @@ describe('a new opus Kafka event', () => {
     await vectorizingConsumer.eachMessage(payload);
     await enrichmentConsumer.eachMessage(fakePayload(opus.path));
 
-    return { tbc, vectorizer, enrichment };
+    return { tbc, vectorizer, enrichment, covers };
   }
 
-  it('vectorizes and enriches both a not-yet-enriched opus and its not-yet-enriched author', async () => {
+  it('vectorizes and enriches the not-yet-enriched author - and only the author, never the work', async () => {
     const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
 
-    const { tbc, vectorizer, enrichment } = await bootBothListeners(opus);
+    const { tbc, vectorizer, enrichment, covers } = await bootBothListeners(opus);
 
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
-    expect(enrichment.enrichWork).toHaveBeenCalledWith(opus);
     expect(enrichment.enrichAuthor).toHaveBeenCalledWith(opus.author);
+    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path, id: opus.id }));
+    // The listener is author-only by design: the work's own summary
+    // enrichment belongs to EnrichmentService.dailySweep(), so a fresh
+    // unenriched opus must NOT trigger enrichWork here.
+    expect(enrichment.enrichWork).not.toHaveBeenCalled();
     // The embedded author already answers the already-enriched question -
     // the listener must not need the whole authors list for it.
     expect(tbc.getAuthors).not.toHaveBeenCalled();
   });
 
-  it('still vectorizes and enriches the opus, but skips an author who is already enriched', async () => {
+  it('still vectorizes, but skips an author who is already enriched', async () => {
     const opus = {
       id: 999, path: 'eminescu/poezii', head: 'Poezii',
       author: { strId: 'eminescu', displayName: 'Mihai Eminescu', bio: 'Already has a bio from a previous sweep.' },
     };
 
-    const { vectorizer, enrichment } = await bootBothListeners(opus);
+    const { vectorizer, enrichment, covers } = await bootBothListeners(opus);
 
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
-    expect(enrichment.enrichWork).toHaveBeenCalledWith(opus);
     expect(enrichment.enrichAuthor).not.toHaveBeenCalled();
+    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path }));
+    expect(enrichment.enrichWork).not.toHaveBeenCalled();
   });
 
-  it('still vectorizes and enriches the author, but skips an opus that is already enriched (summarySourceUrl marker)', async () => {
-    // The real single-div response carries summarySourceUrl, not summary
-    // (the LOB is @JsonIgnore'd) - this is the case a replayed event hits.
+  it('does not enrich the work even when the opus carries already-enriched markers', async () => {
+    // The real single-div response carries work-level metadata; this
+    // listener does not enrich works directly.
+    // listener: it never enriches works, enriched or not.
     const opus = {
       id: 999, path: 'eminescu/poezii', head: 'Poezii',
-      summarySourceUrl: 'https://en.wikipedia.org/wiki/Poezii',
+      description: 'Already enriched.',
       author: { strId: 'eminescu', displayName: 'Mihai Eminescu' },
     };
 
-    const { vectorizer, enrichment } = await bootBothListeners(opus);
+    const { vectorizer, enrichment, covers } = await bootBothListeners(opus);
 
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
     expect(enrichment.enrichWork).not.toHaveBeenCalled();
     expect(enrichment.enrichAuthor).toHaveBeenCalledWith(opus.author);
+    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path }));
   });
 
-  it('still vectorizes and enriches the author, but skips an opus that is already enriched (summary field)', async () => {
-    const opus = {
-      id: 999, path: 'eminescu/poezii', head: 'Poezii',
-      summary: 'Already has a summary.',
-      author: { strId: 'eminescu', displayName: 'Mihai Eminescu' },
-    };
+  it('enriches nothing when the event carries no author', async () => {
+    const opus = { id: 999, path: 'anonymous/fragment', head: 'Fragment' };
 
-    const { vectorizer, enrichment } = await bootBothListeners(opus);
+    const { vectorizer, enrichment, covers } = await bootBothListeners(opus);
 
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
+    expect(enrichment.enrichAuthor).not.toHaveBeenCalled();
     expect(enrichment.enrichWork).not.toHaveBeenCalled();
-    expect(enrichment.enrichAuthor).toHaveBeenCalledWith(opus.author);
+    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path, id: opus.id }));
   });
 });

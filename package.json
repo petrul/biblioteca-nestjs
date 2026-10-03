@@ -39,6 +39,7 @@
     "@nestjs/terminus": "^10.3.0",
     "@zilliz/milvus2-sdk-node": "^2.3.5",
     "kafkajs": "^2.2.4",
+    "minio": "^8.0.7",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"
   },

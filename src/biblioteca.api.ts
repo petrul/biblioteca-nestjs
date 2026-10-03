@@ -42,10 +42,6 @@ export interface Author {
   lastName?: string;
   firstName?: string;
   displayName?: string;
-  avatar?: {
-    binaryStream?: any;
-  };
-  bio?: string;
   bioSourceUrl?: string;
   nativeLanguage?:
     | "BG"
@@ -95,6 +91,89 @@ export interface Author {
   anonymous?: boolean;
 }
 
+export interface EntityModelAuthor {
+  /** @format int64 */
+  id?: number;
+  strId?: string;
+  lastName?: string;
+  firstName?: string;
+  displayName?: string;
+  bioSourceUrl?: string;
+  nativeLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  writingLanguage?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  country?: string;
+  visualName?: string;
+  anonymous?: boolean;
+  _links?: Links;
+}
+
+export interface PageMetadata {
+  /** @format int64 */
+  size?: number;
+  /** @format int64 */
+  totalElements?: number;
+  /** @format int64 */
+  totalPages?: number;
+  /** @format int64 */
+  number?: number;
+}
+
+export interface PagedModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelAuthor {
+  _embedded?: {
+    authors?: EntityModelAuthor[];
+  };
+  _links?: Links;
+}
+
 export interface EntityModelTeiDiv {
   /** @format int64 */
   id?: number;
@@ -139,23 +218,12 @@ export interface EntityModelTeiDiv {
    * @maxLength 3000
    */
   head?: string;
-  summary?: string;
-  summarySourceUrl?: string;
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
   leaf?: boolean;
   completePath?: string;
-  author?: Author;
   _links?: Links;
-}
-
-export interface PageMetadata {
-  /** @format int64 */
-  size?: number;
-  /** @format int64 */
-  totalElements?: number;
-  /** @format int64 */
-  totalPages?: number;
-  /** @format int64 */
-  number?: number;
 }
 
 export interface PagedModelEntityModelTeiDiv {
@@ -209,57 +277,6 @@ export interface TeiFile {
   author?: Author;
 }
 
-export interface EntityModelTeiElem {
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  leaf?: boolean;
-  completePath?: string;
-  author?: Author;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiElem {
-  _embedded?: {
-    teiElems?: EntityModelTeiElem[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
 export interface EntityModelEmbeddingBatchStat {
   /** @format date-time */
   recordedAt?: string;
@@ -306,19 +323,10 @@ export interface PagedModelEntityModelOpusVectorizingStat {
   page?: PageMetadata;
 }
 
-export interface EntityModelAuthor {
-  /** @format int64 */
-  id?: number;
-  strId?: string;
-  lastName?: string;
-  firstName?: string;
-  displayName?: string;
-  avatar?: {
-    binaryStream?: any;
-  };
-  bio?: string;
-  bioSourceUrl?: string;
-  nativeLanguage?:
+export interface EntityModelTeiElem {
+  xpath?: string;
+  domPath?: string;
+  lang?:
     | "BG"
     | "BR"
     | "CA"
@@ -338,48 +346,31 @@ export interface EntityModelAuthor {
     | "RO"
     | "RU"
     | "ZH";
-  birthDate?: string;
-  deathDate?: string;
-  birthPlace?: string;
-  writingLanguage?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  country?: string;
-  visualName?: string;
-  anonymous?: boolean;
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
   _links?: Links;
 }
 
-export interface PagedModelEntityModelAuthor {
+export interface PagedModelEntityModelTeiElem {
   _embedded?: {
-    authors?: EntityModelAuthor[];
+    teiElems?: EntityModelTeiElem[];
   };
   _links?: Links;
   page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelAuthor {
-  _embedded?: {
-    authors?: EntityModelAuthor[];
-  };
-  _links?: Links;
 }
 
 export interface AuthorRequestBody {
@@ -389,10 +380,6 @@ export interface AuthorRequestBody {
   lastName?: string;
   firstName?: string;
   displayName?: string;
-  avatar?: {
-    binaryStream?: any;
-  };
-  bio?: string;
   bioSourceUrl?: string;
   nativeLanguage?:
     | "BG"
@@ -518,11 +505,11 @@ export interface TeiDivRequestBody {
    * @maxLength 3000
    */
   head?: string;
-  summary?: string;
-  summarySourceUrl?: string;
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
   leaf?: boolean;
   completePath?: string;
-  author?: Author;
 }
 
 export interface TeiElemRequestBody {
@@ -566,7 +553,6 @@ export interface TeiElemRequestBody {
   wordSize?: number;
   leaf?: boolean;
   completePath?: string;
-  author?: Author;
 }
 
 export interface SaveRequest {
@@ -601,6 +587,19 @@ export interface AttentionRequest {
   secondsDelta?: number;
 }
 
+export interface RuntimeConfigUpdate {
+  value?: string;
+}
+
+export interface RuntimeConfigEntry {
+  key?: string;
+  environmentVariable?: string;
+  value?: string;
+  configured?: boolean;
+  sensitive?: boolean;
+  restartRequired?: boolean;
+}
+
 export interface RegisterRequest {
   username?: string;
   password?: string;
@@ -613,13 +612,14 @@ export interface EnrichmentUpdateDto {
   bio?: string;
   bioSourceUrl?: string;
   summary?: string;
-  summarySourceUrl?: string;
+  significantQuote?: string;
   birthDate?: string;
   deathDate?: string;
   birthPlace?: string;
   country?: string;
   writingLanguage?: string;
   imageUrls?: string[];
+  coverUrl?: string;
 }
 
 export interface CreateCollectionRequest {
@@ -723,6 +723,14 @@ export interface AuthorDto {
   displayName?: string;
   description?: string;
   bio?: string;
+  bioSourceUrl?: string;
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  country?: string;
+  writingLanguage?: string;
+  /** Number of root works associated with this author. */
+  worksCount?: number;
   opera?: OpusDto[];
   image_href?: string;
 }
@@ -746,6 +754,9 @@ export interface OpusDto {
   head?: string;
   /** @format int32 */
   depth?: number;
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
   author?: any;
   leaf?: boolean;
   opus?: boolean;
@@ -771,6 +782,9 @@ export interface TeiDivDto {
   head?: string;
   /** @format int32 */
   depth?: number;
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
   children?: TeiDivDto[];
   author?: AuthorDto;
   leaf?: boolean;
@@ -2216,9 +2230,31 @@ export class Api<
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet9
-     * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
+     * @request GET:/api/drest/teiDivs/search/findOperaByStablePath
      */
     executeSearchTeidivGet9: (
+      query?: {
+        authorId?: string;
+        opusId?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findOperaByStablePath`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet10
+     * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
+     */
+    executeSearchTeidivGet10: (
       query?: {
         authorStrId?: string;
       },
@@ -2236,10 +2272,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet10
+     * @name ExecuteSearchTeidivGet11
      * @request GET:/api/drest/teiDivs/search/getAuthors
      */
-    executeSearchTeidivGet10: (
+    executeSearchTeidivGet11: (
       query?: {
         /** @format int64 */
         id?: number;
@@ -2258,10 +2294,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet11
+     * @name ExecuteSearchTeidivGet12
      * @request GET:/api/drest/teiDivs/search/getByTeiFileAndXpath
      */
-    executeSearchTeidivGet11: (
+    executeSearchTeidivGet12: (
       query?: {
         teiFile?: TeiFile;
         xpath?: string;
@@ -2280,10 +2316,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet12
+     * @name ExecuteSearchTeidivGet13
      * @request GET:/api/drest/teiDivs/search/getNrOfBottomDivs
      */
-    executeSearchTeidivGet12: (params: RequestParams = {}) =>
+    executeSearchTeidivGet13: (params: RequestParams = {}) =>
       this.request<number, void>({
         path: `/api/drest/teiDivs/search/getNrOfBottomDivs`,
         method: "GET",
@@ -2295,10 +2331,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet13
+     * @name ExecuteSearchTeidivGet14
      * @request GET:/api/drest/teiDivs/search/getOperaForTeiFileId
      */
-    executeSearchTeidivGet13: (
+    executeSearchTeidivGet14: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -2307,6 +2343,28 @@ export class Api<
     ) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/getOperaForTeiFileId`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet15
+     * @request GET:/api/drest/teiDivs/search/getOperaPathsForTeiFileId
+     */
+    executeSearchTeidivGet15: (
+      query?: {
+        /** @format int64 */
+        teiFileId?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/getOperaPathsForTeiFileId`,
         method: "GET",
         query: query,
         format: "json",
@@ -2571,6 +2629,78 @@ export class Api<
         method: "PUT",
         body: data,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags runtime-config-rest-controller
+     * @name Get
+     * @request GET:/api/admin/runtime-config/{key}
+     */
+    get: (
+      key: string,
+      query?: {
+        /** @default false */
+        reveal?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<RuntimeConfigEntry, any>({
+        path: `/api/admin/runtime-config/${key}`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags runtime-config-rest-controller
+     * @name Set
+     * @request PUT:/api/admin/runtime-config/{key}
+     */
+    set: (
+      key: string,
+      data: RuntimeConfigUpdate,
+      query?: {
+        /** @default false */
+        reveal?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<RuntimeConfigEntry, any>({
+        path: `/api/admin/runtime-config/${key}`,
+        method: "PUT",
+        query: query,
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags runtime-config-rest-controller
+     * @name Reset
+     * @request DELETE:/api/admin/runtime-config/{key}
+     */
+    reset: (
+      key: string,
+      query?: {
+        /** @default false */
+        reveal?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<RuntimeConfigEntry, any>({
+        path: `/api/admin/runtime-config/${key}`,
+        method: "DELETE",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -3046,6 +3176,21 @@ export class Api<
      * No description
      *
      * @tags div-collection-rest-controller
+     * @name Featured
+     * @request GET:/api/collections/system/featured
+     */
+    featured: (params: RequestParams = {}) =>
+      this.request<TeiDivDto[], any>({
+        path: `/api/collections/system/featured`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
      * @name ByRepo
      * @request GET:/api/collections/system/by-repo/{repoName}
      */
@@ -3091,10 +3236,10 @@ export class Api<
      * No description
      *
      * @tags div-collection-rest-controller
-     * @name Get
+     * @name Get1
      * @request GET:/api/collections/mine/{name}
      */
-    get: (name: string, params: RequestParams = {}) =>
+    get1: (name: string, params: RequestParams = {}) =>
       this.request<DivCollectionDto, any>({
         path: `/api/collections/mine/${name}`,
         method: "GET",
@@ -3157,6 +3302,28 @@ export class Api<
       this.request<AuthorDto[], any>({
         path: `/api/authors/`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags runtime-config-rest-controller
+     * @name List
+     * @request GET:/api/admin/runtime-config
+     */
+    list: (
+      query?: {
+        /** @default false */
+        reveal?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<RuntimeConfigEntry[], any>({
+        path: `/api/admin/runtime-config`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),

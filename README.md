@@ -158,12 +158,11 @@ lives in exactly four places. In reading order of "who decides what":
    stock defaults let append-only binlog garbage accumulate for days
    (observed: 40G of binlogs behind a 217K-row collection).
 
-Related, same theme: `POST /revectorize_all` is a deprecated alias for the
-incremental vectorizing run. It **never truncates, drops, or deletes the
-collection**. It walks every opus and embeds only paragraphs whose content
-hash is not already stored. Collection resets and opus removal are deliberate,
-manual-only operations exposed by the vector store, never a routine
-consequence of starting a run.
+Related, same theme: the incremental vectorizing run (`POST /api/vectorizing/start`)
+**never truncates, drops, or deletes the collection**. It walks every opus
+and embeds only paragraphs whose content hash is not already stored. Collection
+resets and opus removal are deliberate, manual-only operations exposed by the
+vector store, never a routine consequence of starting a run.
 
 ### How IVF_SQ8 works (and what nlist/nprobe trade off)
 
@@ -206,7 +205,7 @@ raising nprobe forever.
 
 Embedding the full corpus takes **days**, not an index rebuild — vectors
 are a multi-day asset, and the pipeline treats them accordingly
-(`VectorizerService.vectorize`, `KafkaListenerService`,
+(`VectorizerService.vectorize`, `VectorizerKafkaListenerService`,
 `vector_reuse.spec.ts`):
 
 - **Reuse before embedding.** For every page fetched from
@@ -241,7 +240,7 @@ are a multi-day asset, and the pipeline treats them accordingly
 
 ## Kafka contract (AsyncAPI)
 
-`KafkaListenerService` (`src/services/kafka/listener.service.ts`) is this
+`VectorizerKafkaListenerService` (`src/services/kafka/vectorizer-listener.service.ts`) is this
 service's one Kafka consumer — the message schema it consumes, and
 textbase-server's other topics this service *doesn't* touch, are
 documented in full in biblioteca-server's `src/main/resources/static/asyncapi.yml` rather than
@@ -321,7 +320,7 @@ otherwise insert as new.
 | --- | --- |
 | `src/app.module.ts` | Dependency wiring — the fastest place to see how every provider above actually connects |
 | `src/configuration.ts` | Env var loading (`VectorizerConfiguration`) and the `SharedTextbaseConfig` shape fetched from textbase-server |
-| `src/services/kafka/` | `KafkaService`, `ProducerService`, `KafkaListenerService` (the consumer that triggers vectorization) |
+| `src/services/kafka/` | `KafkaService`, `ProducerService`, `VectorizerKafkaListenerService` (the consumer that triggers vectorization) |
 | `src/services/ollama/`, `src/services/sts/` | The embedder implementations (see [Embedding backends](#embedding-backends)) |
 | `src/services/milvus/` | `MilvusCollection` — collection creation, dimension assertions, upserts |
 | `src/services/vector_store.ts` | `MilvusColVectorStore` — the storage-facing side of a vectorize() call |
@@ -369,11 +368,17 @@ pipeline itself (that's driven entirely by Kafka - see
 | `POST /api/vectorizing/start?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes. **Does not truncate** (see [Vectors are precious](#vectors-are-precious-reuse-by-sha256-never-auto-drop)): already-stored sha256s are reused, only genuinely new paragraphs get embedded |
 | `POST /api/vectorizing/pause` | Halts the running job after its current batch |
 | `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead; does not truncate, so the partial collection keeps its already-vectorized rows) |
-| `POST /revectorize_all?shuffle=` | Deprecated alias for `POST /api/vectorizing/start` |
-| `POST /stop_vectorizing` | Deprecated alias for `POST /api/vectorizing/pause` |
 | `POST /optimize` | Compacts the store's storage (Milvus only; a deliberate no-op on qdrant, which compacts on its own) |
 | `POST /api/vector-store/remove-opus` | **Manual-only** drop: removes one opus's vectors (body: `{"path": "author/work"}`) |
 | `POST /api/vector-store/reset` | **Manual-only** drop: drops and recreates the whole collection |
+| `GET /api/enrichment/modules` | The enrichment module catalog: author / work / cover / vectorize, what each fills, whether overwrite applies to it |
+| `POST /api/enrichment/run` | Starts a manual enrichment job (202 + job id, poll `jobs/:id`). Body: `steps` (any of the module ids), optional `targets` (`authorStrIds`, `opusPaths`; omitted = whole corpus), optional `overwrite`. **Fill-only by default**: already-enriched entities are skipped without a call; `overwrite: true` re-enriches them and asks biblioteca-server to replace the data (rejected for `vectorize`). The vectorize step needs explicit `targets.opusPaths` and reuses stored sha256s - it never drops vectors |
+| `POST /api/enrichment/run/dry-run` | The same body, but read-only: lists the candidates the run would process, no external call at all |
+| `GET /api/enrichment/jobs` | Recent enrichment jobs (in memory only), newest first |
+| `GET /api/enrichment/jobs/:id` | One job: state (`running`/`finished`/`cancelled`/`failed`), per-step counters (`candidates`/`processed`/`skippedExisting`/`failed`), first errors |
+| `POST /api/enrichment/jobs/:id/cancel` | Cooperative stop of a running job, honored between entities |
+| `GET /api/enrichment/author/:strId` | Which enrichment fields one author already has |
+| `GET /api/enrichment/work?path=` | Which enrichment fields one work already has |
 
 `@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
 at `/api/ui` - same mechanism, one instance per this app rather than a
@@ -419,3 +424,52 @@ in that repo, raw spec used directly — the vectorizer's admin surface has
 no allowlist layer of its own). So a change to this service's own API
 surface means regenerating there too, with this server running at the
 same commit — see biblioteca-reader's README, "Refresh the API clients".
+### Asynchronous work-cover enrichment
+
+After a successful opus-import event, the NestJS worker schedules cover
+generation in the background. It calls `biblioteca-covers`, writes the PNG to
+the configured MinIO bucket under `covers/`, and persists only the public URL
+on the opus. Jobs are deduplicated by the canonical `authorId/opusId` path and
+never run in the reader request path. A missing or failed cover is harmless:
+the reader uses its bundled default cover.
+
+The worker uses the existing import Kafka topic with its own consumer group,
+so vectorization and enrichment never steal one another's events. Configure
+`COVERS_API_URL`, `MINIO_URL`, and `MINIO_CRED`. Credentials are server-side only.
+
+The cover-cache variables mean:
+
+```dotenv
+# MinIO S3/API endpoint, with the bucket as the URL path.
+MINIO_URL=http://srv2.local:20124/biblioteca
+# access-key:secret-key (example only; never commit a real credential).
+MINIO_CRED=example-cover-cache-access-key:example-cover-cache-secret-key
+```
+
+`MINIO_URL` is used as both the S3/API endpoint and the base URL for public
+objects. `MINIO_CRED` is split at the first colon. Both values stay server-side.
+
+### Manual enrichment admin (`/api/enrichment/*`)
+
+The four enrichment steps - author bio/facts, work summary, cover art,
+vectorization - run automatically off the Kafka import topics and the daily
+03:00 sweep. The `/api/enrichment/*` surface is the explicit manual way to
+retrigger them integrally or partially, designed to be driven entirely from
+the Swagger UI at `/api/ui` (`GET modules` lists what exists; the run
+endpoints carry ready-made named examples in their request body).
+
+The invariant the surface is built around: **every step is fill-only by
+default** - it only enriches what is not enriched yet, and existing data is
+never touched. That is enforced in three independent layers, so a bug in one
+cannot destroy anything: candidate selection (an enriched entity never even
+becomes a candidate), the guards inside the enrichment/cover services
+themselves, and biblioteca-server's persistence endpoint, which fills blank
+fields unless the single update's payload carries `overwrite: true`.
+
+`overwrite: true` is the one explicit switch - per request, never sticky,
+rejected for the vectorize step (vectorization is fill-only by construction:
+stored sha256s are reused, nothing is dropped). Manual runs and the daily
+sweep share one single-flight lock, so they never walk the corpus at the same
+time. Jobs are async (the run answers 202 with a job id), cancel is
+cooperative, and `POST /api/enrichment/run/dry-run` lists the candidates
+without making a single external call.

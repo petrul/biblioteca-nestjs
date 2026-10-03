@@ -115,10 +115,10 @@ describe('EnrichmentService', () => {
   beforeAll(() => { originalFetch = (global as any).fetch; });
   afterAll(() => { (global as any).fetch = originalFetch; });
 
-  it('skips authors with a bio and opera with a summary - no call at all', async () => {
+  it('skips authors with a bio and opera with a description - no call at all', async () => {
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri', bio: 'already there' }];
-    tbc.opera = [{ id: 7, head: 'Lume', summary: 'already there' }];
+    tbc.opera = [{ id: 7, head: 'Lume', description: 'already there' }];
     const fetchMock = new FakeFetch();
     await service(tbc, fetchMock).dailySweep();
     expect(fetchMock.calls).toHaveLength(0);
@@ -158,7 +158,6 @@ describe('EnrichmentService', () => {
     expect(persisted[0]).toMatchObject({
       opusId: 7,
       summary: 'Vasile Alecsandri was a Romanian poet and playwright.',
-      summarySourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent('Lume_Rdicată')}`,
       imageUrls: ['https://upload.wikimedia.org/alecsandri.jpg'],
     });
     // no wikibase_item -> no Wikidata round-trips at all
@@ -188,6 +187,48 @@ describe('EnrichmentService', () => {
     fetchMock.pages['wiki'] = {}; // 200 OK but no extract
     await expect(service(tbc, fetchMock).dailySweep()).resolves.toBeUndefined();
     expect(fetchMock.persisted()).toHaveLength(0);
+  });
+
+  it('skips an already-enriched author when called directly without force - no call at all', async () => {
+    const tbc = new FakeTbc();
+    const author = { strId: 'alecsandri', displayName: 'Vasile Alecsandri', bio: 'old bio' };
+    const fetchMock = new FakeFetch();
+    await service(tbc, fetchMock).enrichAuthor(author);
+    expect(fetchMock.calls).toHaveLength(0);
+  });
+
+  it('force re-enriches an already-enriched author and asks the server to overwrite', async () => {
+    const tbc = new FakeTbc();
+    const author = { strId: 'alecsandri', displayName: 'Vasile Alecsandri', bio: 'old bio' };
+    const fetchMock = new FakeFetch();
+    fetchMock.pages['wiki'] = wikiSummaryPage();
+    await service(tbc, fetchMock).enrichAuthor(author, { force: true });
+
+    const persisted = fetchMock.persisted();
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({ authorStrId: 'alecsandri', overwrite: true });
+  });
+
+  it('force re-enriches an already-enriched work too', async () => {
+    const tbc = new FakeTbc();
+    const opus = { id: 7, head: 'Lume', description: 'old summary' };
+    const fetchMock = new FakeFetch();
+    fetchMock.pages['wiki'] = wikiSummaryPage({ wikibase_item: undefined });
+    await service(tbc, fetchMock).enrichWork(opus, { force: true });
+
+    const persisted = fetchMock.persisted();
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({ opusId: 7, overwrite: true });
+  });
+
+  it('fill-only persistence carries an explicit overwrite: false, so the server rule is unambiguous', async () => {
+    const tbc = new FakeTbc();
+    tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri' }];
+    const fetchMock = new FakeFetch();
+    fetchMock.pages['wiki'] = wikiSummaryPage();
+    await service(tbc, fetchMock).dailySweep();
+
+    expect(fetchMock.persisted()[0].overwrite).toBe(false);
   });
 
   it('never talks to anything but wikipedia, wikidata and the enrichment endpoint', async () => {

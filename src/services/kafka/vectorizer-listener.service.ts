@@ -5,13 +5,14 @@ import { VectorizerService } from '../vectorizer.service';
 import { BibliotecaClient } from '../biblioteca_client.service';
 import { PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, VectorizerConfiguration } from 'src/configuration';
 import { Util } from 'src/util';
+import { describeKafkaError } from './error-details';
 
 @Injectable()
-export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit {
+export class VectorizerKafkaListenerService implements OnApplicationShutdown, OnModuleInit {
 
   consumer: Consumer;
 
-  private readonly log = new Logger(KafkaListenerService.name);
+  private readonly log = new Logger(VectorizerKafkaListenerService.name);
 
   constructor(protected ks: KafkaService,
     protected tbc: BibliotecaClient,
@@ -52,6 +53,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
       ],
       fromBeginning: true,
     });
+    this.log.log(`listening on Kafka topics ${this.sharedConfig.kafka.newOpusImportedTopic} and ${this.sharedConfig.kafka.opusRemovedTopic}`);
     await this.consumer.run({
       eachMessage: (async ({ topic, message, heartbeat }) => {
         // Do not let one transient Textbase/Ollama/Milvus outage terminate the
@@ -117,7 +119,7 @@ export class KafkaListenerService implements OnApplicationShutdown, OnModuleInit
                 message.value.toString());
               return;
             }
-            this.log.error('failed to process opus event; retaining the Kafka offset and retrying in 10 seconds', err);
+            this.log.error(`failed to process opus ${obj?.path ?? '<unknown>'}; retaining the Kafka offset and retrying in 10 seconds — ${await describeKafkaError(err)}`);
             await Util.delay(10 * 1000);
             await heartbeat();
           }

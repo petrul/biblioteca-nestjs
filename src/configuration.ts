@@ -11,7 +11,7 @@ function required(name: string): string {
 // This worker's own Kafka consumer group id. A stable product convention, not
 // a per-environment value: no other service ever needs to agree on it (the
 // topic name is what's shared, and that comes from PROVIDER_SHARED_CONFIG --
-// see KafkaListenerService), so it's hardcoded here rather than externalized
+// see VectorizerKafkaListenerService), so it's hardcoded here rather than externalized
 // into the pass store as a KAFKA_GROUP_ID secret.
 export const KAFKA_GROUP_ID = 'biblioteca_nestjs';
 
@@ -32,6 +32,9 @@ export default (): VectorizerConfiguration => ({
     // collection names that the server's shared config carries) or
     // 'milvus' (the historic store, still fully supported).
     vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
+    coversApiUrl: process.env.COVERS_API_URL || 'http://localhost:3335',
+    minioUrl: process.env.MINIO_URL,
+    minioCred: process.env.MINIO_CRED,
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
@@ -108,6 +111,9 @@ export interface VectorizerConfiguration {
     // which store backs VectorStore: 'qdrant' (the default - see the
     // default-export comment above) or 'milvus' (the historic store).
     vectorStoreType: 'milvus' | 'qdrant';
+    coversApiUrl: string;
+    minioUrl?: string;
+    minioCred?: string;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
@@ -146,5 +152,9 @@ export class AppConfService implements VectorizerConfiguration {
     get vectorStoreType(): 'milvus' | 'qdrant' {
         return this.conf.get<'milvus' | 'qdrant'>('vectorStoreType');
     }
+
+    get coversApiUrl(): string { return this.conf.get<string>('coversApiUrl'); }
+    get minioUrl(): string | undefined { return this.conf.get<string>('minioUrl'); }
+    get minioCred(): string | undefined { return this.conf.get<string>('minioCred'); }
 
 }

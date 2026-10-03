@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
 import { PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
 import { VectorizingJobService, VectorizingStatus } from './services/vectorizing_job.service';
 import { VectorizerService } from './services/vectorizer.service';
@@ -44,19 +44,6 @@ export class AppController {
   @Get('/api/status')
   status(): { vectorizing: VectorizingStatus } {
     return { vectorizing: this.job.status() };
-  }
-
-  /** @deprecated use POST /api/vectorizing/start */
-  @Post('/revectorize_all')
-  async revectorizeAll(@Query('shuffle') shuffle: boolean = false): Promise<any> {
-    return await this.job.start(shuffle);
-  }
-
-  /** @deprecated use POST /api/vectorizing/pause */
-  @Post('/stop_vectorizing')
-  stopVectorizing(): { stopped: boolean } {
-    this.job.pause();
-    return { stopped: true };
   }
 
   @Post('/optimize')

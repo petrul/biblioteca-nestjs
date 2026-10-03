@@ -1,6 +1,7 @@
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { AppConfService, PROVIDER_CONF } from '../configuration';
+import { CoverEnrichmentService } from './cover-enrichment.service';
 
 type WikiSummary = {
     extract?: string;
@@ -16,7 +17,7 @@ type EnrichmentUpdate = {
     bio?: string;
     bioSourceUrl?: string;
     summary?: string;
-    summarySourceUrl?: string;
+    significantQuote?: string;
     birthDate?: string;
     deathDate?: string;
     birthPlace?: string;
@@ -58,14 +59,18 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   // request - without one both the REST summary API and Wikidata answer
   // with a flat 403 instead of a real response.
   private static readonly USER_AGENT =
-    'Biblioteca-NestJS-Enrichment/1.0 (https://biblioteca.scriptorium.ro; self-hosted TEI library)';
+    'Biblioteca-/1.0 (https://biblioteca.scriptorium.ro; TEI library)';
 
   // Cuts at the last sentence boundary (. ! ?) at or before the limit,
   // rather than mid-sentence - a clean-ish first few paragraphs, not a
   // word chopped in half. Same rule as the retired Java service.
   private static readonly MAX_MATERIAL_CHARS = 1200;
 
-  constructor(private readonly client: BibliotecaClient, @Inject(PROVIDER_CONF) private readonly conf: AppConfService) {}
+  constructor(
+    private readonly client: BibliotecaClient,
+    @Inject(PROVIDER_CONF) private readonly conf: AppConfService,
+    @Optional() private readonly covers?: CoverEnrichmentService,
+  ) {}
 
   onModuleInit() {
     const now = new Date();
@@ -75,6 +80,22 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
     this.timer = setTimeout(() => { void this.dailySweep(); this.timer = setInterval(() => void this.dailySweep(), 24 * 60 * 60 * 1000); }, next.getTime() - now.getTime());
     this.log.log(`daily enrichment sweep scheduled for ${next.toISOString()}`);
   }
+
+  /** Whether an enrichment run (the daily sweep or a manual admin run) is executing. */
+  isRunning(): boolean { return this.running; }
+
+  /**
+   * The single-flight lock shared by dailySweep() and the manual admin
+   * runs (EnrichmentAdminService): only one enrichment pass over the
+   * corpus may walk authors/opera at a time, whatever started it.
+   */
+  tryBeginRun(): boolean {
+    if (this.running) return false;
+    this.running = true;
+    return true;
+  }
+
+  endRun(): void { this.running = false; }
 
   onModuleDestroy() { if (this.timer) { clearTimeout(this.timer); clearInterval(this.timer); } }
 
@@ -89,8 +110,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * never aborts the rest of the sweep.
    */
   async dailySweep() {
-    if (this.running) return;
-    this.running = true;
+    if (!this.tryBeginRun()) return;
     try {
       const authors = await this.client.getAuthors();
       for (const author of (authors as any[]).filter(a => !a.bio)) {
@@ -105,13 +125,19 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       // paginates through every opus on the server, not just the first
       // page, now that nothing here caps how many get considered.
       // Already-enriched check: this SDR findOpera projection never
-      // carries summary (a @JsonIgnore'd Derby LOB) - summarySourceUrl,
-      // persisted together with summary on the one and only enrichment
-      // pass, is the wire-visible marker for "already done". Without it
-      // this filter matched nothing and the sweep re-enriched every
-      // single opus, every night.
+      // carries the work-level description and quote from TeiOpus. Either
+      // value is enough to identify a completed enrichment.
       for await (const opus of this.client.allOperaGen()) {
-        if ((opus as any).summary || (opus as any).summarySourceUrl) continue;
+        if (this.covers && (opus as any).id && (opus as any).completePath && (opus as any).head) {
+          this.covers.enqueue({
+            id: (opus as any).id,
+            path: (opus as any).completePath,
+            title: (opus as any).head,
+            author: (opus as any).author?.visualName || (opus as any).author?.displayName || 'Anonymous',
+            coverUrl: (opus as any).coverUrl,
+          });
+        }
+        if ((opus as any).description || (opus as any).significantQuote) continue;
         try {
           this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
           await this.enrichWork(opus);
@@ -120,12 +146,19 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
         }
       }
     } catch (e: any) { this.log.warn(`daily enrichment sweep failed: ${e?.message ?? e}`); }
-    finally { this.running = false; }
+    finally { this.endRun(); }
   }
 
-  async enrichAuthor(author: any) {
+  /**
+   * @param opts.force re-enriches an already-enriched author instead of
+   * skipping them - the explicit overwrite switch of the manual admin
+   * runs (EnrichmentAdminService). The default, and every automatic
+   * caller (daily sweep, Kafka listener), keeps the fill-only invariant:
+   * an author with a bio is never touched again.
+   */
+  async enrichAuthor(author: any, opts: { force?: boolean } = {}) {
     const name = author.displayName || [author.firstName, author.lastName].filter(Boolean).join(' ');
-    if (!name || author.bio) return;
+    if (!name || (author.bio && !opts.force)) return;
     const page = await this.wikipedia(name);
     if (!page?.extract) return;
     const facts = await this.wikidataFacts(page.wikibase_item);
@@ -136,25 +169,19 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       ...facts,
       imageUrls: this.image(page),
     };
-    await this.persist(update);
+    await this.persist(update, opts);
   }
 
-  async enrichWork(opus: any) {
-    // summarySourceUrl is the reliable already-enriched marker: summary
-    // itself is @JsonIgnore'd out of every projection the worker ever
-    // sees (single-div DTO and SDR findOpera), while its attribution
-    // column - persisted together with it, in the same single write -
-    // is not. Accept either, so a hand-crafted object with summary set
-    // still short-circuits.
-    if (!opus?.id || !opus.head || opus.summary || opus.summarySourceUrl) return;
+  /** Same force semantics as enrichAuthor above: default fills only what is missing. */
+  async enrichWork(opus: any, opts: { force?: boolean } = {}) {
+    if (!opus?.id || !opus.head || ((opus.description || opus.significantQuote) && !opts.force)) return;
     const page = await this.wikipedia(opus.head);
     if (!page?.extract) return;
     await this.persist({
       opusId: opus.id,
       summary: this.truncateMaterial(page.extract),
-      summarySourceUrl: this.wikipediaUrl(opus.head),
       imageUrls: this.image(page),
-    });
+    }, opts);
   }
 
   /**
@@ -273,9 +300,16 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * plain fetch for now: the endpoint postdates the generated client
    * (biblioteca.api.ts) - once that is regenerated this should move onto
    * the generated Api like every other server call.
+   *
+   * The payload always carries an explicit overwrite flag, so the
+   * server-side contract stays one rule with no ambiguity: overwrite
+   * false (the default for every automatic caller) means fill blanks
+   * only - existing values are never touched; overwrite true - sent only
+   * by a manual admin run whose request said so - means this single
+   * update replaces already-populated fields.
    */
-  private async persist(body: EnrichmentUpdate) {
-    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) });
+  private async persist(body: EnrichmentUpdate, opts: { force?: boolean } = {}) {
+    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ ...body, overwrite: opts.force === true }) });
     if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`);
   }
 
