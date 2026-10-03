@@ -34,7 +34,7 @@ export default (): VectorizerConfiguration => ({
     vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
     coversApiUrl: process.env.COVERS_API_URL || 'http://localhost:3335',
     minioUrl: process.env.MINIO_URL,
-    minioCred: process.env.MINIO_CRED,
+    minioCred: process.env.MINIO_CREDS,
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to

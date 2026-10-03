@@ -151,7 +151,6 @@ end
 desc 'Run the complete test suite with a profile (dev by default)'
 task :test, [:profile] => [:ensure_deps] do |_task, args|
     profile = selected_profile(args)
-    load_profile!(profile)
     Rake::Task[:'check-env'].invoke(profile)
     if ENV['TEAMCITY_VERSION']
         sh 'npm', 'test', '--', '--reporters=jest-teamcity'

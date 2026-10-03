@@ -35,6 +35,106 @@ export interface RepresentationModelObject {
   _links?: Links;
 }
 
+export interface EntityModelOpusVectorizingStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int64 */
+  opusId?: number;
+  /** @format int32 */
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PageMetadata {
+  /** @format int64 */
+  size?: number;
+  /** @format int64 */
+  totalElements?: number;
+  /** @format int64 */
+  totalPages?: number;
+  /** @format int64 */
+  number?: number;
+}
+
+export interface PagedModelEntityModelOpusVectorizingStat {
+  _embedded?: {
+    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelTeiDiv {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
+  summarySourceUrl?: string;
+  coverUrl?: string;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+}
+
 export interface Author {
   /** @format int64 */
   id?: number;
@@ -89,6 +189,137 @@ export interface Author {
   country?: string;
   visualName?: string;
   anonymous?: boolean;
+}
+
+export interface TeiFile {
+  /** @format int64 */
+  id?: number;
+  filename?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1000
+   */
+  title?: string;
+  authors?: Author[];
+  language?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  repoName?: string;
+  /** @format date-time */
+  timestamp?: string;
+  author?: Author;
+}
+
+export interface EntityModelTeiElem {
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiElem {
+  _embedded?: {
+    teiElems?: EntityModelTeiElem[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelTeiOpus {
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiOpus {
+  _embedded?: {
+    teiOpuses?: EntityModelTeiOpus[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelObject {
+  _embedded?: {
+    objects?: any[];
+  };
+  _links?: Links;
+}
+
+export interface EntityModelEmbeddingBatchStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
+  /** @format int64 */
+  totalChars?: number;
+  /** @format int32 */
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelEmbeddingBatchStat {
+  _embedded?: {
+    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
 }
 
 export interface EntityModelAuthor {
@@ -148,17 +379,6 @@ export interface EntityModelAuthor {
   _links?: Links;
 }
 
-export interface PageMetadata {
-  /** @format int64 */
-  size?: number;
-  /** @format int64 */
-  totalElements?: number;
-  /** @format int64 */
-  totalPages?: number;
-  /** @format int64 */
-  number?: number;
-}
-
 export interface PagedModelEntityModelAuthor {
   _embedded?: {
     authors?: EntityModelAuthor[];
@@ -172,205 +392,6 @@ export interface CollectionModelEntityModelAuthor {
     authors?: EntityModelAuthor[];
   };
   _links?: Links;
-}
-
-export interface EntityModelTeiDiv {
-  /** @format int64 */
-  id?: number;
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
-  description?: string;
-  significantQuote?: string;
-  coverUrl?: string;
-  leaf?: boolean;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
-}
-
-export interface TeiFile {
-  /** @format int64 */
-  id?: number;
-  filename?: string;
-  /**
-   * @minLength 0
-   * @maxLength 1000
-   */
-  title?: string;
-  authors?: Author[];
-  language?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  repoName?: string;
-  /** @format date-time */
-  timestamp?: string;
-  author?: Author;
-}
-
-export interface EntityModelEmbeddingBatchStat {
-  /** @format date-time */
-  recordedAt?: string;
-  /** @format int32 */
-  batchSize?: number;
-  /** @format int64 */
-  totalChars?: number;
-  /** @format int32 */
-  vectorDimension?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelEmbeddingBatchStat {
-  _embedded?: {
-    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface EntityModelOpusVectorizingStat {
-  /** @format date-time */
-  recordedAt?: string;
-  /** @format int64 */
-  opusId?: number;
-  /** @format int32 */
-  totalParas?: number;
-  /** @format int32 */
-  totalBatches?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelOpusVectorizingStat {
-  _embedded?: {
-    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface EntityModelTeiElem {
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  leaf?: boolean;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiElem {
-  _embedded?: {
-    teiElems?: EntityModelTeiElem[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
 }
 
 export interface AuthorRequestBody {
@@ -505,8 +526,7 @@ export interface TeiDivRequestBody {
    * @maxLength 3000
    */
   head?: string;
-  description?: string;
-  significantQuote?: string;
+  summarySourceUrl?: string;
   coverUrl?: string;
   leaf?: boolean;
   completePath?: string;
@@ -553,6 +573,15 @@ export interface TeiElemRequestBody {
   wordSize?: number;
   leaf?: boolean;
   completePath?: string;
+}
+
+export interface TeiOpusRequestBody {
+  /** @format int64 */
+  id?: number;
+  teiDiv?: string;
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
 }
 
 export interface SaveRequest {
@@ -656,6 +685,113 @@ export interface AddItemRequest {
   end?: string;
 }
 
+export interface AuthorDto {
+  strId?: string;
+  lastName?: string;
+  firstName?: string;
+  displayName?: string;
+  description?: string;
+  bio?: string;
+  bioSourceUrl?: string;
+  birthDate?: string;
+  deathDate?: string;
+  birthPlace?: string;
+  country?: string;
+  writingLanguage?: string;
+  /** @format int64 */
+  worksCount?: number;
+  opera?: OpusDto[];
+  image_href?: string;
+}
+
+export interface CatalogPageDtoTeiDivDto {
+  items?: TeiDivDto[];
+  /** @format int32 */
+  page?: number;
+  /** @format int32 */
+  size?: number;
+  /** @format int64 */
+  totalItems?: number;
+  /** @format int32 */
+  totalPages?: number;
+}
+
+export interface OpusDto {
+  /** @format int64 */
+  id?: number;
+  parent?: TeiElemDto;
+  name?: string;
+  path?: string;
+  xpath?: string;
+  urlFragment?: string;
+  url?: string;
+  text?: string;
+  text_sha256?: string;
+  language?: string;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  head?: string;
+  /** @format int32 */
+  depth?: number;
+  summarySourceUrl?: string;
+  coverUrl?: string;
+  description?: string;
+  significantQuote?: string;
+  author?: any;
+  leaf?: boolean;
+  opus?: boolean;
+  authors?: AuthorDto[];
+}
+
+export interface TeiDivDto {
+  /** @format int64 */
+  id?: number;
+  parent?: TeiElemDto;
+  name?: string;
+  path?: string;
+  xpath?: string;
+  urlFragment?: string;
+  url?: string;
+  text?: string;
+  text_sha256?: string;
+  language?: string;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  head?: string;
+  /** @format int32 */
+  depth?: number;
+  summarySourceUrl?: string;
+  coverUrl?: string;
+  description?: string;
+  significantQuote?: string;
+  children?: TeiDivDto[];
+  author?: AuthorDto;
+  leaf?: boolean;
+  opus?: boolean;
+}
+
+export interface TeiElemDto {
+  /** @format int64 */
+  id?: number;
+  parent?: any;
+  name?: string;
+  path?: string;
+  xpath?: string;
+  urlFragment?: string;
+  url?: string;
+  text?: string;
+  text_sha256?: string;
+  language?: string;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+}
+
 export interface HitDto {
   type?: string;
   url?: string;
@@ -698,97 +834,16 @@ export interface RebuildStatus {
   indexedDocs?: number;
 }
 
-export interface TeiElemDto {
-  /** @format int64 */
-  id?: number;
-  parent?: TeiElemDto;
-  name?: string;
-  path?: string;
-  xpath?: string;
-  urlFragment?: string;
-  url?: string;
-  text?: string;
-  text_sha256?: string;
-  language?: string;
+export interface CatalogPageDtoAuthorDto {
+  items?: AuthorDto[];
+  /** @format int32 */
+  page?: number;
   /** @format int32 */
   size?: number;
-  /** @format int32 */
-  wordSize?: number;
-}
-
-export interface AuthorDto {
-  strId?: string;
-  lastName?: string;
-  firstName?: string;
-  displayName?: string;
-  description?: string;
-  bio?: string;
-  bioSourceUrl?: string;
-  birthDate?: string;
-  deathDate?: string;
-  birthPlace?: string;
-  country?: string;
-  writingLanguage?: string;
-  /** Number of root works associated with this author. */
-  worksCount?: number;
-  opera?: OpusDto[];
-  image_href?: string;
-}
-
-export interface OpusDto {
   /** @format int64 */
-  id?: number;
-  parent?: TeiElemDto;
-  name?: string;
-  path?: string;
-  xpath?: string;
-  urlFragment?: string;
-  url?: string;
-  text?: string;
-  text_sha256?: string;
-  language?: string;
+  totalItems?: number;
   /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  head?: string;
-  /** @format int32 */
-  depth?: number;
-  description?: string;
-  significantQuote?: string;
-  coverUrl?: string;
-  author?: any;
-  leaf?: boolean;
-  opus?: boolean;
-  authors?: AuthorDto[];
-}
-
-export interface TeiDivDto {
-  /** @format int64 */
-  id?: number;
-  parent?: TeiElemDto;
-  name?: string;
-  path?: string;
-  xpath?: string;
-  urlFragment?: string;
-  url?: string;
-  text?: string;
-  text_sha256?: string;
-  language?: string;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  head?: string;
-  /** @format int32 */
-  depth?: number;
-  description?: string;
-  significantQuote?: string;
-  coverUrl?: string;
-  children?: TeiDivDto[];
-  author?: AuthorDto;
-  leaf?: boolean;
-  opus?: boolean;
+  totalPages?: number;
 }
 
 export interface Embedder {
@@ -1343,9 +1398,44 @@ export class Api<
      *
      * @tags author-search-controller
      * @name ExecuteSearchAuthorGet6
-     * @request GET:/api/drest/authors/search/getByOriginalNameInTeiFile
+     * @request GET:/api/drest/authors/search/findCatalogPage
      */
     executeSearchAuthorGet6: (
+      query: {
+        q: string;
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelAuthor, void>({
+        path: `/api/drest/authors/search/findCatalogPage`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags author-search-controller
+     * @name ExecuteSearchAuthorGet7
+     * @request GET:/api/drest/authors/search/getByOriginalNameInTeiFile
+     */
+    executeSearchAuthorGet7: (
       query?: {
         originalName?: string;
       },
@@ -1363,10 +1453,10 @@ export class Api<
      * No description
      *
      * @tags author-search-controller
-     * @name ExecuteSearchAuthorGet7
+     * @name ExecuteSearchAuthorGet8
      * @request GET:/api/drest/authors/search/getByStrId
      */
-    executeSearchAuthorGet7: (
+    executeSearchAuthorGet8: (
       query?: {
         strId?: string;
       },
@@ -1384,10 +1474,10 @@ export class Api<
      * No description
      *
      * @tags author-search-controller
-     * @name ExecuteSearchAuthorGet8
+     * @name ExecuteSearchAuthorGet9
      * @request GET:/api/drest/authors/search/getTeiFiles
      */
-    executeSearchAuthorGet8: (
+    executeSearchAuthorGet9: (
       query?: {
         /** @format int64 */
         authorId?: number;
@@ -1894,6 +1984,21 @@ export class Api<
       }),
 
     /**
+     * No description
+     *
+     * @tags profile-controller
+     * @name Descriptor5
+     * @request GET:/api/drest/profile/teiOpuses
+     */
+    descriptor5: (params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/api/drest/profile/teiOpuses`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * @description get-teidiv
      *
      * @tags tei-div-entity-controller
@@ -1952,9 +2057,30 @@ export class Api<
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet
+     * @request GET:/api/drest/teiDivs/search/countOperaForAuthorStrId
+     */
+    executeSearchTeidivGet: (
+      query?: {
+        authorStrId?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<number, void>({
+        path: `/api/drest/teiDivs/search/countOperaForAuthorStrId`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet1
      * @request GET:/api/drest/teiDivs/search/findAllOpera
      */
-    executeSearchTeidivGet: (params: RequestParams = {}) =>
+    executeSearchTeidivGet1: (params: RequestParams = {}) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findAllOpera`,
         method: "GET",
@@ -1966,10 +2092,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet1
+     * @name ExecuteSearchTeidivGet2
      * @request GET:/api/drest/teiDivs/search/findByHead
      */
-    executeSearchTeidivGet1: (
+    executeSearchTeidivGet2: (
       query?: {
         head?: string;
       },
@@ -1987,10 +2113,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet2
+     * @name ExecuteSearchTeidivGet3
      * @request GET:/api/drest/teiDivs/search/findByHeadContainingIgnoreCase
      */
-    executeSearchTeidivGet2: (
+    executeSearchTeidivGet3: (
       query?: {
         excerpt?: string;
         /**
@@ -2022,10 +2148,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet3
+     * @name ExecuteSearchTeidivGet4
      * @request GET:/api/drest/teiDivs/search/findByLang
      */
-    executeSearchTeidivGet3: (
+    executeSearchTeidivGet4: (
       query?: {
         lang?:
           | "BG"
@@ -2076,10 +2202,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet4
+     * @name ExecuteSearchTeidivGet5
      * @request GET:/api/drest/teiDivs/search/findByTeiFile
      */
-    executeSearchTeidivGet4: (
+    executeSearchTeidivGet5: (
       query?: {
         teiFile?: TeiFile;
       },
@@ -2097,10 +2223,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet5
+     * @name ExecuteSearchTeidivGet6
      * @request GET:/api/drest/teiDivs/search/findByTeiFileAndXpath
      */
-    executeSearchTeidivGet5: (
+    executeSearchTeidivGet6: (
       query?: {
         teiFile?: TeiFile;
         xpath?: string;
@@ -2119,10 +2245,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet6
+     * @name ExecuteSearchTeidivGet7
      * @request GET:/api/drest/teiDivs/search/findByUrlFragmentAndParent
      */
-    executeSearchTeidivGet6: (
+    executeSearchTeidivGet7: (
       query?: {
         urlFragment?: string;
         parent?: TeiDivRequestBody;
@@ -2141,10 +2267,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet7
+     * @name ExecuteSearchTeidivGet8
      * @request GET:/api/drest/teiDivs/search/findOpera
      */
-    executeSearchTeidivGet7: (
+    executeSearchTeidivGet8: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -2175,10 +2301,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet8
+     * @name ExecuteSearchTeidivGet9
      * @request GET:/api/drest/teiDivs/search/findOperaByLang
      */
-    executeSearchTeidivGet8: (
+    executeSearchTeidivGet9: (
       query?: {
         lang?:
           | "BG"
@@ -2229,10 +2355,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet9
+     * @name ExecuteSearchTeidivGet10
      * @request GET:/api/drest/teiDivs/search/findOperaByStablePath
      */
-    executeSearchTeidivGet9: (
+    executeSearchTeidivGet10: (
       query?: {
         authorId?: string;
         opusId?: string;
@@ -2251,10 +2377,65 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet10
+     * @name ExecuteSearchTeidivGet11
+     * @request GET:/api/drest/teiDivs/search/findOperaCatalogPage
+     */
+    executeSearchTeidivGet11: (
+      query: {
+        q: string;
+        language:
+          | "BG"
+          | "BR"
+          | "CA"
+          | "DA"
+          | "DE"
+          | "EN"
+          | "ES"
+          | "FI"
+          | "FR"
+          | "GR"
+          | "HU"
+          | "IT"
+          | "LA"
+          | "NL"
+          | "NO"
+          | "PT"
+          | "RO"
+          | "RU"
+          | "ZH";
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findOperaCatalogPage`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet12
      * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
      */
-    executeSearchTeidivGet10: (
+    executeSearchTeidivGet12: (
       query?: {
         authorStrId?: string;
       },
@@ -2272,10 +2453,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet11
+     * @name ExecuteSearchTeidivGet13
      * @request GET:/api/drest/teiDivs/search/getAuthors
      */
-    executeSearchTeidivGet11: (
+    executeSearchTeidivGet13: (
       query?: {
         /** @format int64 */
         id?: number;
@@ -2294,10 +2475,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet12
+     * @name ExecuteSearchTeidivGet14
      * @request GET:/api/drest/teiDivs/search/getByTeiFileAndXpath
      */
-    executeSearchTeidivGet12: (
+    executeSearchTeidivGet14: (
       query?: {
         teiFile?: TeiFile;
         xpath?: string;
@@ -2316,10 +2497,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet13
+     * @name ExecuteSearchTeidivGet15
      * @request GET:/api/drest/teiDivs/search/getNrOfBottomDivs
      */
-    executeSearchTeidivGet13: (params: RequestParams = {}) =>
+    executeSearchTeidivGet15: (params: RequestParams = {}) =>
       this.request<number, void>({
         path: `/api/drest/teiDivs/search/getNrOfBottomDivs`,
         method: "GET",
@@ -2331,10 +2512,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet14
+     * @name ExecuteSearchTeidivGet16
      * @request GET:/api/drest/teiDivs/search/getOperaForTeiFileId
      */
-    executeSearchTeidivGet14: (
+    executeSearchTeidivGet16: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -2353,10 +2534,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet15
+     * @name ExecuteSearchTeidivGet17
      * @request GET:/api/drest/teiDivs/search/getOperaPathsForTeiFileId
      */
-    executeSearchTeidivGet15: (
+    executeSearchTeidivGet17: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -2564,6 +2745,288 @@ export class Api<
         body: data,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name GetCollectionResourceTeiopusGet
+     * @request GET:/api/drest/teiOpuses
+     */
+    getCollectionResourceTeiopusGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelTeiOpus, any>({
+        path: `/api/drest/teiOpuses`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description create-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name PostCollectionResourceTeiopusPost
+     * @request POST:/api/drest/teiOpuses
+     */
+    postCollectionResourceTeiopusPost: (
+      data: TeiOpusRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiOpus, any>({
+        path: `/api/drest/teiOpuses`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-opus-search-controller
+     * @name ExecuteSearchTeiopusGet
+     * @request GET:/api/drest/teiOpuses/search/deleteByTeiDivId
+     */
+    executeSearchTeiopusGet: (
+      query?: {
+        /** @format int64 */
+        teiDivId?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/teiOpuses/search/deleteByTeiDivId`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-opus-search-controller
+     * @name ExecuteSearchTeiopusGet1
+     * @request GET:/api/drest/teiOpuses/search/findByTeiDivId
+     */
+    executeSearchTeiopusGet1: (
+      query?: {
+        /** @format int64 */
+        teiDivId?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiOpus, void>({
+        path: `/api/drest/teiOpuses/search/findByTeiDivId`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name GetItemResourceTeiopusGet
+     * @request GET:/api/drest/teiOpuses/{id}
+     */
+    getItemResourceTeiopusGet: (id: string, params: RequestParams = {}) =>
+      this.request<EntityModelTeiOpus, void>({
+        path: `/api/drest/teiOpuses/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name PutItemResourceTeiopusPut
+     * @request PUT:/api/drest/teiOpuses/{id}
+     */
+    putItemResourceTeiopusPut: (
+      id: string,
+      data: TeiOpusRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiOpus, any>({
+        path: `/api/drest/teiOpuses/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name DeleteItemResourceTeiopusDelete
+     * @request DELETE:/api/drest/teiOpuses/{id}
+     */
+    deleteItemResourceTeiopusDelete: (id: string, params: RequestParams = {}) =>
+      this.request<void, void>({
+        path: `/api/drest/teiOpuses/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-teiopus
+     *
+     * @tags tei-opus-entity-controller
+     * @name PatchItemResourceTeiopusPatch
+     * @request PATCH:/api/drest/teiOpuses/{id}
+     */
+    patchItemResourceTeiopusPatch: (
+      id: string,
+      data: TeiOpusRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiOpus, any>({
+        path: `/api/drest/teiOpuses/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name FollowPropertyReferenceTeiopusGet
+     * @request GET:/api/drest/teiOpuses/{id}/teiDiv
+     */
+    followPropertyReferenceTeiopusGet: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, void>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name CreatePropertyReferenceTeiopusPut
+     * @request PUT:/api/drest/teiOpuses/{id}/teiDiv
+     */
+    createPropertyReferenceTeiopusPut: (
+      id: string,
+      data: CollectionModelObject,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, any>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name DeletePropertyReferenceTeiopusDelete
+     * @request DELETE:/api/drest/teiOpuses/{id}/teiDiv
+     */
+    deletePropertyReferenceTeiopusDelete: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name CreatePropertyReferenceTeiopusPatch
+     * @request PATCH:/api/drest/teiOpuses/{id}/teiDiv
+     */
+    createPropertyReferenceTeiopusPatch: (
+      id: string,
+      data: CollectionModelObject,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, any>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name FollowPropertyReferenceTeiopusGet1
+     * @request GET:/api/drest/teiOpuses/{id}/teiDiv/{propertyId}
+     */
+    followPropertyReferenceTeiopusGet1: (
+      id: string,
+      propertyId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelTeiDiv, void>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv/${propertyId}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-teidiv-by-teiopus-Id
+     *
+     * @tags tei-opus-property-reference-controller
+     * @name DeletePropertyReferenceIdTeiopusDelete
+     * @request DELETE:/api/drest/teiOpuses/{id}/teiDiv/{propertyId}
+     */
+    deletePropertyReferenceIdTeiopusDelete: (
+      id: string,
+      propertyId: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/teiOpuses/${id}/teiDiv/${propertyId}`,
+        method: "DELETE",
         ...params,
       }),
 
@@ -2784,6 +3247,38 @@ export class Api<
         method: "POST",
         body: data,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags work-catalog-rest-controller
+     * @name Page
+     * @request GET:/api/works
+     */
+    page: (
+      query?: {
+        /**
+         * @format int32
+         * @default 1
+         */
+        page?: number;
+        /**
+         * @format int32
+         * @default 12
+         */
+        size?: number;
+        q?: string;
+        lang?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CatalogPageDtoTeiDivDto, any>({
+        path: `/api/works`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -3287,6 +3782,37 @@ export class Api<
       this.request<TeiDivDto[], any>({
         path: `/api/authors/${strId}/opera`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags author-rest-controller
+     * @name GetAuthorPage
+     * @request GET:/api/authors/page
+     */
+    getAuthorPage: (
+      query?: {
+        /**
+         * @format int32
+         * @default 1
+         */
+        page?: number;
+        /**
+         * @format int32
+         * @default 12
+         */
+        size?: number;
+        q?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CatalogPageDtoAuthorDto, any>({
+        path: `/api/authors/page`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),

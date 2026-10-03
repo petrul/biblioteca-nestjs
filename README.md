@@ -435,7 +435,7 @@ the reader uses its bundled default cover.
 
 The worker uses the existing import Kafka topic with its own consumer group,
 so vectorization and enrichment never steal one another's events. Configure
-`COVERS_API_URL`, `MINIO_URL`, and `MINIO_CRED`. Credentials are server-side only.
+`COVERS_API_URL`, `MINIO_URL`, and `MINIO_CREDS`. Credentials are server-side only.
 
 The cover-cache variables mean:
 
@@ -443,11 +443,11 @@ The cover-cache variables mean:
 # MinIO S3/API endpoint, with the bucket as the URL path.
 MINIO_URL=http://srv2.local:20124/biblioteca
 # access-key:secret-key (example only; never commit a real credential).
-MINIO_CRED=example-cover-cache-access-key:example-cover-cache-secret-key
+MINIO_CREDS=example-cover-cache-access-key:example-cover-cache-secret-key
 ```
 
 `MINIO_URL` is used as both the S3/API endpoint and the base URL for public
-objects. `MINIO_CRED` is split at the first colon. Both values stay server-side.
+objects. `MINIO_CREDS` is split at the first colon. Both values stay server-side.
 
 ### Manual enrichment admin (`/api/enrichment/*`)
 

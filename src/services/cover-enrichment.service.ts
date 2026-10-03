@@ -32,7 +32,7 @@ export class CoverEnrichmentService {
         const endpoint = new URL(conf.minioUrl);
         this.bucket = endpoint.pathname.replace(/^\/+|\/+$/g, '') || 'biblioteca';
         const separator = conf.minioCred.indexOf(':');
-        if (separator <= 0 || separator === conf.minioCred.length - 1) throw new Error('MINIO_CRED must be access-key:secret-key');
+        if (separator <= 0 || separator === conf.minioCred.length - 1) throw new Error('MINIO_CREDS must be access-key:secret-key');
         const accessKey = conf.minioCred.slice(0, separator);
         const secretKey = conf.minioCred.slice(separator + 1);
         this.minio = new MinioClient({
@@ -44,7 +44,7 @@ export class CoverEnrichmentService {
         });
         this.log.log(`cover cache enabled (bucket ${this.bucket}, prefix covers/)`);
       } catch (error: any) {
-        this.log.warn(`cover cache disabled: invalid MINIO_URL/MINIO_CRED (${error?.message || 'invalid configuration'})`);
+        this.log.warn(`cover cache disabled: invalid MINIO_URL/MINIO_CREDS (${error?.message || 'invalid configuration'})`);
       }
     } else {
       this.log.warn('cover enrichment disabled: MinIO cover-cache credentials are not configured');
