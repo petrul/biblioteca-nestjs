@@ -89,3 +89,86 @@ describe('CoverEnrichmentService enqueue admission', () => {
     expect(renderBodies[1].coverArtUrl).toBeUndefined();
   });
 });
+
+/**
+ * The storage half of generate(): a successful render must land the PNG
+ * in the MinIO cover cache and only then report the public object URL
+ * back to the server (persistEnrichment) - the coverUrl the reader and
+ * the REST API then serve. Everything external is faked: the renderer
+ * fetch returns a fixed PNG buffer, and putObject is a jest mock on the
+ * real MinioClient instance, so no network and no MinIO server.
+ */
+describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+  let originalFetch: any;
+  let renderCalls: any[] = [];
+  let persisted: any[] = [];
+
+  class FakeBiblioteca {
+    async persistEnrichment(update: any) { persisted.push(update); }
+  }
+
+  beforeAll(() => {
+    originalFetch = (global as any).fetch;
+    (global as any).fetch = (async (_url: any, init?: any) => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength),
+      headers: new Map(),
+    })) as any;
+  });
+  afterAll(() => { (global as any).fetch = originalFetch; });
+  beforeEach(() => { renderCalls = []; persisted = []; });
+
+  function makeStoredService() {
+    const conf = {
+      minioUrl: 'http://minio.test',
+      minioCred: 'key:secret',
+      coversApiUrl: 'http://covers.test',
+    } as any;
+    const svc = new CoverEnrichmentService(new FakeBiblioteca() as any, conf);
+    const putObject = jest.spyOn((svc as any).minio!, 'putObject').mockImplementation(async (...args: any[]) => {
+      renderCalls.push(args);
+      return { etag: 'mock' };
+    });
+    return { svc, putObject };
+  }
+
+  it('puts the rendered PNG in the cover cache and persists the public URL', async () => {
+    const { svc, putObject } = makeStoredService();
+    svc.enqueue({ id: 7, path: 'opera/alecsandri/lume-ridicata.xml', title: 'Lume', author: 'Vasile Alecsandri' });
+    await settle(svc);
+
+    // stored in MinIO: bucket biblioteca, the covers/ key derived from the
+    // opus path, the exact renderer bytes, immutable cache headers
+    expect(putObject).toHaveBeenCalledTimes(1);
+    const [bucket, key, body, size, headers] = renderCalls[0];
+    expect(bucket).toBe('biblioteca');
+    expect(key).toBe('covers/opera/alecsandri/lume-ridicata.xml-d91a5027a5a9.png');
+    expect(Buffer.from(body)).toEqual(PNG);
+    expect(size).toBe(PNG.length);
+    expect(headers).toMatchObject({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' });
+
+    // and only then reported to the server, as the public MinIO URL
+    expect(persisted).toEqual([
+      { opusId: 7, coverUrl: `http://minio.test/${key}` },
+    ]);
+  });
+
+  it('a failed render stores nothing and reports nothing', async () => {
+    const { svc, putObject } = makeStoredService();
+    (global as any).fetch = (async () => ({ ok: false, status: 500 })) as any;
+    try {
+      svc.enqueue({ id: 8, path: 'p-fail', title: 'T', author: 'A' });
+      await settle(svc);
+    } finally {
+      (global as any).fetch = (async () => ({
+        ok: true,
+        status: 200,
+        arrayBuffer: async () => PNG.buffer,
+      })) as any;
+    }
+    expect(putObject).not.toHaveBeenCalled();
+    expect(persisted).toHaveLength(0);
+  });
+});
