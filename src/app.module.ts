@@ -25,6 +25,7 @@ import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
 import { EnrichmentService } from './services/enrichment.service';
 import { EnrichmentAdminService } from './services/enrichment-admin.service';
 import { EnrichmentAdminController } from './enrichment-admin.controller';
+import { CoverAdminController } from './cover-admin.controller';
 import { CoverEnrichmentService } from './services/cover-enrichment.service';
 
 @Module({
@@ -42,6 +43,7 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     AppController,
     VectorizingController,
     EnrichmentAdminController,
+    CoverAdminController,
     HealthController
   ],
 

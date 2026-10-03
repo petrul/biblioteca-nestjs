@@ -226,6 +226,17 @@ describe('EnrichmentService', () => {
     expect(fetchMock.calls).toHaveLength(0);
   });
 
+  it('skips an already-enriched work when called directly without force - no call at all', async () => {
+    const tbc = new FakeTbc();
+    // either marker identifies a completed enrichment (see dailySweep's own
+    // comment) - description here, significantQuote would do the same
+    const opus = { id: 7, head: 'Lume', description: 'old summary' };
+    const fetchMock = new FakeFetch();
+    await service(tbc, fetchMock).enrichWork(opus);
+    // no Wikipedia, no Wikidata, no persistence - not even a partial touch
+    expect(fetchMock.calls).toHaveLength(0);
+  });
+
   it('force re-enriches an already-enriched author and asks the server to overwrite', async () => {
     const tbc = new FakeTbc();
     const author = { strId: 'alecsandri', displayName: 'Vasile Alecsandri', bio: 'old bio' };
