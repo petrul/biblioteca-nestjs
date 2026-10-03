@@ -35,16 +35,19 @@ async function settle(svc: CoverEnrichmentService) {
 describe('CoverEnrichmentService enqueue admission', () => {
   let originalFetch: any;
   let renderAttempts: string[];
+  let renderBodies: any[];
   beforeAll(() => {
     originalFetch = (global as any).fetch;
     renderAttempts = [];
-    (global as any).fetch = (async (url: any) => {
+    renderBodies = [];
+    (global as any).fetch = (async (url: any, init?: any) => {
       renderAttempts.push(String(url));
+      if (init?.body) renderBodies.push(JSON.parse(String(init.body)));
       return { ok: false, status: 500, json: async () => ({}) };
     }) as any;
   });
   afterAll(() => { (global as any).fetch = originalFetch; });
-  beforeEach(() => { renderAttempts.length = 0; });
+  beforeEach(() => { renderAttempts.length = 0; renderBodies.length = 0; });
 
   it('skips an opus that already has a cover - fill-only by default', async () => {
     const svc = makeService();
@@ -71,8 +74,18 @@ describe('CoverEnrichmentService enqueue admission', () => {
   it('enqueues nothing at all when the MinIO cache is not configured', async () => {
     const svc = makeService({ minioUrl: undefined, minioCred: undefined });
     svc.enqueue({ id: 1, path: 'p1', title: 'T', author: 'A' });
-    svc.enqueue({ id: 1, path: 'p1', title: 'T', author: 'A' }, { force: true });
+    svc.enqueue({ id: 1, path: 'p1', title: 'T', author: 'A', artUrl: 'https://upload.wikimedia.org/a.jpg' }, { force: true });
     await settle(svc);
     expect(renderAttempts).toHaveLength(0);
+  });
+
+  it('sends the retrieved art as the renderer coverArtUrl, and omits it when absent', async () => {
+    const svc = makeService();
+    svc.enqueue({ id: 1, path: 'p1', title: 'T', author: 'A', artUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Some_Art.jpg?width=1200' });
+    svc.enqueue({ id: 2, path: 'p2', title: 'T2', author: 'A2' });
+    await settle(svc);
+    expect(renderBodies).toHaveLength(2);
+    expect(renderBodies[0].coverArtUrl).toBe('https://commons.wikimedia.org/wiki/Special:FilePath/Some_Art.jpg?width=1200');
+    expect(renderBodies[1].coverArtUrl).toBeUndefined();
   });
 });

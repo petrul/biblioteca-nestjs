@@ -89,9 +89,14 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
             // carries bio (present-or-null) precisely so this check needs
             // no second query - bio present means already enriched, skip.
             const author = opus?.author;
+            let artUrl: string | undefined;
             if (author && !author.bio) {
               this.log.log(`enrichment candidate author ${author.strId}`);
-              await this.enrichment.enrichAuthor(author);
+              // The author's art is returned by the enrichment itself,
+              // retrieved BEFORE the cover order below so the portrait
+              // makes it into the render - covers are fill-only, an
+              // ordered cover is never re-rendered with art later.
+              artUrl = (await this.enrichment.enrichAuthor(author))?.[0];
             }
             // Cover generation is a separate slow job. It is triggered by the
             // same successful import notification but has its own dedupe set,
@@ -103,6 +108,7 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
                 title: opus.head,
                 author: author?.displayName || author?.visualName || author?.strId || 'Anonymous',
                 coverUrl: opus.coverUrl,
+                artUrl,
               });
             }
             return;

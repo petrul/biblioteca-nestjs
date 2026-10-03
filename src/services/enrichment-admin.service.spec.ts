@@ -31,23 +31,31 @@ class FakeEnrichment {
   enrichAuthorCalls: { strId: string; force?: boolean }[] = [];
   enrichWorkCalls: { opusId: number; force?: boolean }[] = [];
   failFor = new Set<string>();
+  // The real service returns the retrieved image URLs per entity - the
+  // admin run threads the first into the cover order (see the combined
+  // work+cover test).
+  artFor = new Map<string, string[]>();
   tryBeginRun() { if (!this.canBegin || this.running) return false; this.running = true; return true; }
   endRun() { this.running = false; }
   isRunning() { return this.running; }
   async enrichAuthor(author: any, opts: { force?: boolean } = {}) {
     this.enrichAuthorCalls.push({ strId: author.strId, force: opts.force });
     if (this.failFor.has(author.strId)) throw new Error('wikipedia unreachable');
+    return this.artFor.get(author.strId);
   }
   async enrichWork(opus: any, opts: { force?: boolean } = {}) {
     this.enrichWorkCalls.push({ opusId: opus.id, force: opts.force });
     if (this.failFor.has(`opus-${opus.id}`)) throw new Error('wikipedia unreachable');
+    return this.artFor.get(`opus-${opus.id}`);
   }
 }
 
 class FakeCovers {
   enqueued: { id: number; hasCoverUrl: boolean; force?: boolean }[] = [];
+  enqueuedCandidates: any[] = [];
   enqueue(candidate: any, opts: { force?: boolean } = {}) {
     this.enqueued.push({ id: candidate.id, hasCoverUrl: !!candidate.coverUrl, force: opts.force });
+    this.enqueuedCandidates.push(candidate);
   }
 }
 
@@ -151,6 +159,31 @@ describe('EnrichmentAdminService', () => {
     expect(covers2.enqueued).toEqual([
       { id: 1, hasCoverUrl: true, force: true },
       { id: 2, hasCoverUrl: false, force: true },
+    ]);
+  });
+
+  it('a work+cover run enriches first and threads the retrieved art into the cover order', async () => {
+    const tbc = new FakeTbc();
+    tbc.authors = [{ strId: 'a1', displayName: 'An Author' }];
+    tbc.opera = [
+      // no art of its own -> falls back to the author portrait the
+      // author step retrieved earlier in the same run
+      { id: 1, head: 'Fallback', completePath: 'p1', author: { strId: 'a1', displayName: 'An Author' } },
+      // its own art -> the work step's return wins over the portrait
+      { id: 2, head: 'Own Art', completePath: 'p2', author: { strId: 'a1', displayName: 'An Author' } },
+    ];
+    const enrichment = new FakeEnrichment();
+    enrichment.artFor.set('a1', ['https://upload.wikimedia.org/author.jpg']);
+    enrichment.artFor.set('opus-2', ['https://commons.wikimedia.org/wiki/Special:FilePath/Work_Art.jpg?width=1200']);
+    const covers = new FakeCovers();
+    const svc = makeSvc(tbc, enrichment, covers, new FakeVectorizer());
+
+    await waitJob(svc, (await svc.start({ steps: ['author', 'work', 'cover'] })).id);
+
+    expect(enrichment.enrichWorkCalls).toEqual([{ opusId: 1, force: false }, { opusId: 2, force: false }]);
+    expect(covers.enqueuedCandidates).toEqual([
+      expect.objectContaining({ id: 1, artUrl: 'https://upload.wikimedia.org/author.jpg' }),
+      expect.objectContaining({ id: 2, artUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Work_Art.jpg?width=1200' }),
     ]);
   });
 

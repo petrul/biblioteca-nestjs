@@ -238,8 +238,12 @@ export class EnrichmentAdminService {
   private async execute(job: Job): Promise<void> {
     const force = job.request.overwrite === true;
     try {
-      if (job.request.steps.includes('author')) await this.runAuthors(job, force);
-      if (job.request.steps.includes('work') || job.request.steps.includes('cover')) await this.runOpera(job, force);
+      // The author pass runs first and shares its retrieved art with the
+      // cover pass below: an opus without art of its own falls back to
+      // its author's portrait (same rule as EnrichmentService.dailySweep).
+      const artByAuthor = new Map<string, string>();
+      if (job.request.steps.includes('author')) await this.runAuthors(job, force, artByAuthor);
+      if (job.request.steps.includes('work') || job.request.steps.includes('cover')) await this.runOpera(job, force, artByAuthor);
       if (job.request.steps.includes('vectorize')) await this.runVectorize(job);
       job.state = job.cancelRequested ? 'cancelled' : 'finished';
     } catch (e: any) {
@@ -254,7 +258,7 @@ export class EnrichmentAdminService {
     }
   }
 
-  private async runAuthors(job: Job, force: boolean): Promise<void> {
+  private async runAuthors(job: Job, force: boolean, artByAuthor: Map<string, string>): Promise<void> {
     const counters = job.steps.author!;
     for (const author of (await this.client.getAuthors()) as any[]) {
       if (job.cancelRequested) return;
@@ -263,7 +267,8 @@ export class EnrichmentAdminService {
       counters.candidates++;
       try {
         this.log.log(`enrichment candidate author ${author.strId}`);
-        await this.enrichment.enrichAuthor(author, { force });
+        const images = await this.enrichment.enrichAuthor(author, { force });
+        if (images?.length) artByAuthor.set(author.strId, images[0]);
         counters.processed++;
       } catch (e: any) {
         counters.failed++;
@@ -273,12 +278,33 @@ export class EnrichmentAdminService {
   }
 
   /** The single walk over all opera shared by the work and cover steps. */
-  private async runOpera(job: Job, force: boolean): Promise<void> {
+  private async runOpera(job: Job, force: boolean, artByAuthor: Map<string, string>): Promise<void> {
     const wantsWork = job.request.steps.includes('work');
     const wantsCover = job.request.steps.includes('cover');
     for await (const opus of this.client.allOperaGen() as any) {
       if (job.cancelRequested) return;
       if (!this.opusTargeted(opus, job.request)) continue;
+      // Work enrichment first: its retrieved art is threaded into the
+      // cover order below, so a requested cover renders with the
+      // graphics instead of a text-only design that fill-only would
+      // then freeze forever.
+      let artUrl: string | undefined;
+      if (wantsWork) {
+        const workCounters = job.steps.work!;
+        if ((opus.description || opus.significantQuote) && !force) { workCounters.skippedExisting++; }
+        else {
+          workCounters.candidates++;
+          try {
+            this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
+            const images = await this.enrichment.enrichWork(opus, { force });
+            artUrl = images?.[0];
+            workCounters.processed++;
+          } catch (e: any) {
+            workCounters.failed++;
+            this.recordError(job, `opus ${opus.id} ${opus.head}: ${e?.message ?? e}`);
+          }
+        }
+      }
       if (wantsCover && opus.id && opus.completePath && opus.head) {
         const coverCounters = job.steps.cover!;
         if (opus.coverUrl && !force) { coverCounters.skippedExisting++; }
@@ -286,27 +312,18 @@ export class EnrichmentAdminService {
           coverCounters.candidates++;
           // CoverEnrichmentService.enqueue enforces the same fill-only
           // rule on its own; force is threaded through so the switch
-          // does not have to rely on this caller's arithmetic.
+          // does not have to rely on this caller's arithmetic. artUrl:
+          // the work's own art when the work step ran above, else its
+          // author's portrait - absent on cover-only runs, which order
+          // art-less covers exactly as before.
           this.covers.enqueue({
             id: opus.id,
             path: opus.completePath,
             title: opus.head,
             author: opus.author?.visualName || opus.author?.displayName || 'Anonymous',
             coverUrl: opus.coverUrl,
+            artUrl: artUrl || (opus.author?.strId ? artByAuthor.get(opus.author.strId) : undefined),
           }, { force });
-        }
-      }
-      if (wantsWork) {
-        const workCounters = job.steps.work!;
-        if ((opus.description || opus.significantQuote) && !force) { workCounters.skippedExisting++; continue; }
-        workCounters.candidates++;
-        try {
-          this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
-          await this.enrichment.enrichWork(opus, { force });
-          workCounters.processed++;
-        } catch (e: any) {
-          workCounters.failed++;
-          this.recordError(job, `opus ${opus.id} ${opus.head}: ${e?.message ?? e}`);
         }
       }
     }

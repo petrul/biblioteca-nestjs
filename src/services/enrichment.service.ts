@@ -66,6 +66,11 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   // word chopped in half. Same rule as the retired Java service.
   private static readonly MAX_MATERIAL_CHARS = 1200;
 
+  // Same cap as biblioteca-server's EnrichmentRestController
+  // (MAX_ENRICHMENT_IMAGES): the server slices imageUrls at 3 when
+  // persisting the media associations, so sending more is wasted payload.
+  private static readonly MAX_IMAGES = 3;
+
   constructor(
     private readonly client: BibliotecaClient,
     @Inject(PROVIDER_CONF) private readonly conf: AppConfService,
@@ -112,11 +117,19 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   async dailySweep() {
     if (!this.tryBeginRun()) return;
     try {
+      // Authors first, and not just for their bios: the art retrieved
+      // here is the fallback for covers whose opus has no art of its own
+      // (see the opus loop below), so it must be in hand before the first
+      // cover is ordered. Authors already enriched in a previous run are
+      // skipped without their art being recalled - covers for their
+      // opera then order art-less unless the opus itself yields art.
       const authors = await this.client.getAuthors();
+      const artByAuthor = new Map<string, string>();
       for (const author of (authors as any[]).filter(a => !a.bio)) {
         try {
           this.log.log(`enrichment candidate author ${author.strId}`);
-          await this.enrichAuthor(author);
+          const images = await this.enrichAuthor(author);
+          if (images?.length) artByAuthor.set(author.strId, images[0]);
         } catch (e: any) {
           this.log.warn(`author enrichment failed for ${author.strId}: ${e?.message ?? e}`);
         }
@@ -128,21 +141,33 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       // carries the work-level description and quote from TeiOpus. Either
       // value is enough to identify a completed enrichment.
       for await (const opus of this.client.allOperaGen()) {
+        // Work enrichment runs BEFORE the cover is ordered: the graphics
+        // this pass just retrieved (the article's lead image, the
+        // Wikidata entity's Commons art) are threaded into the order as
+        // coverArtUrl. Ordering first would render a text-only cover and
+        // freeze it - covers are fill-only, an existing coverUrl is never
+        // re-rendered.
+        let artUrl: string | undefined;
+        if (!(opus as any).description && !(opus as any).significantQuote) {
+          try {
+            this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
+            const images = await this.enrichWork(opus);
+            artUrl = images?.[0];
+          } catch (e: any) {
+            this.log.warn(`opus enrichment failed for ${(opus as any).id} ${(opus as any).head}: ${e?.message ?? e}`);
+          }
+        }
         if (this.covers && (opus as any).id && (opus as any).completePath && (opus as any).head) {
+          const authorStrId = (opus as any).author?.strId;
           this.covers.enqueue({
             id: (opus as any).id,
             path: (opus as any).completePath,
             title: (opus as any).head,
             author: (opus as any).author?.visualName || (opus as any).author?.displayName || 'Anonymous',
             coverUrl: (opus as any).coverUrl,
+            // the work's own art when this pass found any, else its author's portrait
+            artUrl: artUrl || (authorStrId ? artByAuthor.get(authorStrId) : undefined),
           });
-        }
-        if ((opus as any).description || (opus as any).significantQuote) continue;
-        try {
-          this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
-          await this.enrichWork(opus);
-        } catch (e: any) {
-          this.log.warn(`opus enrichment failed for ${(opus as any).id} ${(opus as any).head}: ${e?.message ?? e}`);
         }
       }
     } catch (e: any) { this.log.warn(`daily enrichment sweep failed: ${e?.message ?? e}`); }
@@ -155,33 +180,50 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * runs (EnrichmentAdminService). The default, and every automatic
    * caller (daily sweep, Kafka listener), keeps the fill-only invariant:
    * an author with a bio is never touched again.
+   *
+   * @returns the image URLs persisted for the author (lead image plus
+   * the Wikidata entity's Commons art), most representative first;
+   * undefined when the author was skipped or no article was found. The
+   * callers thread the first URL into the cover order as coverArtUrl.
    */
-  async enrichAuthor(author: any, opts: { force?: boolean } = {}) {
+  async enrichAuthor(author: any, opts: { force?: boolean } = {}): Promise<string[] | undefined> {
     const name = author.displayName || [author.firstName, author.lastName].filter(Boolean).join(' ');
-    if (!name || (author.bio && !opts.force)) return;
+    if (!name || (author.bio && !opts.force)) return undefined;
     const page = await this.wikipedia(name);
-    if (!page?.extract) return;
-    const facts = await this.wikidataFacts(page.wikibase_item);
+    if (!page?.extract) return undefined;
+    // The Wikidata entity behind the article is fetched once and read
+    // twice: the structured facts for the bio fields, and its P18
+    // (image) claims for extra art beyond the article's lead image.
+    const claims = await this.wikidataClaims(page.wikibase_item);
     const update: EnrichmentUpdate = {
       authorStrId: author.strId,
       bio: this.truncateMaterial(page.extract),
       bioSourceUrl: this.wikipediaUrl(name),
-      ...facts,
-      imageUrls: this.image(page),
+      ...await this.wikidataFacts(claims),
+      imageUrls: this.images(page, claims),
     };
     await this.persist(update, opts);
+    return update.imageUrls;
   }
 
-  /** Same force semantics as enrichAuthor above: default fills only what is missing. */
-  async enrichWork(opus: any, opts: { force?: boolean } = {}) {
-    if (!opus?.id || !opus.head || ((opus.description || opus.significantQuote) && !opts.force)) return;
+  /**
+   * Same force semantics as enrichAuthor above: default fills only what
+   * is missing. Also returns the persisted image URLs - the article's
+   * lead image plus the work entity's own P18 Commons art (a scan, a
+   * famous painting of the scene) - for the cover order.
+   */
+  async enrichWork(opus: any, opts: { force?: boolean } = {}): Promise<string[] | undefined> {
+    if (!opus?.id || !opus.head || ((opus.description || opus.significantQuote) && !opts.force)) return undefined;
     const page = await this.wikipedia(opus.head);
-    if (!page?.extract) return;
+    if (!page?.extract) return undefined;
+    const claims = await this.wikidataClaims(page.wikibase_item);
+    const imageUrls = this.images(page, claims);
     await this.persist({
       opusId: opus.id,
       summary: this.truncateMaterial(page.extract),
-      imageUrls: this.image(page),
+      imageUrls,
     }, opts);
+    return imageUrls;
   }
 
   /**
@@ -195,18 +237,33 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Structured author facts from the Wikidata entity behind the selected
-   * Wikipedia article: birth/death dates (P569/P570), birth place and
-   * country (P19/P27, resolved to their labels), and the author's
-   * writing languages (P1412, mapped through each language entity's own
-   * ISO 639-1 code, P218). Best-effort: any failure leaves the fields
-   * unset, and the server only fills blanks anyway.
+   * The claims of the Wikidata entity behind the selected Wikipedia
+   * article, fetched once and shared by the fact extraction and the
+   * image harvesting below. Best-effort: any failure yields undefined
+   * and the callers proceed without facts/art.
    */
-  private async wikidataFacts(wikibaseItem?: string): Promise<Partial<EnrichmentUpdate>> {
+  private async wikidataClaims(wikibaseItem?: string): Promise<any | undefined> {
     try {
-      if (!wikibaseItem) return {};
-      const claims = await this.fetchJson<any>(`https://www.wikidata.org/wiki/Special:EntityData/${wikibaseItem}.json`)
+      if (!wikibaseItem) return undefined;
+      return await this.fetchJson<any>(`https://www.wikidata.org/wiki/Special:EntityData/${wikibaseItem}.json`)
         .then((root: any) => root?.entities?.[wikibaseItem]?.claims ?? {});
+    } catch (e: any) {
+      this.log.log(`no Wikidata entity (${wikibaseItem}): ${e?.message ?? e}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Structured author facts from those claims: birth/death dates
+   * (P569/P570), birth place and country (P19/P27, resolved to their
+   * labels), and the author's writing languages (P1412, mapped through
+   * each language entity's own ISO 639-1 code, P218). Best-effort: any
+   * failure leaves the fields unset, and the server only fills blanks
+   * anyway.
+   */
+  private async wikidataFacts(claims: any): Promise<Partial<EnrichmentUpdate>> {
+    try {
+      if (!claims) return {};
       const birthPlaceId = this.firstEntityId(claims.P19);
       const countryId = this.firstEntityId(claims.P27);
       const languageIds: string[] = this.entityIds(claims.P1412);
@@ -220,7 +277,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
         ...(writingLanguage ? { writingLanguage } : {}),
       };
     } catch (e: any) {
-      this.log.log(`no Wikidata facts (${wikibaseItem}): ${e?.message ?? e}`);
+      this.log.log(`no Wikidata facts: ${e?.message ?? e}`);
       return {};
     }
   }
@@ -316,6 +373,39 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   private wikipediaApiUrl(title: string) { return `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`; }
   private wikipediaUrl(title: string) { return `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/\s+/g, '_'))}`; }
   private image(page: WikiSummary) { const url = page.originalimage?.source || page.thumbnail?.source; return url ? [url] : []; }
+
+  /**
+   * The entity's art, most representative first: the article's lead
+   * image, then every P18 (image) claim of the linked Wikidata entity.
+   * P18 values are Commons file titles, turned into Special:FilePath
+   * URLs - image URLs only, never bytes: the server stores the URL as a
+   * media association (up to MAX_IMAGES, matching its own
+   * EnrichmentRestController cap) and the covers renderer downloads the
+   * chosen one itself when a cover is actually rendered.
+   */
+  private images(page: WikiSummary, claims?: any): string[] {
+    const urls: string[] = [];
+    for (const url of [...this.image(page), ...this.commonsImages(claims)]) {
+      if (url && !urls.includes(url)) urls.push(url);
+    }
+    return urls.slice(0, EnrichmentService.MAX_IMAGES);
+  }
+
+  private commonsImages(claims: any): string[] {
+    return this.claimValues(claims?.P18)
+      .map((value: any) => this.commonsFilePath(String(value)))
+      .filter(Boolean);
+  }
+
+  private commonsFilePath(fileName: string): string | undefined {
+    if (!fileName) return undefined;
+    // Special:FilePath redirects to the real upload.wikimedia.org image;
+    // the width cap keeps the renderer from pulling Commons originals,
+    // which are routinely tens of megabytes.
+    const title = fileName.replace(/^File:/, '').trim();
+    if (!title) return undefined;
+    return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(title.replace(/\s/g, '_'))}?width=1200`;
+  }
 
   private truncateMaterial(material: string) {
     if (material.length <= EnrichmentService.MAX_MATERIAL_CHARS) return material;

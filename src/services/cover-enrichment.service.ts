@@ -10,6 +10,15 @@ type CoverCandidate = {
   title: string;
   author: string;
   coverUrl?: string;
+  /**
+   * Art for the cover's portrait/art layer, retrieved by the enrichment
+   * pass that orders the cover (see EnrichmentService): the opus's own
+   * Wikipedia/Wikimedia image, else its author's portrait. Absent when
+   * no graphics were retrieved - the renderer then falls back to its
+   * text-only studio default. Just a URL, like every enrichment image:
+   * the renderer downloads it itself at render time.
+   */
+  artUrl?: string;
 };
 
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
@@ -88,6 +97,10 @@ export class CoverEnrichmentService {
         body: JSON.stringify({
           title: candidate.title,
           author: candidate.author,
+          // The renderer's coverArtUrl: same-origin path, data URL or
+          // remote https URL (auto-proxied, see biblioteca-covers'
+          // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
+          ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
           layout: 'archival_monograph',
           foilEffect: 'none',
           hardcover: false,

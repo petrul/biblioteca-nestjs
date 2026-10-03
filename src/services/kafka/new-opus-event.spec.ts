@@ -73,7 +73,9 @@ describe('a new opus Kafka event', () => {
     const vectorizer: any = { vectorize: jest.fn().mockResolvedValue(undefined) };
     const enrichment: any = {
       enrichWork: jest.fn().mockResolvedValue(undefined),
-      enrichAuthor: jest.fn().mockResolvedValue(undefined),
+      // The real service returns the author's retrieved image URLs -
+      // the listener threads the first into the cover order.
+      enrichAuthor: jest.fn().mockResolvedValue(['https://upload.wikimedia.org/eminescu.jpg']),
     };
     const covers: any = { enqueue: jest.fn() };
 
@@ -111,7 +113,8 @@ describe('a new opus Kafka event', () => {
 
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
     expect(enrichment.enrichAuthor).toHaveBeenCalledWith(opus.author);
-    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path, id: opus.id }));
+    // the cover order carries the art the author enrichment just retrieved
+    expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path, id: opus.id, artUrl: 'https://upload.wikimedia.org/eminescu.jpg' }));
     // The listener is author-only by design: the work's own summary
     // enrichment belongs to EnrichmentService.dailySweep(), so a fresh
     // unenriched opus must NOT trigger enrichWork here.
@@ -132,6 +135,8 @@ describe('a new opus Kafka event', () => {
     expect(vectorizer.vectorize).toHaveBeenCalledWith(999, expect.any(Function));
     expect(enrichment.enrichAuthor).not.toHaveBeenCalled();
     expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path }));
+    // already enriched -> no enrichment ran -> the cover orders art-less
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBeUndefined();
     expect(enrichment.enrichWork).not.toHaveBeenCalled();
   });
 

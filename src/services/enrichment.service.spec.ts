@@ -50,6 +50,9 @@ const WIKIDATA = {
       P19: [idClaim('Q4918')],
       P27: [idClaim('Q217')],
       P1412: [idClaim('Q7918')],
+      // P18 (image): Commons file titles, same shape the real entities
+      // carry - the service turns them into Special:FilePath URLs.
+      P18: [stringClaim('Vasile Alecsandri.jpg'), stringClaim('File:Alecsandri 1865.jpg')],
     },
   },
   Q4918: { claims: {} },
@@ -104,10 +107,10 @@ class FakeTbc {
   async *allOperaGen() { for (const opus of this.opera) yield opus; }
 }
 
-function service(tbc: FakeTbc, fetch: FakeFetch) {
+function service(tbc: FakeTbc, fetch: FakeFetch, covers?: any) {
   (global as any).fetch = fetch.stub;
   const conf = { bibliotecaUrl: 'http://biblioteca.test' } as any;
-  return new EnrichmentService(tbc as any, conf);
+  return new EnrichmentService(tbc as any, conf, covers);
 }
 
 describe('EnrichmentService', () => {
@@ -142,7 +145,33 @@ describe('EnrichmentService', () => {
       birthPlace: 'Bacău',
       country: 'Romania',
       writingLanguage: 'RO', // P1412 -> Q7918 -> P218 'ro'
-      imageUrls: ['https://upload.wikimedia.org/alecsandri.jpg'],
+      // the lead image first, then the Wikidata entity's P18 Commons art
+      imageUrls: [
+        'https://upload.wikimedia.org/alecsandri.jpg',
+        'https://commons.wikimedia.org/wiki/Special:FilePath/Vasile_Alecsandri.jpg?width=1200',
+        'https://commons.wikimedia.org/wiki/Special:FilePath/Alecsandri_1865.jpg?width=1200',
+      ],
+    });
+  });
+
+  it('enriches an opus with the article lead image plus the work entity\'s Commons art', async () => {
+    const tbc = new FakeTbc();
+    tbc.opera = [{ id: 7, head: 'Lume Rdicată' }];
+    const fetchMock = new FakeFetch();
+    // wikibase_item present -> the work's own Wikidata entity is
+    // consulted for P18 art, same as the author's is for its facts.
+    fetchMock.pages['wiki'] = wikiSummaryPage();
+    await service(tbc, fetchMock).dailySweep();
+
+    const persisted = fetchMock.persisted();
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).toMatchObject({
+      opusId: 7,
+      imageUrls: [
+        'https://upload.wikimedia.org/alecsandri.jpg',
+        'https://commons.wikimedia.org/wiki/Special:FilePath/Vasile_Alecsandri.jpg?width=1200',
+        'https://commons.wikimedia.org/wiki/Special:FilePath/Alecsandri_1865.jpg?width=1200',
+      ],
     });
   });
 
@@ -229,6 +258,36 @@ describe('EnrichmentService', () => {
     await service(tbc, fetchMock).dailySweep();
 
     expect(fetchMock.persisted()[0].overwrite).toBe(false);
+  });
+
+  it('orders covers only after the graphics are retrieved, work art first, author portrait as the fallback', async () => {
+    const tbc = new FakeTbc();
+    tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri' }];
+    tbc.opera = [
+      // enriched by this sweep -> cover ordered with the work's own art
+      { id: 7, head: 'Lume Rdicată', completePath: 'alecsandri/lume', author: { strId: 'alecsandri', displayName: 'Vasile Alecsandri' } },
+      // already enriched -> cover ordered with the author portrait instead
+      { id: 8, head: 'Desteptarea', completePath: 'alecsandri/desteptarea', description: 'already there', author: { strId: 'alecsandri', displayName: 'Vasile Alecsandri' } },
+    ];
+    const fetchMock = new FakeFetch();
+    fetchMock.pages['wiki'] = wikiSummaryPage();
+    const enqueued: any[] = [];
+    const order: string[] = [];
+    const covers = { enqueue: (candidate: any) => { enqueued.push(candidate); order.push('cover'); } };
+    // one shared sequence to prove the ordering: the enrichment persistence
+    // precedes the cover order for the same opus, never the other way around.
+    const realStub = fetchMock.stub;
+    fetchMock.stub = async (url: any, init?: any) => {
+      if (String(url).includes('/api/internal/enrichment')) order.push('enrich');
+      return realStub(url, init);
+    };
+    await service(tbc, fetchMock, covers).dailySweep();
+
+    expect(enqueued).toHaveLength(2);
+    expect(enqueued[0]).toMatchObject({ id: 7, artUrl: 'https://upload.wikimedia.org/alecsandri.jpg' });
+    expect(enqueued[1]).toMatchObject({ id: 8, artUrl: 'https://upload.wikimedia.org/alecsandri.jpg' });
+    // author enrich, work enrich, then the two cover orders - enrichment always first
+    expect(order).toEqual(['enrich', 'enrich', 'cover', 'cover']);
   });
 
   it('never talks to anything but wikipedia, wikidata and the enrichment endpoint', async () => {
