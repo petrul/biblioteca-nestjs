@@ -105,7 +105,7 @@ task :'check-env', [:profile] do |_task, args|
     required = [
         'KAFKA_BROKERS', 'OLLAMA_URL',
         %w[VECTORSTORE_URL MILVUS_URL],
-        'BIBLIOTECA_EXTERNAL_URL'
+        'BIBLIOTECA_EXTERNAL_URL', 'MINIO_URL', 'MINIO_CREDS'
     ]
     missing = required.reject do |entry|
         keys = entry.is_a?(Array) ? entry : [entry]
