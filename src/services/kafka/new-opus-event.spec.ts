@@ -65,7 +65,9 @@ describe('a new opus Kafka event', () => {
   // own opus fixture (the author is embedded in the opus, exactly as the
   // server's single-div response carries it: an AuthorDto with bio
   // present-or-null) and assert on the calls made against them.
-  async function bootBothListeners(opus: any) {
+  // enrichmentOverrides replaces mock behaviors on the EnrichmentService
+  // mock (e.g. a once-rejecting enrichAuthor for the retry path).
+  async function bootBothListeners(opus: any, enrichmentOverrides: Record<string, any> = {}) {
     const tbc: any = {
       getElemByPath: jest.fn().mockResolvedValue(opus),
       getAuthors: jest.fn().mockResolvedValue([]),
@@ -78,6 +80,7 @@ describe('a new opus Kafka event', () => {
       enrichAuthor: jest.fn().mockResolvedValue(['https://upload.wikimedia.org/eminescu.jpg']),
       // The stored-portrait fallback when no fresh art was retrieved.
       storedAuthorArt: jest.fn().mockResolvedValue(undefined),
+      ...enrichmentOverrides,
     };
     const covers: any = { enqueue: jest.fn() };
 
@@ -169,5 +172,46 @@ describe('a new opus Kafka event', () => {
     expect(enrichment.enrichAuthor).not.toHaveBeenCalled();
     expect(enrichment.enrichWork).not.toHaveBeenCalled();
     expect(covers.enqueue).toHaveBeenCalledWith(expect.objectContaining({ path: opus.path, id: opus.id }));
+  });
+
+  it('orders the cover only after the author enrichment ran, with the retrieved image URL as its artUrl', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
+
+    const { enrichment, covers } = await bootBothListeners(opus);
+
+    // Strict ordering: the author enrichment must complete before the
+    // cover is ordered - its retrieved image URLs are threaded into the
+    // order as artUrl, so a cover ordered before the enrichment ran
+    // would render art-less and freeze (covers are fill-only, an
+    // ordered cover is never re-rendered with art later).
+    const enrichOrder = (enrichment.enrichAuthor as jest.Mock).mock.invocationCallOrder;
+    const coverOrder = (covers.enqueue as jest.Mock).mock.invocationCallOrder;
+    expect(coverOrder).toHaveLength(1);
+    expect(enrichOrder[0]).toBeLessThan(coverOrder[0]);
+    // And the enrichment's first image URL is exactly what the order carries.
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu.jpg');
+  });
+
+  it('orders the cover only after a failed enrichment attempt has finally succeeded, never before', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
+
+    // First attempt fails transiently; the listener retains the offset
+    // and retries (its for(;;) loop with the mocked-away 10s delay), and
+    // only the successful second attempt releases the cover order.
+    const { enrichment, covers } = await bootBothListeners(opus, {
+      enrichAuthor: jest.fn()
+        .mockRejectedValueOnce(new Error('wikipedia unreachable'))
+        .mockResolvedValue(['https://upload.wikimedia.org/eminescu_2.jpg']),
+    });
+
+    const enrichOrder = (enrichment.enrichAuthor as jest.Mock).mock.invocationCallOrder;
+    const coverOrder = (covers.enqueue as jest.Mock).mock.invocationCallOrder;
+    expect(enrichOrder).toHaveLength(2);
+    expect(coverOrder).toHaveLength(1);
+    // No cover was ordered while enrichment was still failing: the single
+    // order follows the successful (second) enrichment attempt.
+    expect(coverOrder[0]).toBeGreaterThan(enrichOrder[0]);
+    expect(coverOrder[0]).toBeGreaterThan(enrichOrder[1]);
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu_2.jpg');
   });
 });
