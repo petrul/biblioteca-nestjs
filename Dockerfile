@@ -1,4 +1,4 @@
-FROM node:lts
+FROM node:24-slim
 
 ENV NODE_ENV=production
 WORKDIR /app
