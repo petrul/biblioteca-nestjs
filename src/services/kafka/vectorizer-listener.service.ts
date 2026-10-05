@@ -30,6 +30,14 @@ export class VectorizerKafkaListenerService implements OnApplicationShutdown, On
   }
 
   async initKafkaListener() {
+    // The topics must exist before the consumer's first metadata request:
+    // a fresh broker has none of them, and a consumer never triggers
+    // Kafka's own auto-create (that fires on produce only) - see
+    // KafkaService.ensureTopics.
+    await this.ks.ensureTopics([
+      this.sharedConfig.kafka.newOpusImportedTopic,
+      this.sharedConfig.kafka.opusRemovedTopic,
+    ]);
     this.consumer = this.ks.kafka.consumer({
       groupId: this.conf.kafkaGroupId,
       /**

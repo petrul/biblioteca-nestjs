@@ -39,7 +39,7 @@ describe('a new opus Kafka event', () => {
   }
 
   function fakeKafkaService(consumer: any) {
-    return { kafka: { consumer: jest.fn(() => consumer) } } as any;
+    return { kafka: { consumer: jest.fn(() => consumer) }, ensureTopics: jest.fn().mockResolvedValue(undefined) } as any;
   }
 
   const sharedConfig: any = {

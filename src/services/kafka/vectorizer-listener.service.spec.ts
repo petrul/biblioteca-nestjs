@@ -42,7 +42,7 @@ describe('VectorizerKafkaListenerService', () => {
             run: jest.fn().mockImplementation(({ eachMessage: h }) => { eachMessage = h; }),
             disconnect: jest.fn().mockResolvedValue(undefined),
         };
-        const ks = { kafka: { consumer: jest.fn(() => consumer) } } as unknown as KafkaService;
+        const ks = { kafka: { consumer: jest.fn(() => consumer) }, ensureTopics: jest.fn().mockResolvedValue(undefined) } as unknown as KafkaService;
         getElemByPath = jest.fn();
         const tbc = { getElemByPath } as unknown as BibliotecaClient;
         removeOpus = jest.fn().mockResolvedValue(undefined);
