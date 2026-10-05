@@ -192,7 +192,11 @@ export class CoverEnrichmentService {
   }
 
   private publicUrl(key: string): string {
-    const base = (this.conf.minioUrl || '').replace(/\/$/, '');
+    // The real-user-browser-facing address - deliberately NOT minioUrl
+    // (that one is the internal direct host:port the S3 client itself
+    // connects on; a reverse-proxied public domain is one more thing
+    // that can silently break writes, so uploads never depend on it).
+    const base = (this.conf.minioPublicUrl || '').replace(/\/$/, '');
     return `${base}/${key}`;
   }
 

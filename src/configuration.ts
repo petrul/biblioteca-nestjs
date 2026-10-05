@@ -33,8 +33,19 @@ export default (): VectorizerConfiguration => ({
     // 'milvus' (the historic store, still fully supported).
     vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
     coversApiUrl: process.env.COVERS_API_URL || 'http://localhost:3335',
+    // The internal address the S3 client itself connects to (uploads,
+    // bucket derivation) - direct host:port, no reverse proxy in the
+    // way, so a stale Caddy route can never break writes. Separate from
+    // minioPublicUrl below, which the *browser* needs instead.
     minioUrl: process.env.MINIO_URL,
     minioCred: process.env.MINIO_CREDS,
+    // The address baked into every coverUrl/image_href this worker
+    // persists - a real end-user browser fetches covers directly from
+    // this URL, so unlike minioUrl above it must be the public,
+    // internet-reachable one (Caddy-fronted). Falls back to minioUrl
+    // itself so environments with no separate public endpoint (e.g. an
+    // all-internal test setup) keep working unchanged.
+    minioPublicUrl: process.env.MINIO_PUBLIC_URL || process.env.MINIO_URL,
 });
 
 // Number of paragraphs fetched per page from textbase-server and handed to
@@ -114,6 +125,7 @@ export interface VectorizerConfiguration {
     coversApiUrl: string;
     minioUrl?: string;
     minioCred?: string;
+    minioPublicUrl?: string;
 }
 export const PROVIDER_CONF = Symbol('VectorizerConfiguration');
 export const PROVIDER_SHARED_CONFIG = Symbol('SharedTextbaseConfig');
@@ -156,5 +168,6 @@ export class AppConfService implements VectorizerConfiguration {
     get coversApiUrl(): string { return this.conf.get<string>('coversApiUrl'); }
     get minioUrl(): string | undefined { return this.conf.get<string>('minioUrl'); }
     get minioCred(): string | undefined { return this.conf.get<string>('minioCred'); }
+    get minioPublicUrl(): string | undefined { return this.conf.get<string>('minioPublicUrl'); }
 
 }
