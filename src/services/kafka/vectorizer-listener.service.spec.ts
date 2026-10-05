@@ -170,4 +170,34 @@ describe('VectorizerKafkaListenerService', () => {
         getElemByPath.mockResolvedValue(FETCHED_OPUS);
         await pending;
     });
+
+    it('a membership error rethrows out of eachMessage so KafkaJS can rejoin, instead of spinning the retry loop', async () => {
+        // The exact production wedge behind "The coordinator is not aware
+        // of this member": the coordinator evicts the consumer mid-vectorize
+        // (30s session exceeded - a slow shared Ollama plus the deliberate
+        // inter-batch pause can do that), and every subsequent heartbeat
+        // throws UNKNOWN_MEMBER_ID. The old catch treated it as just
+        // another retryable outage - log, 10s delay, heartbeat() again -
+        // which threw the SAME error uncaught, crashed the worker, and the
+        // redelivered message restarted the cycle: an error every ~10s
+        // forever, the opus never processed.
+        const membershipError = Object.assign(
+            new Error('The coordinator is not aware of this member'),
+            { type: 'UNKNOWN_MEMBER_ID', name: 'KafkaJSProtocolError' });
+        getElemByPath.mockResolvedValue(FETCHED_OPUS);
+        vectorize.mockImplementation(async (_opId: number, interPageJob: () => Promise<any>) => {
+            // The heartbeat fires from inside vectorize (its per-page
+            // callback) - exactly where the membership error surfaces.
+            await interPageJob();
+            throw membershipError;
+        });
+
+        await expect(consumeImported()).rejects.toBe(membershipError);
+
+        // The message is NOT retried in place: the offset stays with
+        // KafkaJS, which rejoins the group and redelivers the opus to the
+        // rejoined member (sha-based reuse then makes the reprocess cheap).
+        expect(vectorize).toHaveBeenCalledTimes(1);
+        expect(delaySpy).not.toHaveBeenCalledWith(10 * 1000);
+    });
 });

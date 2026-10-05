@@ -34,3 +34,29 @@ export async function describeKafkaError(error: unknown): Promise<string> {
     return String(error);
   }
 }
+
+/**
+ * Kafka group-membership errors - the coordinator has evicted this
+ * consumer from its group (UNKNOWN_MEMBER_ID / ILLEGAL_GENERATION, e.g.
+ * after a session-timeout expiry mid-processing) or the group is
+ * mid-rebalance / coordinatorless. In-place retry can NEVER succeed:
+ * every heartbeat and offset commit is rejected until the consumer
+ * rejoins the group, which only KafkaJS's own recovery can do.
+ */
+const MEMBERSHIP_ERROR_TYPES = new Set([
+    'UNKNOWN_MEMBER_ID',
+    'ILLEGAL_GENERATION',
+    'REBALANCE_IN_PROGRESS',
+    'NOT_COORDINATOR_FOR_GROUP',
+    'COORDINATOR_NOT_AVAILABLE',
+    'COORDINATOR_LOAD_IN_PROGRESS',
+    'FENCED_INSTANCE_ID',
+]);
+
+export function isMembershipError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const candidate = error as { type?: unknown; code?: unknown; message?: unknown };
+    return MEMBERSHIP_ERROR_TYPES.has(String(candidate.type))
+        || MEMBERSHIP_ERROR_TYPES.has(String(candidate.code))
+        || /coordinator is not aware of this member|not the coordinator/i.test(String(candidate.message ?? ''));
+}

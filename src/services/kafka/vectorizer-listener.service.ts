@@ -5,7 +5,7 @@ import { VectorizerService } from '../vectorizer.service';
 import { BibliotecaClient } from '../biblioteca_client.service';
 import { PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, VectorizerConfiguration } from 'src/configuration';
 import { Util } from 'src/util';
-import { describeKafkaError } from './error-details';
+import { describeKafkaError, isMembershipError } from './error-details';
 
 @Injectable()
 export class VectorizerKafkaListenerService implements OnApplicationShutdown, OnModuleInit {
@@ -118,6 +118,24 @@ export class VectorizerKafkaListenerService implements OnApplicationShutdown, On
               this.log.warn(`opus ${obj?.path ?? '<unknown>'} rejected by the server (${err.status}) - skipping Kafka event`,
                 message.value.toString());
               return;
+            }
+            // A membership error (e.g. "The coordinator is not aware of
+            // this member", UNKNOWN_MEMBER_ID) means the group coordinator
+            // evicted this consumer - the 30s session expired mid-vectorize
+            // (a slow, shared Ollama can take that long per page, plus the
+            // deliberate equal-length pause between batches), or another
+            // instance joined/left the shared group. Retrying in place can
+            // never succeed: every heartbeat/commit is rejected until the
+            // consumer rejoins, which only KafkaJS's own recovery can do -
+            // the old path (retry -> heartbeat() -> same error, uncaught)
+            // wedged the consumer on the same opus, logging an error every
+            // 10s forever. Rethrow instead: the offset stays uncommitted,
+            // so this opus is redelivered once the consumer has rejoined,
+            // and the vectorizer's sha-based reuse makes the reprocess
+            // cheap.
+            if (isMembershipError(err)) {
+              this.log.error(`consumer evicted from the Kafka group while processing opus ${obj?.path ?? '<unknown>'} - rejoining; the opus will be redelivered — ${await describeKafkaError(err)}`);
+              throw err;
             }
             this.log.error(`failed to process opus ${obj?.path ?? '<unknown>'}; retaining the Kafka offset and retrying in 10 seconds — ${await describeKafkaError(err)}`);
             await Util.delay(10 * 1000);

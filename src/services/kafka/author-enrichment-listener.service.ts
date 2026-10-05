@@ -6,7 +6,7 @@ import { EnrichmentService } from '../enrichment.service';
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from 'src/configuration';
 import { Util } from 'src/util';
 import { CoverEnrichmentService } from '../cover-enrichment.service';
-import { describeKafkaError } from './error-details';
+import { describeKafkaError, isMembershipError } from './error-details';
 
 // Deliberately its own consumer group, not VectorizerKafkaListenerService's
 // KAFKA_GROUP_ID (used for vectorizing) - two consumers sharing one group
@@ -127,6 +127,16 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
               this.log.warn(`opus rejected by the server (${err.status}) - skipping author enrichment for this event`,
                 message.value.toString());
               return;
+            }
+            // Same membership-error reasoning as
+            // VectorizerKafkaListenerService: an evicted consumer cannot
+            // retry its way back into the group - rethrow so KafkaJS
+            // rejoins, and the uncommitted offset redelivers this event.
+            if (isMembershipError(err)) {
+              let evictedPath = '<unknown>';
+              try { evictedPath = JSON.parse(message.value.toString()).path || evictedPath; } catch { /* described below */ }
+              this.log.error(`consumer evicted from the Kafka group while processing opus ${evictedPath} for author enrichment - rejoining; the opus will be redelivered — ${await describeKafkaError(err)}`);
+              throw err;
             }
             let eventPath = '<unknown>';
             try { eventPath = JSON.parse(message.value.toString()).path || eventPath; } catch { /* malformed event is described below */ }
