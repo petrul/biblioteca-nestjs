@@ -1,117 +1,27 @@
-
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
-import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './sts.service';
 import { BgeM3OllamaService, OllamaService } from '../ollama/ollama.service';
+import { TestUtils } from '../../../test/testutils';
 
-// Real-network tests, gated off by default like the Ollama ones (see
-// ollama.service.spec.ts) - never run unattended in CI.
-const describeOllama = process.env.RUN_OLLAMA_INTEGRATION === 'true' ? describe : describe.skip;
-
-// The embeddings-adaptation test below is real-network too: it encodes
-// against STS_SERVER, which is only defined where an STS server exists.
-const itSts = process.env.RUN_STS_INTEGRATION === 'true' ? it : it.skip;
-
-describe('StsService', () => {
-
-    const conf : Partial<VectorizerConfiguration> = {
-        sentenceTransformersServer: process.env.STS_SERVER,
-    }
-
-    let stsService: SentenceTransformersService;
-    let all_mpnet_base_v2: AllMpnetBaseV2_StsService;
-    let all_minilm_l6_v2: AllMiniLmL6V2_StsService;
-
-    beforeEach(async () => {
-
-        const moduleRef = await Test.createTestingModule({
-            imports: [],
-            controllers: [],
-            providers: [
-                {
-                    provide: PROVIDER_CONF,
-                    useValue: conf
-                },
-                SentenceTransformersService,
-                AllMpnetBaseV2_StsService,
-                AllMiniLmL6V2_StsService,
-            ],
-        }).compile();
-
-        stsService = moduleRef.get<SentenceTransformersService>(SentenceTransformersService);
-        all_mpnet_base_v2 = moduleRef.get<AllMpnetBaseV2_StsService>(AllMpnetBaseV2_StsService);
-        all_minilm_l6_v2 = moduleRef.get<AllMiniLmL6V2_StsService>(AllMiniLmL6V2_StsService);
-    });
-
-    // Disabled: mini.local:11200 still only serves 2 models - the 3-model
-    // image (all-MiniLM-L6-v2, all-mpnet-base-v2, paraphrase-multilingual-
-    // MiniLM-L12-v2 - see ~/work/sentence-transformers-server) was built but
-    // deliberately never published/deployed there. STS is also no longer
-    // the active production embedder (BGE-M3 via Ollama is - see
-    // "active embedding service" below), so this is blocked on an infra
-    // deploy that no longer gates anything real. Re-enable once that image
-    // is actually deployed, if STS gets used for something again.
-    it.skip('generic call to embeddings', async () => {
-        expect(stsService).toBeDefined();
-        expect(conf.sentenceTransformersServer).toBeTruthy();
-
-        const names = await stsService.getModelNames();
-        expect(names.length).toEqual(3);
-        expect(names).toContain('paraphrase-multilingual-MiniLM-L12-v2');
-
-        {
-            const sentences_1 = [
-                "scrieti",
-                "ce vreti",
-                "dvs"
-            ];
-            const allmini_vects = await stsService.encode(SentenceTransformersService.NAME_ALL_MINILM_L6_V2, sentences_1);
-            expect(allmini_vects.length).toEqual(3);
-            allmini_vects.forEach(it => expect(it.length).toEqual(384));
-
-            // again to make sure idempotent
-            expect(await stsService.encode(SentenceTransformersService.NAME_ALL_MINILM_L6_V2, sentences_1)).toEqual(allmini_vects);
-        }
-        
-
-        {
-            const sentences_2 = [
-                "foaie verde",
-                "la 5eme republique vous remercie ce que vous faite pentru ea"
-            ];
-            const allmpnetv2_vects = await all_mpnet_base_v2.encode(sentences_2);
-            expect(allmpnetv2_vects.length).toEqual(2);
-            allmpnetv2_vects.forEach(it => expect(it.length).toEqual(768));
-
-            // again to make sure idempotent
-            expect(await all_mpnet_base_v2.encode(sentences_2)).toEqual(allmpnetv2_vects);
-        }
-
-    });
-
-    itSts('AllMiniLmL6V2_StsService.embeddings() adapts Content the same way AllMpnetBaseV2_StsService does', async () => {
-        expect(conf.sentenceTransformersServer).toBeTruthy();
-        expect(all_minilm_l6_v2.supportedLanguages).toEqual(['en']);
-
-        const content = [
-            { text: 'hello there', url: 'u1', sha256: 's1' },
-            { text: 'how are you', url: 'u2', sha256: 's2' },
-        ];
-        const enriched = await all_minilm_l6_v2.embeddings(content);
-
-        expect(enriched.length).toEqual(2);
-        enriched.forEach(it => {
-            expect(it.embedding).toBeDefined();
-            expect(it.embedding.length).toEqual(384);
-        });
-        expect(enriched[0].embedding).not.toEqual(enriched[1].embedding);
-    });
-});
-
-// Replaces the disabled STS model-count test above as the "is the
-// production embedder actually up" check - BGE-M3 via zmeu's Ollama is
-// PROVIDER_EMBEDDER now (see app.module.ts), not STS.
-describeOllama('active embedding service (bge-m3 via zmeu Ollama)', () => {
+// The bge-m3 migration of the retired StsService suite. STS (the
+// sentence-transformers server on mini.local:11200) is no longer the
+// production embedder - BGE-M3 via zmeu's Ollama is PROVIDER_EMBEDDER now
+// (see app.module.ts) - and the old suite's centerpiece (the "generic
+// call to embeddings" test) was skipped for good: mini's STS server serves
+// only 2 of the 3 models it asserted, and the 3-model image was built but
+// deliberately never deployed. Rather than wait on that deploy, the tests
+// migrated here to the embedder that actually gates production:
+// - model inventory + multilingual encode + idempotency (the generic call
+//   test; its Romanian sentences finally get embedded by a model that
+//   actually speaks Romanian - the English-only MiniLM never honestly
+//   could),
+// - the Content adaptation check (BgeM3OllamaService.embeddings() does
+//   what AllMiniLmL6V2_StsService.embeddings() used to),
+// - the "is the production embedder up" availability check.
+//
+// Live tests, no gates: they run in every suite, and the two-minute
+// per-test timeouts absorb a busy shared host.
+describe('BgeM3OllamaService - the active embedder (migrated from the retired StsService suite)', () => {
 
     const conf: Partial<VectorizerConfiguration> = {
         ollamaUrl: 'http://zmeu.local:11434',
@@ -121,6 +31,8 @@ describeOllama('active embedding service (bge-m3 via zmeu Ollama)', () => {
 
     beforeEach(async () => {
         const moduleRef = await Test.createTestingModule({
+            imports: [],
+            controllers: [],
             providers: [
                 { provide: PROVIDER_CONF, useValue: conf },
                 OllamaService,
@@ -135,5 +47,41 @@ describeOllama('active embedding service (bge-m3 via zmeu Ollama)', () => {
         const vectors = await bgeM3.encode(['is the embedding service up?']);
         expect(vectors.length).toEqual(1);
         expect(vectors[0].length).toEqual(1024);
-    });
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
+
+    it('generic call to embeddings: the shared host serves bge-m3, which encodes multilingual text deterministically', async () => {
+        // Model inventory - the part the old STS server could never
+        // satisfy (2 of 3 models). OllamaService exposes no tags call,
+        // so the inventory check goes to the raw REST surface.
+        const tags = await (await fetch(`${conf.ollamaUrl}/api/tags`)).json();
+        const names = (tags?.models ?? []).map((it: any) => it.name);
+        expect(names).toContain('bge-m3:latest');
+
+        const sentences = ['scrieti', 'ce vreti', 'foaie verde'];
+        const vects = await bgeM3.encode(sentences);
+        expect(vects.length).toEqual(3);
+        vects.forEach(it => expect(it.length).toEqual(1024));
+
+        // again to make sure idempotent - the property the old test pinned
+        expect(await bgeM3.encode(sentences)).toEqual(vects);
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
+
+    it('embeddings() adapts Content the way the STS encoders used to: vectors attached in place, correctly shaped and distinct', async () => {
+        // bge-m3 is multilingual where the English-only MiniLM it replaces
+        // was not - the language-aware embedding filter treats it as 'all'.
+        expect(bgeM3.supportedLanguages).toBe('all');
+
+        const content = [
+            { text: 'hello there', url: 'u1', sha256: 's1' },
+            { text: 'how are you', url: 'u2', sha256: 's2' },
+        ];
+        const enriched = await bgeM3.embeddings(content);
+
+        expect(enriched.length).toEqual(2);
+        enriched.forEach(it => {
+            expect(it.embedding).toBeDefined();
+            expect(it.embedding.length).toEqual(1024);
+        });
+        expect(enriched[0].embedding).not.toEqual(enriched[1].embedding);
+    }, TestUtils.TIMEOUT_TWO_MINUTES);
 });

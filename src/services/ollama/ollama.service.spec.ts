@@ -1,15 +1,12 @@
-
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 import { BgeM3OllamaService, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './ollama.service';
 import { TestUtils } from '../../../test/testutils';
 
-// These tests call a shared production Ollama host and load large models. Keep
-// normal CI deterministic when that host is busy (for example with OCR), while
-// retaining an explicit way to run the live integration suite.
-const describeOllama = process.env.RUN_OLLAMA_INTEGRATION === 'true' ? describe : describe.skip;
-
-describeOllama('OllamaService', () => {
+// These tests call a shared production Ollama host and load large models -
+// they run as part of the normal suite on purpose: the two-minute
+// per-test timeouts below absorb a busy host (e.g. one running OCR).
+describe('OllamaService', () => {
 
     const conf: Partial<VectorizerConfiguration> = {
         ollamaUrl: 'http://zmeu.local:11434',
