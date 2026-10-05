@@ -81,11 +81,31 @@ export class CoverEnrichmentService {
           secretKey,
         });
         this.log.log(`cover cache enabled (bucket ${this.bucket}, prefix covers/)`);
+        if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+          void this.verifyMinio();
+        }
       } catch (error: any) {
         this.log.warn(`cover cache disabled: invalid MINIO_URL/MINIO_CREDS (${error?.message || 'invalid configuration'})`);
       }
     } else {
       this.log.warn('cover enrichment disabled: MinIO cover-cache credentials are not configured');
+    }
+  }
+
+  private async verifyMinio(): Promise<void> {
+    const endpoint = this.conf.minioUrl?.replace(/\/+$|\?.*$/g, '') || 'configured endpoint';
+    try {
+      const reachable = await Promise.race([
+        this.minio!.bucketExists(this.bucket),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout after 10s')), 10_000)),
+      ]);
+      if (!reachable) {
+        this.log.error(`MINIO unavailable: bucket \`${this.bucket}\` does not exist at ${endpoint}`);
+        return;
+      }
+      this.log.log(`MINIO cover cache reachable at ${endpoint} (bucket ${this.bucket})`);
+    } catch (error: any) {
+      this.log.error(`MINIO unavailable at ${endpoint} (bucket ${this.bucket}): ${error?.message || error}`);
     }
   }
 
@@ -148,10 +168,16 @@ export class CoverEnrichmentService {
       if (!response.ok) throw new Error(`cover renderer HTTP ${response.status}`);
       const body = Buffer.from(await response.arrayBuffer());
       const key = this.objectKey(candidate.path!);
-      await this.minio!.putObject(this.bucket, key, body, body.length, {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      });
+      try {
+        await this.minio!.putObject(this.bucket, key, body, body.length, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        });
+      } catch (error: any) {
+        const endpoint = this.conf.minioUrl?.replace(/\/+$|\?.*$/g, '') || 'configured endpoint';
+        this.log.error(`MINIO unavailable while storing cover at ${endpoint} (bucket ${this.bucket}, key ${key}): ${error?.message || error}`);
+        throw error;
+      }
       const url = this.publicUrl(key);
       await this.biblioteca.persistEnrichment({ opusId: candidate.id, coverUrl: url });
       this.log.log(`generated cover ${candidate.path} in ${this.elapsed(started)}`);
