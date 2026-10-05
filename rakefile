@@ -1,6 +1,7 @@
 require 'json'
 require 'shellwords'
 require 'open3'
+require 'socket'
 
 PACKAGE = JSON.parse(File.read(File.expand_path('package.json', __dir__))).freeze
 puts "#{PACKAGE.fetch('name')} version #{PACKAGE.fetch('version')}"
@@ -85,8 +86,13 @@ task :load_pass_secrets do
     puts "> Loaded #{loaded} secret(s) from pass (#{ci_dir})"
 end
 
+# Same convention as biblioteca-server's and biblioteca-reader's rakefiles:
+# with no PROFILE env and no [profile] arg, default to this machine's own
+# short hostname (its own biblioteca/<host> pass-store section, e.g.
+# biblioteca/zmeu) instead of a generic shared "dev" - each dev box points
+# at its own MinIO/Kafka/vector-store, so the machine name is the profile.
 def selected_profile(args)
-    args[:profile] || ENV.fetch('PROFILE', 'dev')
+    args[:profile] || ENV['PROFILE'] || Socket.gethostname.split('.').first
 end
 
 # Mirrors biblioteca-server's rakefile check-env task: verifies the pass
