@@ -83,13 +83,14 @@ describe('CoverAdminController (independent /api/covers surface)', () => {
     // The real service the controller delegates to, over the same style
     // of fakes as enrichment-admin.service.spec.ts.
     const tbc: any = {
+      async getAuthors() { return []; },
       async *allOperaGen() {
         yield { id: 1, head: 'Has Cover', completePath: 'p1', coverUrl: 'https://x/c1.png' };
         yield { id: 2, head: 'Coverless', completePath: 'p2' };
       },
     };
     const covers: any = { enqueued: [] as any[], enqueue(candidate: any, opts: any = {}) { this.enqueued.push({ ...candidate, force: opts.force }); } };
-    const svc = new EnrichmentAdminService(tbc, { tryBeginRun: () => true, endRun: () => {} } as any, covers, {} as any, { status: () => ({ running: false }) } as any);
+    const svc = new EnrichmentAdminService(tbc, { tryBeginRun: () => true, endRun: () => {}, storedAuthorArt: async () => undefined } as any, covers, {} as any, { status: () => ({ running: false }) } as any);
     const controller = new CoverAdminController(svc);
 
     const job: any = await controller.run({} as any);
@@ -98,9 +99,11 @@ describe('CoverAdminController (independent /api/covers surface)', () => {
     }
 
     // only the coverless opus, force always false: an existing cover
-    // (however it was retrieved) is never re-rendered
+    // (however it was retrieved) is never re-rendered. The author is the
+    // completePath's leading segment - the SDR walk data has no author,
+    // and no author of that strId exists to resolve a display name.
     expect(covers.enqueued).toEqual([
-      { id: 2, path: 'p2', title: 'Coverless', author: 'Anonymous', coverUrl: undefined, artUrl: undefined, force: false },
+      { id: 2, path: 'p2', title: 'Coverless', author: 'p2', coverUrl: undefined, artUrl: undefined, force: false },
     ]);
     expect(svc.get(job.id).steps.cover).toMatchObject({ candidates: 1, skippedExisting: 1, failed: 0 });
   });

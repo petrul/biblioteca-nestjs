@@ -35,9 +35,15 @@ class FakeEnrichment {
   // admin run threads the first into the cover order (see the combined
   // work+cover test).
   artFor = new Map<string, string[]>();
+  // The real service resolves an author's already-stored portrait from
+  // the authors API (its own short-lived cache) - the walk's SDR
+  // projection never embeds the opus's author, so the cover step asks
+  // for it by the completePath's leading segment (the author strId).
+  storedArt = new Map<string, string>();
   tryBeginRun() { if (!this.canBegin || this.running) return false; this.running = true; return true; }
   endRun() { this.running = false; }
   isRunning() { return this.running; }
+  async storedAuthorArt(strId: string) { return this.storedArt.get(strId); }
   async enrichAuthor(author: any, opts: { force?: boolean } = {}) {
     this.enrichAuthorCalls.push({ strId: author.strId, force: opts.force });
     if (this.failFor.has(author.strId)) throw new Error('wikipedia unreachable');
@@ -142,6 +148,64 @@ describe('EnrichmentAdminService', () => {
     expect(enrichment.enrichAuthorCalls).toEqual([{ strId: 'a2', force: false }]);
   });
 
+  it('explicit opusPaths targets are fetched by path, never through the catalog walk', async () => {
+    const tbc = new FakeTbc();
+    tbc.byPath = { 'author/target': { id: 9, head: 'Targeted', path: 'author/target' } };
+    let walked = false;
+    (tbc as any).allOperaGen = async function* () { walked = true; };
+    const enrichment = new FakeEnrichment();
+    const covers = new FakeCovers();
+    const svc = makeSvc(tbc, enrichment, covers, new FakeVectorizer());
+
+    const done = await waitJob(svc, (await svc.start({
+      steps: ['work', 'cover'],
+      targets: { opusPaths: ['author/target'] },
+    })).id);
+
+    expect(walked).toBe(false);
+    expect(enrichment.enrichWorkCalls).toEqual([{ opusId: 9, force: false }]);
+    expect(covers.enqueuedCandidates).toEqual([
+      expect.objectContaining({ id: 9, path: 'author/target', title: 'Targeted' }),
+    ]);
+    expect(done.steps.cover).toMatchObject({ candidates: 1, processed: 1, failed: 0 });
+    expect(done.state).toBe('finished');
+  });
+
+  it('a targeted path with no opus fails per step and never aborts the rest of the run', async () => {
+    const tbc = new FakeTbc();
+    tbc.byPath = { 'there': { id: 1, head: 'There', path: 'there' } };
+    const covers = new FakeCovers();
+    const svc = makeSvc(tbc, new FakeEnrichment(), covers, new FakeVectorizer());
+
+    const done = await waitJob(svc, (await svc.start({
+      steps: ['cover'],
+      targets: { opusPaths: ['nowhere', 'there'] },
+    })).id);
+
+    expect(done.steps.cover).toMatchObject({ candidates: 1, processed: 1, failed: 1 });
+    expect(done.errors).toEqual([expect.stringContaining('nowhere')]);
+    expect(covers.enqueuedCandidates.map(c => c.id)).toEqual([1]);
+    expect(done.state).toBe('finished');
+  });
+
+  it('dry run with opusPaths targets previews exactly those opera; a missing target fails loudly', async () => {
+    const tbc = new FakeTbc();
+    tbc.byPath = {
+      'p1': { id: 1, head: 'Covered', path: 'p1', coverUrl: 'https://x/c.png' },
+      'p2': { id: 2, head: 'Missing', path: 'p2' },
+    };
+    let walked = false;
+    (tbc as any).allOperaGen = async function* () { walked = true; };
+    const svc = makeSvc(tbc, new FakeEnrichment(), new FakeCovers(), new FakeVectorizer());
+
+    const preview = await svc.dryRun({ steps: ['cover'], targets: { opusPaths: ['p1', 'p2'] } });
+    expect(walked).toBe(false);
+    expect(preview.totals).toEqual({ cover: 1 });
+    expect(preview.covers).toEqual([{ id: 2, head: 'Missing', path: 'p2', alreadyEnriched: false }]);
+
+    await expect(svc.dryRun({ steps: ['cover'], targets: { opusPaths: ['nowhere'] } })).rejects.toThrow(NotFoundException);
+  });
+
   it('the cover step enqueues only cover-less opera unless forced', async () => {
     const tbc = new FakeTbc();
     tbc.opera = [
@@ -160,6 +224,30 @@ describe('EnrichmentAdminService', () => {
     expect(covers2.enqueued).toEqual([
       { id: 1, hasCoverUrl: true, force: true },
       { id: 2, hasCoverUrl: false, force: true },
+    ]);
+  });
+
+  it('a walk opus with no embedded author resolves its name and portrait from the authors list', async () => {
+    // The findOpera SDR projection the corpus walk yields never carries
+    // the opus's author - without the resolution, every walk-ordered
+    // cover renders as 'Anonymous' with no portrait.
+    const tbc = new FakeTbc();
+    tbc.authors = [{ strId: 'dostoyevskii', displayName: 'Федор Михайлович Достоевский' }];
+    tbc.opera = [{ id: 9, head: 'Братья Карамазовы*', completePath: 'dostoyevskii/bratya_karamazovy' }];
+    const enrichment = new FakeEnrichment();
+    enrichment.storedArt.set('dostoyevskii', 'http://localhost:8080/img/authors/dostoyevskii.jpg');
+    const covers = new FakeCovers();
+    const svc = makeSvc(tbc, enrichment, covers, new FakeVectorizer());
+
+    await waitJob(svc, (await svc.start({ steps: ['cover'] })).id);
+
+    expect(covers.enqueuedCandidates).toEqual([
+      expect.objectContaining({
+        id: 9,
+        path: 'dostoyevskii/bratya_karamazovy',
+        author: 'Федор Михайлович Достоевский',
+        artUrl: 'http://localhost:8080/img/authors/dostoyevskii.jpg',
+      }),
     ]);
   });
 

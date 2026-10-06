@@ -154,9 +154,9 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     {
       provide: VectorizerService,
       useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: VectorStore,
-        conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService ) => {
+        conf: VectorizerConfiguration, shared: SharedTextbaseConfig ) => {
         log(conf);
-        return new VectorizerService(tbc, embedder, vecstore, logger, shared, TB_GETPARAS_PAGE_SIZE);
+        return new VectorizerService(tbc, embedder, vecstore, shared, TB_GETPARAS_PAGE_SIZE);
       },
       inject: [BibliotecaClient, PROVIDER_EMBEDDER, PROVIDER_VECTOR_STORE, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },

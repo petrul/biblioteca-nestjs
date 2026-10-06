@@ -166,7 +166,7 @@ export class EnrichmentAdminService {
       }
     }
     if (wants('work') || wants('cover')) {
-      for await (const opus of this.client.allOperaGen() as any) {
+      for await (const opus of this.operaGen(request)) {
         if (!this.opusTargeted(opus, request)) continue;
         if (wants('work') && ((!opus.description && !opus.significantQuote) || force)) {
           add('work');
@@ -277,10 +277,61 @@ export class EnrichmentAdminService {
     }
   }
 
+  /**
+   * The work/cover steps' opus source, shared by runOpera and dryRun.
+   * Unset/empty targets.opusPaths: the corpus walk, as before. Explicit
+   * targets: fetched by path, one getElemByPath per target - never a
+   * findOpera traversal, whose 1000-opus pages cost tens of seconds
+   * each, which a one-opus run must not wait behind. A target that
+   * cannot be fetched (no opus at that path, server verdict) is
+   * recorded per-path via onMissingTarget and skipped - one stale
+   * path's verdict, never the whole run's; without the callback (the
+   * dry-run) it propagates instead, so a typo'd target fails the
+   * preview loudly.
+   */
+  private async *operaGen(
+    request: EnrichmentRunRequest,
+    onMissingTarget?: (path: string, error: any) => void,
+  ): AsyncGenerator<any> {
+    const paths = request.targets?.opusPaths ?? [];
+    if (!paths.length) {
+      yield* this.client.allOperaGen() as any;
+      return;
+    }
+    for (const path of paths) {
+      let opus: any;
+      try {
+        opus = await this.client.getElemByPath(path) as any;
+        if (!opus?.id) throw new NotFoundException(`no opus at path '${path}'`);
+      } catch (e: any) {
+        if (!onMissingTarget) throw e;
+        onMissingTarget(path, e);
+        continue;
+      }
+      // The /api/divs response carries the stable path as `path`; the
+      // SDR projection the corpus walk yields calls it `completePath` -
+      // normalize so the shared per-opus logic never has to care.
+      yield { ...opus, completePath: opus.path ?? path };
+    }
+  }
+
   /** The single walk over all opera shared by the work and cover steps. */
   private async runOpera(job: Job, force: boolean, artByAuthor: Map<string, string>): Promise<void> {
     const wantsWork = job.request.steps.includes('work');
     const wantsCover = job.request.steps.includes('cover');
+    // The corpus walk's SDR projection never embeds the opus's author
+    // (the targeted getElemByPath fetch does), so the cover order's
+    // author name is resolved from the authors list, keyed by the
+    // completePath's leading segment - the author strId, the reader's
+    // own authorId convention. Without this every walk-ordered cover
+    // renders as 'Anonymous' with no portrait.
+    const nameByAuthor = new Map<string, string>();
+    if (wantsCover) {
+      for (const author of (await this.client.getAuthors()) as any[]) {
+        const name = author.visualName || author.displayName;
+        if (author.strId && name) nameByAuthor.set(author.strId, name);
+      }
+    }
     // Covers render through CoverEnrichmentService's own 2-at-a-time queue,
     // well behind this metadata walk - collected here (not awaited inline,
     // that would serialize the walk down to the render queue's own pace)
@@ -292,7 +343,15 @@ export class EnrichmentAdminService {
     // even as covers genuinely render and land in MinIO in the background.
     const coverSettling: Promise<void>[] = [];
     try {
-      for await (const opus of this.client.allOperaGen() as any) {
+      for await (const opus of this.operaGen(job.request, (path, e) => {
+        // A targeted path that could not be fetched counts as failed for
+        // every work/cover step the request asked for - the runVectorize
+        // precedent for per-path verdicts.
+        for (const step of ['work', 'cover'] as EnrichmentStep[]) {
+          if (job.request.steps.includes(step)) job.steps[step]!.failed++;
+        }
+        this.recordError(job, `opus ${path}: ${e?.message ?? e}`);
+      })) {
         if (job.cancelRequested) return;
         if (!this.opusTargeted(opus, job.request)) continue;
         // Work enrichment first: its retrieved art is threaded into the
@@ -329,7 +388,7 @@ export class EnrichmentAdminService {
             // ran, else the author's already-stored portrait, so even a
             // cover-only run orders an authored cover, not a text-only
             // one.
-            const authorStrId = opus.author?.strId;
+            const authorStrId = opus.author?.strId || (opus.completePath || '').split('/')[0];
             const portrait = artUrl
               || (authorStrId ? artByAuthor.get(authorStrId) : undefined)
               || (authorStrId ? await this.enrichment.storedAuthorArt(authorStrId) : undefined);
@@ -337,7 +396,8 @@ export class EnrichmentAdminService {
               id: opus.id,
               path: opus.completePath,
               title: opus.head,
-              author: opus.author?.visualName || opus.author?.displayName || 'Anonymous',
+              author: opus.author?.visualName || opus.author?.displayName
+                || nameByAuthor.get(authorStrId) || authorStrId || 'Anonymous',
               coverUrl: opus.coverUrl,
               artUrl: portrait,
             }, { force }).then(ok => { if (ok) coverCounters.processed++; else coverCounters.failed++; }));

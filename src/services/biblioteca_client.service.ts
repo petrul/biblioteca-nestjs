@@ -31,6 +31,16 @@ export class BibliotecaClient {
         return authors;
     }
 
+    /**
+     * One author with everything the server associates with it - imageUrls
+     * (author_media) and image_href (the bundled portrait). Cast to any:
+     * the generated AuthorDto predates imageUrls.
+     */
+    async getAuthor(strId: string): Promise<any> {
+        const resp = await this.tb.api.getAuthor(encodeURIComponent(strId));
+        return resp.data;
+    }
+
     async getOperaForAuthor(strId: string) {
         const opera = await this.tb.api.getOpera(strId);
         return opera.data;

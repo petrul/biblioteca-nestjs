@@ -92,6 +92,7 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
             // (authors as any[])/(opus: any) casts below.
             const opus = await this.tbc.getElemByPath(obj.path) as any;
             await heartbeat();
+            this.log.log(`received opus event for enrichment and cover generation: ${obj.path}`);
 
             // The div response embeds its author as an AuthorDto, which
             // carries bio (present-or-null) precisely so this check needs
@@ -104,20 +105,43 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
               // retrieved BEFORE the cover order below so the portrait
               // makes it into the render - covers are fill-only, an
               // ordered cover is never re-rendered with art later.
-              artUrl = (await this.enrichment.enrichAuthor(author))?.[0];
+              // Author enrichment is optional decoration.  It must never
+              // prevent the opus cover from being scheduled: Wikimedia can
+              // be unavailable while the renderer and MinIO are healthy.
+              try {
+                artUrl = (await this.enrichment.enrichAuthor(author))?.[0];
+              } catch (error: any) {
+                this.log.warn(`author enrichment failed for ${author.strId}; continuing with cover generation: ${error?.message || error}`);
+              }
             }
-            // No fresh art (the name form had no Wikipedia hit, or the
-            // server response skipped the bio check): the author's
-            // already-stored portrait still belongs on the cover, not a
-            // text-only render.
-            if (!artUrl && author?.strId) {
-              artUrl = await this.enrichment.storedAuthorArt(author.strId);
+            // Re-ask the server for the author with all its media - the
+            // images enrichment persisted (just now or on earlier runs) plus
+            // the bundled portrait - and pick one at random, so a corpus
+            // does not get one repeated portrait. The freshly retrieved art
+            // only stands in when the server has nothing associated yet.
+            if (author?.strId) {
+              try {
+                const arts = await this.authorArts(author.strId);
+                if (arts.length) artUrl = arts[Math.floor(Math.random() * arts.length)];
+              } catch (error: any) {
+                this.log.warn(`author media lookup failed for ${author.strId}; continuing with ${artUrl ? 'the enrichment art' : 'no artwork'}: ${error?.message || error}`);
+              }
             }
             // Cover generation is a separate slow job. It is triggered by the
             // same successful import notification but has its own dedupe set,
             // so it never blocks vectorization or Wikipedia enrichment.
             if (opus?.id && opus?.path && opus?.head) {
-              this.covers.enqueue({
+              if (!opus.coverUrl && !this.covers.accepting) {
+                // Do not acknowledge an event the cover pipeline cannot take
+                // (MinIO not configured) - the outer loop retains the offset
+                // and retries.
+                throw new Error(`cover pipeline unavailable; cover not scheduled for ${opus.path}`);
+              }
+              this.log.log(`cover candidate from opus event: ${opus.path}${artUrl ? ` (art ${artUrl})` : ''}`);
+              // Fire-and-forget: the render takes up to minutes, far beyond
+              // the consumer session timeout - awaiting it here would get
+              // the consumer evicted and the event redelivered.
+              void this.covers.enqueue({
                 id: opus.id,
                 path: opus.path,
                 title: opus.head,
@@ -155,6 +179,15 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
         }
       }),
     });
+  }
+
+  /** The author's image URLs as the server associates them, deduplicated. */
+  private async authorArts(strId: string): Promise<string[]> {
+    const author = await this.tbc.getAuthor(strId);
+    return [
+      ...(Array.isArray(author?.imageUrls) ? author.imageUrls : []),
+      ...(author?.image_href ? [author.image_href] : []),
+    ].filter((url, i, all) => typeof url === 'string' && url.length > 0 && all.indexOf(url) === i);
   }
 
   onApplicationShutdown(_signal?: string) {

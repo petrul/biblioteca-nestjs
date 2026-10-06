@@ -1,4 +1,4 @@
-import { Inject, Injectable, LoggerService, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, LoggerService, OnModuleInit } from "@nestjs/common";
 import { BibliotecaClient } from "./biblioteca_client.service";
 import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from "../configuration";
@@ -16,6 +16,7 @@ export class VectorizerService implements OnModuleInit {
 
     pageSize: number;
     private stopRequested = false;
+    private readonly log = new Logger("vectorizer");
 
     /** Called at the start of a fresh run so a previous stop doesn't carry over. */
     clearStop(): void {
@@ -46,7 +47,7 @@ export class VectorizerService implements OnModuleInit {
         protected tbc: BibliotecaClient,
         @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder,
         @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
-        protected log: LoggerService,
+        // protected log: LoggerService,
         @Inject(PROVIDER_SHARED_CONFIG) protected shared: SharedTextbaseConfig,
         pageSize = 2000) {
             this.pageSize = pageSize;

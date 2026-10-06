@@ -1,3 +1,4 @@
+import { describe, expect, it, jest } from '@jest/globals';
 import { KafkaService, parseKafkaBrokers } from './kafka.service';
 
 describe('parseKafkaBrokers', () => {
@@ -34,14 +35,14 @@ describe('KafkaService.ensureTopics', () => {
 
   function fakeAdmin(createTopics: any) {
     return {
-      connect: jest.fn().mockResolvedValue(undefined),
+      connect: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
       createTopics,
-      disconnect: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
     };
   }
 
   it('creates the given topics on a fresh broker', async () => {
-    const createTopics = jest.fn().mockResolvedValue(true);
+    const createTopics = jest.fn<() => Promise<boolean>>().mockResolvedValue(true);
     const admin = fakeAdmin(createTopics);
     await serviceWithAdmin(admin).ensureTopics(['biblioteca_newOpusImportedTopic']);
     expect(createTopics).toHaveBeenCalledWith({
@@ -52,9 +53,11 @@ describe('KafkaService.ensureTopics', () => {
   });
 
   it('treats an already-existing topic as success, not an error', async () => {
-    const createTopics = jest.fn().mockRejectedValue(
-      new Error("Topic 'biblioteca_newOpusImportedTopic' already exists."),
-    );
+    const createTopics = jest
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(
+        new Error("Topic 'biblioteca_newOpusImportedTopic' already exists."),
+      );
     const admin = fakeAdmin(createTopics);
     await expect(
       serviceWithAdmin(admin).ensureTopics(['biblioteca_newOpusImportedTopic']),
@@ -63,7 +66,9 @@ describe('KafkaService.ensureTopics', () => {
   });
 
   it('propagates real broker errors and still disconnects the admin', async () => {
-    const createTopics = jest.fn().mockRejectedValue(new Error('broker unreachable'));
+    const createTopics = jest
+      .fn<() => Promise<unknown>>()
+      .mockRejectedValue(new Error('broker unreachable'));
     const admin = fakeAdmin(createTopics);
     await expect(
       serviceWithAdmin(admin).ensureTopics(['biblioteca_newOpusImportedTopic']),

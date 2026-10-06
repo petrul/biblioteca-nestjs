@@ -67,10 +67,14 @@ describe('a new opus Kafka event', () => {
   // present-or-null) and assert on the calls made against them.
   // enrichmentOverrides replaces mock behaviors on the EnrichmentService
   // mock (e.g. a once-rejecting enrichAuthor for the retry path).
-  async function bootBothListeners(opus: any, enrichmentOverrides: Record<string, any> = {}) {
+  async function bootBothListeners(opus: any, enrichmentOverrides: Record<string, any> = {}, tbcOverrides: Record<string, any> = {}) {
     const tbc: any = {
       getElemByPath: jest.fn().mockResolvedValue(opus),
       getAuthors: jest.fn().mockResolvedValue([]),
+      // The author as the server returns it, media included - the
+      // listener re-asks for it on every event. Override via tbcOverrides.
+      getAuthor: jest.fn().mockResolvedValue({}),
+      ...tbcOverrides,
     };
     const vectorizer: any = { vectorize: jest.fn().mockResolvedValue(undefined) };
     const enrichment: any = {
@@ -80,9 +84,10 @@ describe('a new opus Kafka event', () => {
       enrichAuthor: jest.fn().mockResolvedValue(['https://upload.wikimedia.org/eminescu.jpg']),
       // The stored-portrait fallback when no fresh art was retrieved.
       storedAuthorArt: jest.fn().mockResolvedValue(undefined),
+      storedAuthorArts: jest.fn().mockResolvedValue([]),
       ...enrichmentOverrides,
     };
-    const covers: any = { enqueue: jest.fn() };
+    const covers: any = { accepting: true, enqueue: jest.fn().mockResolvedValue(true) };
 
     const vectorizingConsumer = fakeConsumer();
     const vectorizingListener = new VectorizerKafkaListenerService(
@@ -192,26 +197,133 @@ describe('a new opus Kafka event', () => {
     expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu.jpg');
   });
 
-  it('orders the cover only after a failed enrichment attempt has finally succeeded, never before', async () => {
+  it('still orders the cover when optional author enrichment fails', async () => {
     const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
 
-    // First attempt fails transiently; the listener retains the offset
-    // and retries (its for(;;) loop with the mocked-away 10s delay), and
-    // only the successful second attempt releases the cover order.
+    // Wikipedia failure must not suppress the independent cover pipeline.
     const { enrichment, covers } = await bootBothListeners(opus, {
-      enrichAuthor: jest.fn()
-        .mockRejectedValueOnce(new Error('wikipedia unreachable'))
-        .mockResolvedValue(['https://upload.wikimedia.org/eminescu_2.jpg']),
+      enrichAuthor: jest.fn().mockRejectedValue(new Error('wikipedia unreachable')),
     });
 
     const enrichOrder = (enrichment.enrichAuthor as jest.Mock).mock.invocationCallOrder;
     const coverOrder = (covers.enqueue as jest.Mock).mock.invocationCallOrder;
-    expect(enrichOrder).toHaveLength(2);
+    expect(enrichOrder).toHaveLength(1);
     expect(coverOrder).toHaveLength(1);
-    // No cover was ordered while enrichment was still failing: the single
-    // order follows the successful (second) enrichment attempt.
     expect(coverOrder[0]).toBeGreaterThan(enrichOrder[0]);
-    expect(coverOrder[0]).toBeGreaterThan(enrichOrder[1]);
-    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu_2.jpg');
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0]).toMatchObject({ path: opus.path, author: 'Mihai Eminescu' });
+  });
+
+  it('re-asks the server for the author and orders the cover with one of its images at random', async () => {
+    const opus = {
+      id: 999, path: 'eminescu/poezii', head: 'Poezii',
+      author: { strId: 'eminescu', displayName: 'Mihai Eminescu', bio: 'enriched' },
+    };
+    const media = ['https://upload.wikimedia.org/a.jpg', 'https://upload.wikimedia.org/b.jpg'];
+
+    const { tbc, covers } = await bootBothListeners(opus, {}, {
+      getAuthor: jest.fn().mockResolvedValue({ strId: 'eminescu', imageUrls: media, image_href: 'http://localhost:8080/img/authors/eminescu.jpg' }),
+    });
+
+    expect(tbc.getAuthor).toHaveBeenCalledWith('eminescu');
+    expect([...media, 'http://localhost:8080/img/authors/eminescu.jpg'])
+      .toContain((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl);
+  });
+
+  it('keeps the freshly enriched art when the server has no author media yet', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
+
+    const { covers } = await bootBothListeners(opus, {}, {
+      getAuthor: jest.fn().mockRejectedValue(new Error('server hiccup')),
+    });
+
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu.jpg');
+  });
+
+  it('does not wait for the render before acknowledging the event', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', bio: 'enriched' } };
+    const tbc: any = { getElemByPath: jest.fn().mockResolvedValue(opus), getAuthor: jest.fn().mockResolvedValue({}) };
+    // a render that never finishes
+    const covers: any = { accepting: true, enqueue: jest.fn(() => new Promise(() => undefined)) };
+    const consumer = fakeConsumer();
+    const listener = new AuthorEnrichmentKafkaListenerService(fakeKafkaService(consumer), tbc, {} as any, covers, sharedConfig);
+    await listener.initKafkaListener();
+
+    await consumer.eachMessage(fakePayload(opus.path));
+
+    expect(covers.enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains the offset while the cover pipeline cannot accept work', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', bio: 'enriched' } };
+    const tbc: any = { getElemByPath: jest.fn().mockResolvedValue(opus), getAuthor: jest.fn().mockResolvedValue({}) };
+    const covers: any = { accepting: false, enqueue: jest.fn() };
+    const consumer = fakeConsumer();
+    const listener = new AuthorEnrichmentKafkaListenerService(fakeKafkaService(consumer), tbc, {} as any, covers, sharedConfig);
+    await listener.initKafkaListener();
+    // first attempt fails (no MinIO), the retry finds the pipeline ready
+    (Util.delay as jest.Mock).mockImplementation(async (ms: number) => { if (ms === 10_000) covers.accepting = true; });
+
+    await consumer.eachMessage(fakePayload(opus.path));
+
+    expect(tbc.getElemByPath).toHaveBeenCalledTimes(2);
+    expect(covers.enqueue).toHaveBeenCalledTimes(1);
+    (Util.delay as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it('re-asks the server for the author and orders the cover with one of its images at random', async () => {
+    const opus = {
+      id: 999, path: 'eminescu/poezii', head: 'Poezii',
+      author: { strId: 'eminescu', displayName: 'Mihai Eminescu', bio: 'enriched' },
+    };
+    const media = ['https://upload.wikimedia.org/a.jpg', 'https://upload.wikimedia.org/b.jpg'];
+
+    const { tbc, covers } = await bootBothListeners(opus, {}, {
+      getAuthor: jest.fn().mockResolvedValue({ strId: 'eminescu', imageUrls: media, image_href: 'http://localhost:8080/img/authors/eminescu.jpg' }),
+    });
+
+    expect(tbc.getAuthor).toHaveBeenCalledWith('eminescu');
+    expect([...media, 'http://localhost:8080/img/authors/eminescu.jpg'])
+      .toContain((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl);
+  });
+
+  it('keeps the freshly enriched art when the server has no author media yet', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', displayName: 'Mihai Eminescu' } };
+
+    const { covers } = await bootBothListeners(opus, {}, {
+      getAuthor: jest.fn().mockRejectedValue(new Error('server hiccup')),
+    });
+
+    expect((covers.enqueue as jest.Mock).mock.calls[0][0].artUrl).toBe('https://upload.wikimedia.org/eminescu.jpg');
+  });
+
+  it('does not wait for the render before acknowledging the event', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', bio: 'enriched' } };
+    const tbc: any = { getElemByPath: jest.fn().mockResolvedValue(opus), getAuthor: jest.fn().mockResolvedValue({}) };
+    // a render that never finishes
+    const covers: any = { accepting: true, enqueue: jest.fn(() => new Promise(() => undefined)) };
+    const consumer = fakeConsumer();
+    const listener = new AuthorEnrichmentKafkaListenerService(fakeKafkaService(consumer), tbc, {} as any, covers, sharedConfig);
+    await listener.initKafkaListener();
+
+    await consumer.eachMessage(fakePayload(opus.path));
+
+    expect(covers.enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains the offset while the cover pipeline cannot accept work', async () => {
+    const opus = { id: 999, path: 'eminescu/poezii', head: 'Poezii', author: { strId: 'eminescu', bio: 'enriched' } };
+    const tbc: any = { getElemByPath: jest.fn().mockResolvedValue(opus), getAuthor: jest.fn().mockResolvedValue({}) };
+    const covers: any = { accepting: false, enqueue: jest.fn() };
+    const consumer = fakeConsumer();
+    const listener = new AuthorEnrichmentKafkaListenerService(fakeKafkaService(consumer), tbc, {} as any, covers, sharedConfig);
+    await listener.initKafkaListener();
+    // first attempt fails (no MinIO); the 10s retry delay finds the pipeline ready
+    (Util.delay as jest.Mock).mockImplementation(async (ms: number) => { if (ms === 10_000) covers.accepting = true; });
+
+    await consumer.eachMessage(fakePayload(opus.path));
+
+    expect(tbc.getElemByPath).toHaveBeenCalledTimes(2);
+    expect(covers.enqueue).toHaveBeenCalledTimes(1);
+    (Util.delay as jest.Mock).mockResolvedValue(undefined);
   });
 });

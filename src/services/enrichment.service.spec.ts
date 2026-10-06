@@ -301,6 +301,33 @@ describe('EnrichmentService', () => {
     expect(order).toEqual(['enrich', 'enrich', 'cover', 'cover']);
   });
 
+  it('orders a cover with the author name and portrait resolved from the authors list when the walk opus has no author', async () => {
+    // The findOpera SDR projection the sweep walks never embeds the
+    // opus's author - the strId is the completePath's leading segment,
+    // and the name/portrait come from the authors the sweep fetched.
+    const tbc = new FakeTbc();
+    tbc.authors = [{ strId: 'dostoyevskii', displayName: 'Федор Михайлович Достоевский', imageHref: '/img/authors/dostoyevskii.jpg', bio: 'already there' }];
+    tbc.opera = [{ id: 9, head: 'Братья Карамазовы*', completePath: 'dostoyevskii/bratya_karamazovy', description: 'already there' }];
+    const fetchMock = new FakeFetch();
+    const enqueued: any[] = [];
+    const covers = { enqueue: (candidate: any) => { enqueued.push(candidate); return Promise.resolve(true); } };
+
+    await service(tbc, fetchMock, covers).dailySweep();
+
+    // no Wikipedia work enrichment (description already there), no
+    // author enrichment (bio already there) - yet the cover still
+    // carries the resolved name and the stored portrait.
+    expect(fetchMock.calls).toHaveLength(0);
+    expect(enqueued).toEqual([
+      expect.objectContaining({
+        id: 9,
+        path: 'dostoyevskii/bratya_karamazovy',
+        author: 'Федор Михайлович Достоевский',
+        artUrl: '/img/authors/dostoyevskii.jpg',
+      }),
+    ]);
+  });
+
   it('never talks to anything but wikipedia, wikidata and the enrichment endpoint', async () => {
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri' }];

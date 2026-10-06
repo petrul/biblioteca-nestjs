@@ -44,7 +44,7 @@ type EnrichmentUpdate = {
  */
 @Injectable()
 export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
-  private readonly log = new Logger(EnrichmentService.name);
+  private readonly log = new Logger("enrichment");
   private timer?: NodeJS.Timeout;
   private running = false;
 
@@ -128,9 +128,15 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       // previously enriched authors order text-only covers.
       const authors = await this.client.getAuthors();
       const artByAuthor = new Map<string, string>();
+      // The same walk's SDR projection never embeds the opus's author
+      // either, so the cover order's author name is resolved the same
+      // way - see the opus loop below.
+      const nameByAuthor = new Map<string, string>();
       for (const author of (authors as any[])) {
         const stored = (author as any).imageHref || (author as any).image_href;
         if (author.strId && stored) artByAuthor.set(author.strId, stored);
+        const name = (author as any).visualName || (author as any).displayName;
+        if (author.strId && name) nameByAuthor.set(author.strId, name);
       }
       for (const author of (authors as any[]).filter(a => !a.bio)) {
         try {
@@ -165,12 +171,18 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
           }
         }
         if (this.covers && (opus as any).id && (opus as any).completePath && (opus as any).head) {
-          const authorStrId = (opus as any).author?.strId;
+          // The walk's SDR projection never embeds the opus's author, so
+          // the strId is the completePath's leading segment - the
+          // reader's own authorId convention - and the name and the
+          // portrait come from the maps seeded above. Without this every
+          // sweep-ordered cover renders as 'Anonymous' with no art.
+          const authorStrId = (opus as any).author?.strId || (opus as any).completePath.split('/')[0];
           this.covers.enqueue({
             id: (opus as any).id,
             path: (opus as any).completePath,
             title: (opus as any).head,
-            author: (opus as any).author?.visualName || (opus as any).author?.displayName || 'Anonymous',
+            author: (opus as any).author?.visualName || (opus as any).author?.displayName
+              || nameByAuthor.get(authorStrId) || authorStrId || 'Anonymous',
             coverUrl: (opus as any).coverUrl,
             // the work's own art when this pass found any, else its author's portrait
             artUrl: artUrl || (authorStrId ? artByAuthor.get(authorStrId) : undefined),
@@ -221,18 +233,26 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * when the author's name form has no Wikipedia hit. Short-lived cache:
    * the Kafka listener asks per event and the authors list is large.
    */
-  private authorsArtCache?: { at: number; byStrId: Map<string, string> };
+  private authorsArtCache?: { at: number; byStrId: Map<string, string[]> };
   async storedAuthorArt(strId: string): Promise<string | undefined> {
+    return (await this.storedAuthorArts(strId))[0];
+  }
+
+  /** All stored author images, preserving the server's association order. */
+  async storedAuthorArts(strId: string): Promise<string[]> {
     const now = Date.now();
     if (!this.authorsArtCache || now - this.authorsArtCache.at > 5 * 60_000) {
-      const byStrId = new Map<string, string>();
+      const byStrId = new Map<string, string[]>();
       for (const author of (await this.client.getAuthors()) as any[]) {
-        const stored = author.imageHref || author.image_href;
-        if (author.strId && stored) byStrId.set(author.strId, stored);
+        const stored = [
+          ...(Array.isArray(author.imageUrls) ? author.imageUrls : []),
+          ...(author.imageHref || author.image_href ? [author.imageHref || author.image_href] : []),
+        ].filter((url, i, all) => typeof url === 'string' && url.length > 0 && all.indexOf(url) === i);
+        if (author.strId && stored.length) byStrId.set(author.strId, stored);
       }
       this.authorsArtCache = { at: now, byStrId };
     }
-    return this.authorsArtCache.byStrId.get(strId);
+    return this.authorsArtCache.byStrId.get(strId) || [];
   }
 
   /**

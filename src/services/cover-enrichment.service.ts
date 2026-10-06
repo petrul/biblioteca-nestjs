@@ -24,7 +24,7 @@ type CoverCandidate = {
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
 @Injectable()
 export class CoverEnrichmentService {
-  private readonly log = new Logger(CoverEnrichmentService.name);
+  private readonly log = new Logger("cover-enrichment");
   private readonly pending = new Set<string>();
   private readonly queue: { candidate: CoverCandidate; resolve: (ok: boolean) => void }[] = [];
   private active = 0;
@@ -52,8 +52,10 @@ export class CoverEnrichmentService {
             (Array.isArray(arr) ? arr : []).map((e: any) => e?.id ?? e).filter((id: any) => typeof id === 'string');
           this.coverMeta = { layouts: ids(meta.layouts), palettes: ids(meta.palettes) };
         }
-      } catch {
-        // best-effort discovery - the defaults below still order a cover
+      } catch (error: any) {
+        this.log.error(`Covers service unavailable at ${this.conf.coversApiUrl}: ${error?.message || error}`);
+        // best-effort discovery - the defaults below still order a cover,
+        // but the dependency failure must remain visible in the log.
       }
     }
     const pick = (ids: string[] | undefined, fallback: string) =>
@@ -83,6 +85,7 @@ export class CoverEnrichmentService {
         this.log.log(`cover cache enabled (bucket ${this.bucket}, prefix covers/)`);
         if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
           void this.verifyMinio();
+          void this.verifyCoversApi();
         }
       } catch (error: any) {
         this.log.warn(`cover cache disabled: invalid MINIO_URL/MINIO_CREDS (${error?.message || 'invalid configuration'})`);
@@ -109,6 +112,27 @@ export class CoverEnrichmentService {
     }
   }
 
+  private async verifyCoversApi(): Promise<void> {
+    const endpoint = this.conf.coversApiUrl.replace(/\/+$/, '');
+    try {
+      const response = await fetch(`${endpoint}/api/cover/meta`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        this.log.error(`Covers service unavailable at ${endpoint}: HTTP ${response.status}`);
+        return;
+      }
+      this.log.log(`Covers service reachable at ${endpoint}`);
+    } catch (error: any) {
+      this.log.error(`Covers service unavailable at ${endpoint}: ${error?.message || error}`);
+    }
+  }
+
+  /** Whether enqueue() can accept work at all (MinIO configured). */
+  get accepting(): boolean {
+    return !!this.minio;
+  }
+
   /**
    * Fill-only by default: an opus that already has a coverUrl is left
    * alone. opts.force - the manual admin runs' explicit overwrite switch,
@@ -126,7 +150,15 @@ export class CoverEnrichmentService {
    * the background.
    */
   enqueue(candidate: CoverCandidate, opts: { force?: boolean } = {}): Promise<boolean> {
-    if (!this.minio || !candidate.path) return Promise.resolve(false);
+    if (!candidate.path) {
+      this.log.error(`cover cannot be stored: candidate has no stable path (opus ${candidate.id})`);
+      return Promise.resolve(false);
+    }
+    if (!this.minio) {
+      const endpoint = this.conf.minioUrl?.replace(/\/+$/,'') || 'not configured';
+      this.log.error(`MINIO unavailable; cannot store cover for ${candidate.path} at ${endpoint} (bucket ${this.bucket})`);
+      return Promise.resolve(false);
+    }
     if (this.pending.has(candidate.path)) return Promise.resolve(false);
     if (!opts.force && candidate.coverUrl) return Promise.resolve(false);
     this.pending.add(candidate.path);
@@ -168,9 +200,18 @@ export class CoverEnrichmentService {
           ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
           layout: theme.layout,
           foilEffect: 'none',
-          // The hardcover overlay's default config carries the 12px
-          // spine (HardcoverOverlay: spineVisible, spineWidthPx 12).
-          hardcover: true,
+          // Explicit 12px spine rather than relying on the renderer's
+          // boolean-hardcover defaults (biblioteca-covers coverRequest.ts).
+          hardcover: {
+            enabled: true,
+            spineVisible: true,
+            spineWidthPx: 12,
+            textureStyle: 'buckram_cloth',
+            sheenIntensity: 0.25,
+            creaseDepth: 0.4,
+            showPageEdge: true,
+            embossedTitle: true,
+          },
           format: 'png',
           pixelRatio: 2,
           theme: { paletteId: theme.paletteId, showBarcode: false },
