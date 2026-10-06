@@ -32,6 +32,7 @@ export default (): VectorizerConfiguration => ({
     // collection names that the server's shared config carries) or
     // 'milvus' (the historic store, still fully supported).
     vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
+    qdrantCollection: process.env.QDRANT_COLLECTION?.trim() || undefined,
     coversApiUrl: process.env.COVERS_API_URL || 'http://localhost:3335',
     // The internal address the S3 client itself connects to (uploads,
     // bucket derivation) - direct host:port, no reverse proxy in the
@@ -122,6 +123,7 @@ export interface VectorizerConfiguration {
     // which store backs VectorStore: 'qdrant' (the default - see the
     // default-export comment above) or 'milvus' (the historic store).
     vectorStoreType: 'milvus' | 'qdrant';
+    qdrantCollection?: string;
     coversApiUrl: string;
     minioUrl?: string;
     minioCred?: string;
@@ -164,6 +166,8 @@ export class AppConfService implements VectorizerConfiguration {
     get vectorStoreType(): 'milvus' | 'qdrant' {
         return this.conf.get<'milvus' | 'qdrant'>('vectorStoreType');
     }
+
+    get qdrantCollection(): string | undefined { return this.conf.get<string>('qdrantCollection'); }
 
     get coversApiUrl(): string { return this.conf.get<string>('coversApiUrl'); }
     get minioUrl(): string | undefined { return this.conf.get<string>('minioUrl'); }

@@ -91,7 +91,8 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
       // vectorizer pipeline below never knows which store it writes to.
       provide: PROVIDER_VECTOR_STORE,
       useFactory: async (conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService) => {
-        const name = shared.milvus.collection;
+        const name = conf.vectorStoreType === 'qdrant' ? (conf.qdrantCollection || shared.milvus.collection) : shared.milvus.collection;
+        if (conf.vectorStoreType === 'qdrant' && conf.qdrantCollection) logger.log('Qdrant collection override: ' + name);
         const vectorDim = shared.embedder.dimension;
         if (!vectorDim) {
           throw new Error(`textbase-server's GET /api/admin/config didn't report an embedder dimension for model '${shared.embedder.model}'.`);
