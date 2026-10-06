@@ -15,6 +15,18 @@ function required(name: string): string {
 // into the pass store as a KAFKA_GROUP_ID secret.
 export const KAFKA_GROUP_ID = 'biblioteca_nestjs';
 
+function parseVectorStoreUrl(raw: string): { baseUrl: string; collection?: string } {
+    try {
+        const url = new URL(raw);
+        const parts = url.pathname.split('/').filter(Boolean);
+        const collection = parts.pop();
+        url.pathname = parts.length ? '/' + parts.join('/') : '';
+        return { baseUrl: url.toString().replace(/\/$/, ''), collection };
+    } catch {
+        return { baseUrl: raw.replace(/\/+$/, '') };
+    }
+}
+
 export default (): VectorizerConfiguration => ({
     kafkaServers: required('KAFKA_BROKERS'),
     kafkaGroupId: KAFKA_GROUP_ID,
@@ -32,7 +44,10 @@ export default (): VectorizerConfiguration => ({
     // collection names that the server's shared config carries) or
     // 'milvus' (the historic store, still fully supported).
     vectorStoreType: (process.env.VECTOR_STORE || 'qdrant') as VectorizerConfiguration['vectorStoreType'],
-    qdrantCollection: process.env.QDRANT_COLLECTION?.trim() || undefined,
+    ...(() => {
+        const parsed = parseVectorStoreUrl(process.env.VECTORSTORE_URL || required('MILVUS_URL'));
+        return { vectorStoreUrl: parsed.baseUrl, qdrantCollection: parsed.collection };
+    })(),
     coversApiUrl: process.env.COVERS_API_URL || 'http://localhost:3335',
     // The internal address the S3 client itself connects to (uploads,
     // bucket derivation) - direct host:port, no reverse proxy in the
@@ -123,6 +138,7 @@ export interface VectorizerConfiguration {
     // which store backs VectorStore: 'qdrant' (the default - see the
     // default-export comment above) or 'milvus' (the historic store).
     vectorStoreType: 'milvus' | 'qdrant';
+    /** Collection is encoded as the final path segment of VECTORSTORE_URL. */
     qdrantCollection?: string;
     coversApiUrl: string;
     minioUrl?: string;
