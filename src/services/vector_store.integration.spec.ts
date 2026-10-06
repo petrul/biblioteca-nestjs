@@ -1,7 +1,6 @@
 import { QdrantVectorStore } from './vector_store';
 import { QdrantCollection } from './qdrant/qdrantcollection.service';
 import { TestUtils } from '../../test/testutils';
-import { Util } from '../util';
 import { Content } from '../model/model';
 
 /**
@@ -24,6 +23,14 @@ import { Content } from '../model/model';
  * - no findAll(): findById/count are the read surface, and one raw REST
  *   call fetches the vectors for the url-modification test (findById
  *   never returns vectors).
+ *
+ * The removeOpus test that used to live here is now an offline spec
+ * (vectorizer.remove-opus.spec.ts): the store's removal path is pure
+ * delegation to QdrantCollection.deleteByOpusPath, and its
+ * sibling-safety is carried by the opus_path derivation and exact-match
+ * filter tests (offline) plus the collection-level integration smoke.
+ * What remains below only proves Qdrant's own behaviors: idempotent
+ * upserts and payload overwrites that keep the vectors.
  */
 
 describe('QdrantVectorStore (live integration)', () => {
@@ -32,8 +39,6 @@ describe('QdrantVectorStore (live integration)', () => {
 
     const qdrantUrl = process.env.QDRANT_URL || 'http://zmeu.local:6333';
     const DIM = 384;
-
-    const sha = (s: string) => Util.sha256AsHex(s);
 
     let col: QdrantCollection;
     let vectorStore: QdrantVectorStore;
@@ -68,30 +73,6 @@ describe('QdrantVectorStore (live integration)', () => {
         expect(await col.count()).toEqual(nrElems);
         const stored = await col.findById(content.map(it => it.sha256));
         expect(stored.map(it => it.sha256).sort()).toEqual(content.map(it => it.sha256).sort());
-    },
-    TestUtils.TIMEOUT_TWO_MINUTES);
-
-    it('removeOpus removes only the matching opus, not a similarly-prefixed sibling', async () => {
-        const opusA: Content[] = [
-            { sha256: sha('a-p0'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita/p0', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
-            { sha256: sha('a-p1'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita/p1', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
-        ];
-        // Deliberately a URL that starts with opusA's own path as a plain
-        // string prefix but is a distinct opus - same reasoning as
-        // LuceneIndexServiceResumeTest's sibling-prefix test server-side.
-        const opusB: Content[] = [
-            { sha256: sha('b-p0'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita-longa/p0', embedding: TestUtils.randomContent(1)[0].embedding, text: null },
-        ];
-
-        await vectorStore.store([...opusA, ...opusB]);
-        expect(await col.count()).toEqual(3);
-
-        await vectorStore.removeOpus('seneca/de-vita');
-
-        expect(await col.count()).toEqual(1);
-        const remaining = await col.findById([sha('b-p0')]);
-        expect(remaining.map(it => it.sha256)).toEqual([sha('b-p0')]);
-        expect(remaining[0].url).toEqual('https://biblioteca.scriptorium.ro/seneca/de-vita-longa/p0');
     },
     TestUtils.TIMEOUT_TWO_MINUTES);
 

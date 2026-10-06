@@ -230,7 +230,7 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
             subscribe: jest.fn().mockResolvedValue(undefined),
             run: jest.fn().mockImplementation(({ eachMessage: h }) => { eachMessage = h; }),
         };
-        const ks = { kafka: { consumer: jest.fn(() => consumer) } } as unknown as KafkaService;
+        const ks = { kafka: { consumer: jest.fn(() => consumer) }, ensureTopics: jest.fn().mockResolvedValue(undefined) } as unknown as KafkaService;
 
         const listener = new VectorizerKafkaListenerService(
             ks, listenerTbc, vectorizer,

@@ -6,7 +6,6 @@ import { QdrantCollection } from './qdrant/qdrantcollection.service';
 import { AllMiniLmL6V2_StsService, SentenceTransformersService } from './sts/sts.service';
 import { SharedTextbaseConfig } from '../configuration';
 import { TestUtils } from '../../test/testutils';
-import { Util } from '../util';
 import { LoggerService } from '@nestjs/common';
 
 /**
@@ -35,6 +34,13 @@ import { LoggerService } from '@nestjs/common';
  * - real sha256 hex digests instead of the milvus suite's 'a-p0' style
  *   shas: Qdrant point IDs must be UUIDs, and the deterministic id is the
  *   sha's first 32 hex chars formatted as one.
+ *
+ * The retired suite's removeOpus test is now an offline spec instead
+ * (vectorizer.remove-opus.spec.ts): the service path is pure delegation to
+ * the store, only the live Qdrant filter behavior needed a real instance -
+ * and that is already covered by the collection-level integration smokes.
+ * What remains below is the one thing only this suite can prove: the
+ * end-to-end wiring of a real embedder's output into a real collection.
  */
 
 describe('VectorizerService (live integration)', () => {
@@ -43,8 +49,6 @@ describe('VectorizerService (live integration)', () => {
 
     const qdrantUrl = process.env.QDRANT_URL || 'http://zmeu.local:6333';
     const stsServer = process.env.STS_SERVER || 'http://mini.local:11200';
-
-    const sha = (s: string) => Util.sha256AsHex(s);
 
     const shared = {
         kafka: { newOpusImportedTopic: 'test-opus-new', opusReimportedTopic: 'test-opus-reimported', opusRemovedTopic: 'test-opus-removed' },
@@ -78,23 +82,6 @@ describe('VectorizerService (live integration)', () => {
             // the test failed before the collection existed - nothing to clean
         }
     });
-
-    it('removeOpus drops only that opus\'s vectors, not a similarly-prefixed sibling', async () => {
-        const embedding = Array.from({ length: 384 }, () => Math.random());
-        await vecstore.store([
-            { sha256: sha('a-p0'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita/p0', embedding, text: null },
-            { sha256: sha('a-p1'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita/p1', embedding, text: null },
-            { sha256: sha('b-p0'), url: 'https://biblioteca.scriptorium.ro/seneca/de-vita-longa/p0', embedding, text: null },
-        ]);
-        expect(await col.count()).toEqual(3);
-
-        await vectServ.removeOpus('seneca/de-vita');
-
-        expect(await col.count()).toEqual(1);
-        const remaining = await col.findById([sha('b-p0')]);
-        expect(remaining.map(it => it.sha256)).toEqual([sha('b-p0')]);
-    },
-    TestUtils.TIMEOUT_TWO_MINUTES);
 
     it('vectorizes end-to-end: the live embedder + qdrant store behind the real service', async () => {
         const op = await tbc.getElemByPath('/stoker/the_snake_s_pass');

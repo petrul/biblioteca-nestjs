@@ -20,6 +20,13 @@ import { TestUtils } from '../../../test/testutils';
  * - the milvus "persists useful comments on the collection and every
  *   field" test has no counterpart: Qdrant has no collection/field
  *   description fields (the constructor's description is log-only).
+ *
+ * Pure biblioteca-nestjs logic that used to be exercised only here
+ * (opus_path derivation, dedup-by-sha256, the empty-batch no-op, the
+ * newOrModified diff, the dimension check, the delete filter's shape)
+ * lives in the offline qdrantcollection.spec.ts now - what remains below
+ * is the live Qdrant-behavior smoke only: upsert idempotency and a real
+ * filter engine honoring the exact-match delete.
  */
 
 describe('QdrantCollection (live integration)', () => {
@@ -102,62 +109,5 @@ describe('QdrantCollection (live integration)', () => {
         const remaining = await col.findById([data[3].sha256]);
         expect(remaining).toHaveLength(1);
         expect(remaining[0].url).toEqual('https://biblioteca.scriptorium.ro/seneca/de-vita-longa/chapter-1/p-1');
-    }, TestUtils.TIMEOUT_TWO_MINUTES);
-
-    it('deletes one opus stored with host-prefixed urls, without touching a sibling', async () => {
-        // Production stores absolute urls whose host depends on who fetched
-        // the paragraphs (internal http://server:8080/... here, the public
-        // host for anything vectorized via an external request). The
-        // opus_path is derived from the pathname only, so the deletion is
-        // host-agnostic.
-        const data = TestUtils.randomContent(4, DIM, 200);
-        data[0].url = 'http://server:8080/seneca/de-vita';
-        data[1].url = 'http://server:8080/seneca/de-vita/chapter-1/p-1';
-        data[2].url = 'https://biblioteca.scriptorium.ro/seneca/de-vita/chapter-2/p-1';
-        data[3].url = 'http://server:8080/seneca/de-vita-longa/chapter-1/p-1';
-        await col.upsert(data);
-        expect(await col.count()).toEqual(4);
-
-        await col.deleteByOpusPath('seneca/de-vita');
-
-        expect(await col.count()).toEqual(1);
-        const remaining = await col.findById([data[3].sha256]);
-        expect(remaining).toHaveLength(1);
-        expect(remaining[0].url).toEqual('http://server:8080/seneca/de-vita-longa/chapter-1/p-1');
-    }, TestUtils.TIMEOUT_TWO_MINUTES);
-
-    it('upsertNewOrModified is a no-op, not an error, when nothing is new or modified', async () => {
-        // A page whose every paragraph is already stored unchanged used to
-        // end in milvus.upsert([]) -> "fields_data should be an array and
-        // length > 0", which the Kafka listener treats as a retryable
-        // error, wedging the consumer on the same event forever. Qdrant's
-        // empty upsert must be a clean no-op instead.
-        const data = TestUtils.randomContent(5, DIM, 200);
-        await col.upsert(data);
-        expect(await col.count()).toEqual(5);
-
-        const resp = await col.upsertNewOrModified(data);
-        expect(resp).toEqual(QdrantCollection.NOOP_MUTATION_RESULT);
-        expect(await col.count()).toEqual(5);
-    }, TestUtils.TIMEOUT_TWO_MINUTES);
-
-    it('upsert persists a batch containing duplicate sha256 primary keys', async () => {
-        // The same text appearing twice in one batch (e.g. a repeated opus
-        // title) carries duplicate point IDs, and one point ID must occur
-        // only once per upsert - the batch is deduplicated to one row per
-        // sha256 before being sent.
-        const data = TestUtils.randomContent(5, DIM, 200);
-        const repeated = { ...data[1] };
-        repeated.url = 'https://textbase.scriptorium.ro/' + TestUtils.randomAlphanumeric();
-        data.push(repeated);
-
-        await col.upsert(data);
-        expect(await col.count()).toEqual(5);
-        expect((await col.findById(data.map(it => it.sha256))).length).toEqual(5);
-    }, TestUtils.TIMEOUT_TWO_MINUTES);
-
-    it('assertVectorDimensionMatches resolves on match and throws on mismatch', async () => {
-        await expect(col.assertVectorDimensionMatches(DIM)).resolves.toBeUndefined();
-        await expect(col.assertVectorDimensionMatches(DIM * 2)).rejects.toThrow(/vector dimension/);
     }, TestUtils.TIMEOUT_TWO_MINUTES);
 });
