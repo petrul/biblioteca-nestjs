@@ -118,7 +118,6 @@ describe('the language-aware embedding filter (ported from the retired milvus-ba
             tbc as unknown as BibliotecaClient,
             embedder as unknown as ContentEmbedder,
             store as unknown as VectorStore,
-            log as never,
             shared,
             5); // small page size: several pages through one vectorize() run
 

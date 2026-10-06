@@ -42,7 +42,7 @@ describe('VectorizerService.removeOpus (offline)', () => {
 
     beforeEach(() => {
         vecstore = new FakeStore();
-        vectServ = new VectorizerService(null as any, null as any, vecstore, log, shared);
+        vectServ = new VectorizerService(null as any, null as any, vecstore, shared);
     });
 
     it('delegates the removal to the store and flushes after it', async () => {

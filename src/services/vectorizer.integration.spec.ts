@@ -72,7 +72,7 @@ describe('VectorizerService (live integration)', () => {
         tbc = new FakeBibliotecaClient();
         const sts = new SentenceTransformersService({ sentenceTransformersServer: stsServer } as any);
         const embedder = new AllMiniLmL6V2_StsService(sts);
-        vectServ = new VectorizerService(tbc as unknown as BibliotecaClient, embedder, vecstore, log, shared);
+        vectServ = new VectorizerService(tbc as unknown as BibliotecaClient, embedder, vecstore, shared);
     });
 
     afterEach(async () => {

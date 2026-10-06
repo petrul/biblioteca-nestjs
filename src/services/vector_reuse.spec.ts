@@ -156,7 +156,6 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
             tbc as unknown as BibliotecaClient,
             embedder as unknown as ContentEmbedder,
             store as unknown as VectorStore,
-            log as never,
             shared,
             2000);
     };
