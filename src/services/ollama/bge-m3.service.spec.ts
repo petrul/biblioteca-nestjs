@@ -1,9 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
-import { BgeM3OllamaService, OllamaService } from '../ollama/ollama.service';
+import { BgeM3OllamaService, OllamaService } from './ollama.service';
 import { TestUtils } from '../../../test/testutils';
 
-// The bge-m3 migration of the retired StsService suite. STS (the
+// The bge-m3 migration of the retired StsService suite, moved out of sts/
+// along with its subject: nothing here touches STS, the embedder under
+// test is Ollama-backed. STS (the
 // sentence-transformers server on mini.local:11200) is no longer the
 // production embedder - BGE-M3 via zmeu's Ollama is PROVIDER_EMBEDDER now
 // (see app.module.ts) - and the old suite's centerpiece (the "generic
