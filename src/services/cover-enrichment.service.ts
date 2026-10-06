@@ -159,13 +159,58 @@ export class CoverEnrichmentService {
       this.log.error(`MINIO unavailable; cannot store cover for ${candidate.path} at ${endpoint} (bucket ${this.bucket})`);
       return Promise.resolve(false);
     }
-    if (this.pending.has(candidate.path)) return Promise.resolve(false);
-    if (!opts.force && candidate.coverUrl) return Promise.resolve(false);
+    if (this.pending.has(candidate.path)) {
+      this.log.log(`cover skipped for ${candidate.path}: already queued`);
+      return Promise.resolve(false);
+    }
     this.pending.add(candidate.path);
-    return new Promise<boolean>(resolve => {
-      this.queue.push({ candidate, resolve });
-      this.drain();
-    });
+    return (async () => {
+      if (!opts.force && candidate.coverUrl && await this.coverExists(candidate.coverUrl)) {
+        this.log.log(`cover skipped for ${candidate.path}: already has ${candidate.coverUrl}`);
+        this.pending.delete(candidate.path!);
+        return false;
+      }
+      return new Promise<boolean>(resolve => {
+        this.queue.push({ candidate, resolve });
+        this.drain();
+      });
+    })();
+  }
+
+  /**
+   * Whether a stored coverUrl still points at a real cover. A URL into our
+   * own cache is checked against MinIO - an object deleted there must be
+   * re-rendered, or fill-only would skip that opus forever. Any other URL
+   * (a cover set by hand elsewhere) is trusted as-is.
+   */
+  private async coverExists(coverUrl: string): Promise<boolean> {
+    const key = this.ownObjectKey(coverUrl);
+    if (!key) return true;
+    try {
+      await this.minio!.statObject(this.bucket, key);
+      return true;
+    } catch (error: any) {
+      if (error?.code === 'NotFound' || error?.code === 'NoSuchKey') {
+        this.log.log(`stored cover ${coverUrl} is missing from MinIO; re-rendering`);
+        return false;
+      }
+      // MinIO hiccup: keep fill-only semantics rather than re-render blindly
+      this.log.warn(`cannot verify stored cover ${coverUrl}: ${error?.message || error}`);
+      return true;
+    }
+  }
+
+  /** The cache object key behind one of our own cover URLs, else undefined. */
+  private ownObjectKey(coverUrl: string): string | undefined {
+    for (const base of [this.conf.minioPublicUrl, this.conf.minioUrl]) {
+      const prefix = (base || '').replace(/\/+$/, '') + '/';
+      if (base && coverUrl.startsWith(prefix)) {
+        const key = coverUrl.slice(prefix.length).split('?')[0];
+        // verbatim: objectKey() stores the percent-encoded form as the key
+        return key.startsWith('covers/') ? key : undefined;
+      }
+    }
+    return undefined;
   }
 
   private drain(): void {

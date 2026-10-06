@@ -176,4 +176,27 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
     expect(putObject).not.toHaveBeenCalled();
     expect(persisted).toHaveLength(0);
   });
+
+  it('re-renders a cover whose stored object was deleted from MinIO', async () => {
+    const { svc, putObject } = makeStoredService();
+    const statObject = jest.spyOn((svc as any).minio!, 'statObject')
+      .mockRejectedValue(Object.assign(new Error('Not Found'), { code: 'NotFound' }));
+    const coverUrl = 'http://minio.test/covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png';
+
+    const done = svc.enqueue({ id: 9, path: 'dostoyevskii/bratya_karamazovy', title: 'T', author: 'A', coverUrl });
+
+    await expect(done).resolves.toBe(true);
+    expect(statObject).toHaveBeenCalledWith('biblioteca', 'covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png');
+    expect(putObject).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a cover alone while its stored object still exists', async () => {
+    const { svc, putObject } = makeStoredService();
+    jest.spyOn((svc as any).minio!, 'statObject').mockResolvedValue({ size: 1 } as any);
+
+    const done = svc.enqueue({ id: 9, path: 'p9', title: 'T', author: 'A', coverUrl: 'http://minio.test/covers/p9-abc.png' });
+
+    await expect(done).resolves.toBe(false);
+    expect(putObject).not.toHaveBeenCalled();
+  });
 });
