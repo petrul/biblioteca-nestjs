@@ -26,7 +26,7 @@ type CoverCandidate = {
 export class CoverEnrichmentService {
   private readonly log = new Logger(CoverEnrichmentService.name);
   private readonly pending = new Set<string>();
-  private readonly queue: CoverCandidate[] = [];
+  private readonly queue: { candidate: CoverCandidate; resolve: (ok: boolean) => void }[] = [];
   private active = 0;
   private static readonly MAX_CONCURRENT = 2;
   private readonly minio?: MinioClient;
@@ -115,20 +115,32 @@ export class CoverEnrichmentService {
    * never an automatic caller - is the only way to re-render an existing
    * cover.
    */
-  enqueue(candidate: CoverCandidate, opts: { force?: boolean } = {}): void {
-    if (!this.minio || !candidate.path) return;
-    if (this.pending.has(candidate.path)) return;
-    if (!opts.force && candidate.coverUrl) return;
+  /**
+   * @returns whether the cover actually got generated and stored - false
+   * both for an early skip (fill-only already-covered, no MinIO, no path)
+   * and for a real render/upload failure. Callers that only fire-and-
+   * forget (the Kafka listener, dailySweep) simply never await this;
+   * EnrichmentAdminService's job counters are the one caller that does,
+   * so a long-running admin run can actually report progress instead of
+   * candidates sitting at processed:0 forever while covers render in
+   * the background.
+   */
+  enqueue(candidate: CoverCandidate, opts: { force?: boolean } = {}): Promise<boolean> {
+    if (!this.minio || !candidate.path) return Promise.resolve(false);
+    if (this.pending.has(candidate.path)) return Promise.resolve(false);
+    if (!opts.force && candidate.coverUrl) return Promise.resolve(false);
     this.pending.add(candidate.path);
-    this.queue.push(candidate);
-    this.drain();
+    return new Promise<boolean>(resolve => {
+      this.queue.push({ candidate, resolve });
+      this.drain();
+    });
   }
 
   private drain(): void {
     while (this.active < CoverEnrichmentService.MAX_CONCURRENT && this.queue.length) {
-      const candidate = this.queue.shift()!;
+      const { candidate, resolve } = this.queue.shift()!;
       this.active++;
-      void this.generate(candidate).finally(() => {
+      void this.generate(candidate).then(resolve).finally(() => {
         this.pending.delete(candidate.path!);
         this.active--;
         this.drain();
@@ -136,7 +148,7 @@ export class CoverEnrichmentService {
     }
   }
 
-  private async generate(candidate: CoverCandidate): Promise<void> {
+  private async generate(candidate: CoverCandidate): Promise<boolean> {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
     try {
@@ -181,8 +193,10 @@ export class CoverEnrichmentService {
       const url = this.publicUrl(key);
       await this.biblioteca.persistEnrichment({ opusId: candidate.id, coverUrl: url });
       this.log.log(`generated cover ${candidate.path} in ${this.elapsed(started)}`);
+      return true;
     } catch (error: any) {
       this.log.warn(`cover generation failed for ${candidate.path} after ${this.elapsed(started)}: ${error?.message || error}`);
+      return false;
     }
   }
 
@@ -196,7 +210,7 @@ export class CoverEnrichmentService {
     // (that one is the internal direct host:port the S3 client itself
     // connects on; a reverse-proxied public domain is one more thing
     // that can silently break writes, so uploads never depend on it).
-    const base = (this.conf.minioPublicUrl || '').replace(/\/$/, '');
+    const base = (this.conf.minioPublicUrl || this.conf.minioUrl || '').replace(/\/$/, '');
     return `${base}/${key}`;
   }
 

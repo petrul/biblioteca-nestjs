@@ -53,9 +53,10 @@ class FakeEnrichment {
 class FakeCovers {
   enqueued: { id: number; hasCoverUrl: boolean; force?: boolean }[] = [];
   enqueuedCandidates: any[] = [];
-  enqueue(candidate: any, opts: { force?: boolean } = {}) {
+  enqueue(candidate: any, opts: { force?: boolean } = {}): Promise<boolean> {
     this.enqueued.push({ id: candidate.id, hasCoverUrl: !!candidate.coverUrl, force: opts.force });
     this.enqueuedCandidates.push(candidate);
+    return Promise.resolve(true);
   }
 }
 

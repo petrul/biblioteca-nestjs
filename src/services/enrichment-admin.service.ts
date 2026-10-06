@@ -281,57 +281,71 @@ export class EnrichmentAdminService {
   private async runOpera(job: Job, force: boolean, artByAuthor: Map<string, string>): Promise<void> {
     const wantsWork = job.request.steps.includes('work');
     const wantsCover = job.request.steps.includes('cover');
-    for await (const opus of this.client.allOperaGen() as any) {
-      if (job.cancelRequested) return;
-      if (!this.opusTargeted(opus, job.request)) continue;
-      // Work enrichment first: its retrieved art is threaded into the
-      // cover order below, so a requested cover renders with the
-      // graphics instead of a text-only design that fill-only would
-      // then freeze forever.
-      let artUrl: string | undefined;
-      if (wantsWork) {
-        const workCounters = job.steps.work!;
-        if ((opus.description || opus.significantQuote) && !force) { workCounters.skippedExisting++; }
-        else {
-          workCounters.candidates++;
-          try {
-            this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
-            const images = await this.enrichment.enrichWork(opus, { force });
-            artUrl = images?.[0];
-            workCounters.processed++;
-          } catch (e: any) {
-            workCounters.failed++;
-            this.recordError(job, `opus ${opus.id} ${opus.head}: ${e?.message ?? e}`);
+    // Covers render through CoverEnrichmentService's own 2-at-a-time queue,
+    // well behind this metadata walk - collected here (not awaited inline,
+    // that would serialize the walk down to the render queue's own pace)
+    // and drained once at the end, so the job only reports
+    // finished/cancelled - and releases the single-flight lock - once
+    // every enqueued cover has actually settled, not just once the walk
+    // itself is done. Without this, job.steps.cover.processed would sit
+    // at 0 for the job's entire (possibly hours-long) visible lifetime
+    // even as covers genuinely render and land in MinIO in the background.
+    const coverSettling: Promise<void>[] = [];
+    try {
+      for await (const opus of this.client.allOperaGen() as any) {
+        if (job.cancelRequested) return;
+        if (!this.opusTargeted(opus, job.request)) continue;
+        // Work enrichment first: its retrieved art is threaded into the
+        // cover order below, so a requested cover renders with the
+        // graphics instead of a text-only design that fill-only would
+        // then freeze forever.
+        let artUrl: string | undefined;
+        if (wantsWork) {
+          const workCounters = job.steps.work!;
+          if ((opus.description || opus.significantQuote) && !force) { workCounters.skippedExisting++; }
+          else {
+            workCounters.candidates++;
+            try {
+              this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
+              const images = await this.enrichment.enrichWork(opus, { force });
+              artUrl = images?.[0];
+              workCounters.processed++;
+            } catch (e: any) {
+              workCounters.failed++;
+              this.recordError(job, `opus ${opus.id} ${opus.head}: ${e?.message ?? e}`);
+            }
+          }
+        }
+        if (wantsCover && opus.id && opus.completePath && opus.head) {
+          const coverCounters = job.steps.cover!;
+          if (opus.coverUrl && !force) { coverCounters.skippedExisting++; }
+          else {
+            coverCounters.candidates++;
+            // CoverEnrichmentService.enqueue enforces the same fill-only
+            // rule on its own; force is threaded through so the switch
+            // does not have to rely on this caller's arithmetic. artUrl:
+            // the work's own art when the work step ran above, else its
+            // author's portrait - fresh from the author pass when that
+            // ran, else the author's already-stored portrait, so even a
+            // cover-only run orders an authored cover, not a text-only
+            // one.
+            const authorStrId = opus.author?.strId;
+            const portrait = artUrl
+              || (authorStrId ? artByAuthor.get(authorStrId) : undefined)
+              || (authorStrId ? await this.enrichment.storedAuthorArt(authorStrId) : undefined);
+            coverSettling.push(this.covers.enqueue({
+              id: opus.id,
+              path: opus.completePath,
+              title: opus.head,
+              author: opus.author?.visualName || opus.author?.displayName || 'Anonymous',
+              coverUrl: opus.coverUrl,
+              artUrl: portrait,
+            }, { force }).then(ok => { if (ok) coverCounters.processed++; else coverCounters.failed++; }));
           }
         }
       }
-      if (wantsCover && opus.id && opus.completePath && opus.head) {
-        const coverCounters = job.steps.cover!;
-        if (opus.coverUrl && !force) { coverCounters.skippedExisting++; }
-        else {
-          coverCounters.candidates++;
-          // CoverEnrichmentService.enqueue enforces the same fill-only
-          // rule on its own; force is threaded through so the switch
-          // does not have to rely on this caller's arithmetic. artUrl:
-          // the work's own art when the work step ran above, else its
-          // author's portrait - fresh from the author pass when that
-          // ran, else the author's already-stored portrait, so even a
-          // cover-only run orders an authored cover, not a text-only
-          // one.
-          const authorStrId = opus.author?.strId;
-          const portrait = artUrl
-            || (authorStrId ? artByAuthor.get(authorStrId) : undefined)
-            || (authorStrId ? await this.enrichment.storedAuthorArt(authorStrId) : undefined);
-          this.covers.enqueue({
-            id: opus.id,
-            path: opus.completePath,
-            title: opus.head,
-            author: opus.author?.visualName || opus.author?.displayName || 'Anonymous',
-            coverUrl: opus.coverUrl,
-            artUrl: portrait,
-          }, { force });
-        }
-      }
+    } finally {
+      await Promise.all(coverSettling);
     }
   }
 
