@@ -41,6 +41,11 @@ export class CoverEnrichmentService {
    * cover is always better than none, but never at the cost of ordering
    * one at all.
    */
+  // Excluded from the random pool below, not from the covers service's own
+  // id list - 'storybook_whimsy' ("The Whimsical Storybook") stays a valid,
+  // selectable layout everywhere else, just never auto-picked for a
+  // batch-generated cover.
+  private static readonly EXCLUDED_RANDOM_LAYOUTS = ['storybook_whimsy'];
   private coverMeta?: { layouts: string[]; palettes: string[] };
   private async randomTheme(): Promise<{ layout: string; paletteId: string }> {
     if (!this.coverMeta) {
@@ -50,7 +55,10 @@ export class CoverEnrichmentService {
           const meta = await resp.json();
           const ids = (arr: unknown) =>
             (Array.isArray(arr) ? arr : []).map((e: any) => e?.id ?? e).filter((id: any) => typeof id === 'string');
-          this.coverMeta = { layouts: ids(meta.layouts), palettes: ids(meta.palettes) };
+          const layouts = ids(meta.layouts).filter(
+            (id: string) => !CoverEnrichmentService.EXCLUDED_RANDOM_LAYOUTS.includes(id),
+          );
+          this.coverMeta = { layouts, palettes: ids(meta.palettes) };
         }
       } catch (error: any) {
         this.log.error(`Covers service unavailable at ${this.conf.coversApiUrl}: ${error?.message || error}`);

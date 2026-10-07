@@ -201,3 +201,38 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
     expect(putObject).not.toHaveBeenCalled();
   });
 });
+
+describe('CoverEnrichmentService randomTheme layout exclusion', () => {
+  let originalFetch: any;
+  beforeAll(() => {
+    originalFetch = (global as any).fetch;
+  });
+  afterAll(() => { (global as any).fetch = originalFetch; });
+
+  it('never picks storybook_whimsy even though the covers service still offers it', async () => {
+    (global as any).fetch = (async (url: any) => {
+      if (String(url).endsWith('/api/cover/meta')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            layouts: [{ id: 'storybook_whimsy' }, { id: 'archival_monograph' }, { id: 'constructivist' }],
+            palettes: [{ id: 'archival_alabaster' }],
+          }),
+        };
+      }
+      return { ok: false, status: 500, json: async () => ({}) };
+    }) as any;
+
+    const svc = makeService();
+    const picks = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const theme = await (svc as any).randomTheme();
+      picks.add(theme.layout);
+    }
+
+    expect(picks.has('storybook_whimsy')).toBe(false);
+    // The pool isn't just accidentally empty - the other two still get picked.
+    expect(picks.has('archival_monograph') || picks.has('constructivist')).toBe(true);
+  });
+});
