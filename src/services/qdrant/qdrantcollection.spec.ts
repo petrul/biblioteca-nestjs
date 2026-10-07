@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { QdrantCollection } from './qdrantcollection.service';
 import { Content } from '../../model/model';
 

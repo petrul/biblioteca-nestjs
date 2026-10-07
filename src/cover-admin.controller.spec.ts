@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { BadRequestException } from '@nestjs/common';
 import { CoverAdminController } from './cover-admin.controller';
 import { EnrichmentAdminService } from './services/enrichment-admin.service';

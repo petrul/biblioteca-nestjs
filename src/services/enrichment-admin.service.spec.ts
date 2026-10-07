@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { EnrichmentAdminService, EnrichmentRunRequest } from './enrichment-admin.service';
 import { ENRICHMENT_MODULES, ENRICHMENT_STEP_IDS } from './enrichment-modules';

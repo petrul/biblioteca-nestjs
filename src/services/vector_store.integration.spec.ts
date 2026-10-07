@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { QdrantVectorStore } from './vector_store';
 import { QdrantCollection } from './qdrant/qdrantcollection.service';
 import { TestUtils } from '../../test/testutils';

@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { ConsoleLogger } from '@nestjs/common';
 import { Content, ContentEmbedder } from '../model/model';
 import { RetryingContentEmbedder } from './retrying_content_embedder';

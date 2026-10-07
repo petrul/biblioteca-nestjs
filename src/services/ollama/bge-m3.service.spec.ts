@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 import { BgeM3OllamaService, OllamaService } from './ollama.service';

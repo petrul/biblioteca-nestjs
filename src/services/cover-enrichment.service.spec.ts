@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { CoverEnrichmentService } from './cover-enrichment.service';
 
 /**

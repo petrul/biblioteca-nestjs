@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { VectorizingJobService } from './vectorizing_job.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';

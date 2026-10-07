@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { VectorizerKafkaListenerService } from './vectorizer-listener.service';
 import { KafkaService } from './kafka.service';
 import { BibliotecaClient } from '../biblioteca_client.service';

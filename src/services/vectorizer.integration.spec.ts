@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { VectorizerService } from './vectorizer.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { FakeBibliotecaClient } from '../../test/fake-biblioteca-client';

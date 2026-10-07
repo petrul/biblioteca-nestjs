@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { Test } from '@nestjs/testing';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { PROVIDER_LOGGER, Util } from '../util';

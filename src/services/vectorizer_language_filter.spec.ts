@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { VectorizerService } from './vectorizer.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { Content, ContentEmbedder } from '../model/model';

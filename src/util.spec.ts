@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import { LoggerService } from '@nestjs/common';
 import { retryUntilAvailable, StopWatch, Util } from './util';
 

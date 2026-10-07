@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import {
   BgeM3OllamaService,
   NomicEmbedOllamaService,
