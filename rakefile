@@ -11,6 +11,25 @@ task :version do
     puts PACKAGE.fetch('version')
 end
 
+# The biblioteca-* checkouts under the shared parent directory are one
+# family (this repo, biblioteca-server, biblioteca-reader, biblioteca-covers)
+# and often move together - one sweep instead of a manual git pull per
+# checkout. Continues past a failing repo (dirty tree, conflict) so the
+# rest still update; failures are reported at the end.
+desc 'Run git pull in every biblioteca-* sibling checkout'
+task :pull_all do
+    failures = []
+    Dir[File.expand_path('../biblioteca-*', __dir__)].sort.each do |repo|
+        next unless File.directory?(File.join(repo, '.git'))
+        name = File.basename(repo)
+        puts "==> #{name}"
+        failures << name unless system('git', '-C', repo, 'pull', '--ff-only')
+    end
+    unless failures.empty?
+        warn "Pull failed for: #{failures.join(', ')} (local commits or dirty files - resolve manually)"
+    end
+end
+
 def load_profile!(profile)
     store_dir = ENV.fetch('PASSWORD_STORE_DIR', File.expand_path('~/.password-store'))
     loader = File.join(store_dir, 'load-env.sh')
