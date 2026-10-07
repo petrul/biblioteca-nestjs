@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { PROVIDER_CONF, VectorizerConfiguration } from '../../configuration';
 import { BgeM3OllamaService, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './ollama.service';
@@ -44,6 +45,9 @@ describe('OllamaService', () => {
         vects.forEach(it => expect(it.length).toEqual(1024));
     }, TestUtils.TIMEOUT_TWO_MINUTES);
 
+    /***
+     * //  we dont really use these although we could (if we had more RAM that is)
+
     it('qwen3-embedding produces 2560-dim vectors', async () => {
         expect(conf.ollamaUrl).toBeTruthy();
 
@@ -59,5 +63,7 @@ describe('OllamaService', () => {
         expect(vects.length).toEqual(2);
         vects.forEach(it => expect(it.length).toEqual(768));
     }, TestUtils.TIMEOUT_TWO_MINUTES);
+
+    */
 
 });
