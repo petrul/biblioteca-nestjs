@@ -273,7 +273,7 @@ export class CoverEnrichmentService {
       });
       if (!response.ok) throw new Error(`cover renderer HTTP ${response.status}`);
       const body = Buffer.from(await response.arrayBuffer());
-      const key = this.objectKey(candidate.path!);
+      const key = this.objectKey(candidate.path!, body);
       try {
         await this.minio!.putObject(this.bucket, key, body, body.length, {
           'Content-Type': 'image/png',
@@ -294,9 +294,22 @@ export class CoverEnrichmentService {
     }
   }
 
-  private objectKey(path: string): string {
+  /**
+   * Hashes the rendered BYTES, not the opus path - the stored objects carry
+   * a one-year immutable Cache-Control (see putObject above), so a
+   * path-derived key would mean every re-render overwrites the exact same
+   * URL: a browser, CDN or any intermediate proxy that already cached the
+   * old bytes there would never see the new ones, immutable tells them
+   * not to even ask (observed: "shows cached image no matter what, even
+   * after clearing site data" on a work whose cover had genuinely just
+   * been regenerated). A content hash makes every real change a new URL,
+   * which is what immutable caching actually requires to be safe - the
+   * trade-off is that old keys go orphaned in MinIO rather than being
+   * reused, which is a storage-cost concern, not a correctness one.
+   */
+  private objectKey(path: string, body: Buffer): string {
     const safe = path.split('/').map(part => encodeURIComponent(part)).join('/');
-    return `covers/${safe}-${createHash('sha256').update(path).digest('hex').slice(0, 12)}.png`;
+    return `covers/${safe}-${createHash('sha256').update(body).digest('hex').slice(0, 12)}.png`;
   }
 
   private publicUrl(key: string): string {

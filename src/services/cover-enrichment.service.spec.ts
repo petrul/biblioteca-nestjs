@@ -145,12 +145,14 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
     svc.enqueue({ id: 7, path: 'opera/alecsandri/lume-ridicata.xml', title: 'Lume', author: 'Vasile Alecsandri' });
     await settle(svc);
 
-    // stored in MinIO: bucket biblioteca, the covers/ key derived from the
-    // opus path, the exact renderer bytes, immutable cache headers
+    // stored in MinIO: bucket biblioteca, the covers/ key carries the opus
+    // path for readability but is hashed from the rendered BYTES (not the
+    // path) so a re-render always lands at a new URL - see objectKey's own
+    // comment for why that matters given the immutable cache header below.
     expect(putObject).toHaveBeenCalledTimes(1);
     const [bucket, key, body, size, headers] = renderCalls[0];
     expect(bucket).toBe('biblioteca');
-    expect(key).toBe('covers/opera/alecsandri/lume-ridicata.xml-d91a5027a5a9.png');
+    expect(key).toBe('covers/opera/alecsandri/lume-ridicata.xml-4353a1de7e0d.png');
     expect(Buffer.from(body)).toEqual(PNG);
     expect(size).toBe(PNG.length);
     expect(headers).toMatchObject({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' });
