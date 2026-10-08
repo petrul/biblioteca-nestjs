@@ -277,7 +277,14 @@ export class CoverEnrichmentService {
       try {
         await this.minio!.putObject(this.bucket, key, body, body.length, {
           'Content-Type': 'image/png',
-          'Cache-Control': 'public, max-age=31536000, immutable',
+          // Content-hashed key (objectKey below) already makes a real
+          // change land at a new URL, so a long max-age is still safe -
+          // but covers are being actively iterated on right now, far more
+          // than a typical "renders once, basically final" asset, and a
+          // year is needlessly long for how often that happens today. An
+          // hour still caches meaningfully within one browsing session
+          // without holding on to a now-orphaned render for the long haul.
+          'Cache-Control': 'public, max-age=3600',
         });
       } catch (error: any) {
         const endpoint = this.conf.minioUrl?.replace(/\/+$|\?.*$/g, '') || 'configured endpoint';
@@ -295,17 +302,17 @@ export class CoverEnrichmentService {
   }
 
   /**
-   * Hashes the rendered BYTES, not the opus path - the stored objects carry
-   * a one-year immutable Cache-Control (see putObject above), so a
-   * path-derived key would mean every re-render overwrites the exact same
-   * URL: a browser, CDN or any intermediate proxy that already cached the
-   * old bytes there would never see the new ones, immutable tells them
-   * not to even ask (observed: "shows cached image no matter what, even
-   * after clearing site data" on a work whose cover had genuinely just
-   * been regenerated). A content hash makes every real change a new URL,
-   * which is what immutable caching actually requires to be safe - the
-   * trade-off is that old keys go orphaned in MinIO rather than being
-   * reused, which is a storage-cost concern, not a correctness one.
+   * Hashes the rendered BYTES, not the opus path - a path-derived key
+   * means every re-render overwrites the exact same URL, which is wrong
+   * for any non-zero cache lifetime: a browser, CDN or any intermediate
+   * proxy that already cached the old bytes there has no reason to ask
+   * again until that lifetime is up (observed: "shows cached image no
+   * matter what, even after clearing site data" on a work whose cover
+   * had genuinely just been regenerated, well within putObject's own
+   * max-age above). A content hash makes every real change a new URL
+   * instead, which is correct regardless of how aggressive that caching
+   * is - the trade-off is that old keys go orphaned in MinIO rather than
+   * being reused, a storage-cost concern, not a correctness one.
    */
   private objectKey(path: string, body: Buffer): string {
     const safe = path.split('/').map(part => encodeURIComponent(part)).join('/');
