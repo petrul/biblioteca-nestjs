@@ -21,6 +21,11 @@ type CoverCandidate = {
   artUrl?: string;
 };
 
+/** Every generated cover's publishing house. */
+export const COVER_PUBLISHER = 'Ediții Scriptorium';
+/** The series printed on every generated cover. */
+export const COVER_SERIES = 'Classique';
+
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
 @Injectable()
 export class CoverEnrichmentService {
@@ -233,6 +238,37 @@ export class CoverEnrichmentService {
     }
   }
 
+  /** The POST /api/cover body for one candidate - public so tests can pin it. */
+  coverRequest(candidate: CoverCandidate, theme: { layout: string; paletteId: string }): Record<string, unknown> {
+    return {
+      title: candidate.title,
+      author: candidate.author,
+      publisher: COVER_PUBLISHER,
+      series: COVER_SERIES,
+      // The renderer's coverArtUrl: same-origin path, data URL or
+      // remote https URL (auto-proxied, see biblioteca-covers'
+      // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
+      ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
+      layout: theme.layout,
+      foilEffect: 'none',
+      // Explicit 12px spine rather than relying on the renderer's
+      // boolean-hardcover defaults (biblioteca-covers coverRequest.ts).
+      hardcover: {
+        enabled: true,
+        spineVisible: true,
+        spineWidthPx: 12,
+        textureStyle: 'buckram_cloth',
+        sheenIntensity: 0.25,
+        creaseDepth: 0.4,
+        showPageEdge: true,
+        embossedTitle: true,
+      },
+      format: 'png',
+      pixelRatio: 2,
+      theme: { paletteId: theme.paletteId, showBarcode: false },
+    };
+  }
+
   private async generate(candidate: CoverCandidate): Promise<boolean> {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
@@ -241,34 +277,13 @@ export class CoverEnrichmentService {
       // of the whole cover feature is a varied shelf, not one house
       // design repeated two thousand times.
       const theme = await this.randomTheme();
+      const request = this.coverRequest(candidate, theme);
+      // The exact JSON sent to biblioteca-covers, one line per cover.
+      this.log.log(`cover request ${candidate.path}: ${JSON.stringify(request)}`);
       const response = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover`, {
         method: 'POST',
         headers: { Accept: 'image/png', 'Content-Type': 'application/json', 'X-Biblioteca-Work-Id': candidate.path! },
-        body: JSON.stringify({
-          title: candidate.title,
-          author: candidate.author,
-          // The renderer's coverArtUrl: same-origin path, data URL or
-          // remote https URL (auto-proxied, see biblioteca-covers'
-          // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
-          ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
-          layout: theme.layout,
-          foilEffect: 'none',
-          // Explicit 12px spine rather than relying on the renderer's
-          // boolean-hardcover defaults (biblioteca-covers coverRequest.ts).
-          hardcover: {
-            enabled: true,
-            spineVisible: true,
-            spineWidthPx: 12,
-            textureStyle: 'buckram_cloth',
-            sheenIntensity: 0.25,
-            creaseDepth: 0.4,
-            showPageEdge: true,
-            embossedTitle: true,
-          },
-          format: 'png',
-          pixelRatio: 2,
-          theme: { paletteId: theme.paletteId, showBarcode: false },
-        }),
+        body: JSON.stringify(request),
         signal: AbortSignal.timeout(120_000),
       });
       if (!response.ok) throw new Error(`cover renderer HTTP ${response.status}`);

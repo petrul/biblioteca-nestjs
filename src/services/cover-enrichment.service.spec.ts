@@ -94,6 +94,19 @@ describe('CoverEnrichmentService enqueue admission', () => {
     expect(renderBodies[0].coverArtUrl).toBe('https://commons.wikimedia.org/wiki/Special:FilePath/Some_Art.jpg?width=1200');
     expect(renderBodies[1].coverArtUrl).toBeUndefined();
   });
+
+  it('names Ediții Scriptorium as publisher and Classique as series, and logs the exact JSON it sends', async () => {
+    const svc = makeService();
+    const logged: string[] = [];
+    jest.spyOn((svc as any).log, 'log').mockImplementation((message: any) => { logged.push(String(message)); });
+    svc.enqueue({ id: 1, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu' });
+    await settle(svc);
+    expect(renderBodies).toHaveLength(1);
+    expect(renderBodies[0]).toMatchObject({ title: 'Poezii', author: 'Mihai Eminescu', publisher: 'Ediții Scriptorium', series: 'Classique' });
+    const line = logged.find(m => m.startsWith('cover request eminescu/poezii: '));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line!.slice('cover request eminescu/poezii: '.length))).toEqual(renderBodies[0]);
+  });
 });
 
 /**
