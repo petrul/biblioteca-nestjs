@@ -95,14 +95,17 @@ describe('CoverEnrichmentService enqueue admission', () => {
     expect(renderBodies[1].coverArtUrl).toBeUndefined();
   });
 
-  it('names Ediții Scriptorium as publisher and Classique as series, and logs the exact JSON it sends', async () => {
+  it('prints the Ediții Scriptorium imprint (publisher, 2026, București, Scriptorium Classique), and logs the exact JSON it sends', async () => {
     const svc = makeService();
     const logged: string[] = [];
     jest.spyOn((svc as any).log, 'log').mockImplementation((message: any) => { logged.push(String(message)); });
     svc.enqueue({ id: 1, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu' });
     await settle(svc);
     expect(renderBodies).toHaveLength(1);
-    expect(renderBodies[0]).toMatchObject({ title: 'Poezii', author: 'Mihai Eminescu', publisher: 'Ediții Scriptorium', series: 'Classique' });
+    expect(renderBodies[0]).toMatchObject({
+      title: 'Poezii', author: 'Mihai Eminescu',
+      publisher: 'Ediții Scriptorium', date: '2026', pubPlace: 'București', series: 'Scriptorium Classique',
+    });
     const line = logged.find(m => m.startsWith('cover request eminescu/poezii: '));
     expect(line).toBeDefined();
     expect(JSON.parse(line!.slice('cover request eminescu/poezii: '.length))).toEqual(renderBodies[0]);
@@ -162,13 +165,19 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
     // path for readability but is hashed from the rendered BYTES (not the
     // path) so a re-render always lands at a new URL - see objectKey's own
     // comment for why that matters regardless of the cache lifetime below.
-    expect(putObject).toHaveBeenCalledTimes(1);
+    // Two objects: the PNG, then the request JSON it was rendered from.
+    expect(putObject).toHaveBeenCalledTimes(2);
     const [bucket, key, body, size, headers] = renderCalls[0];
     expect(bucket).toBe('biblioteca');
     expect(key).toBe('covers/opera/alecsandri/lume-ridicata.xml-4353a1de7e0d.png');
     expect(Buffer.from(body)).toEqual(PNG);
     expect(size).toBe(PNG.length);
     expect(headers).toMatchObject({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600' });
+    const [, requestKey, requestBody] = renderCalls[1];
+    expect(requestKey).toBe('covers/opera/alecsandri/lume-ridicata.xml-4353a1de7e0d.json');
+    expect(JSON.parse(Buffer.from(requestBody).toString('utf8'))).toMatchObject({
+      title: 'Lume', author: 'Vasile Alecsandri', publisher: 'Ediții Scriptorium', series: 'Scriptorium Classique',
+    });
 
     // and only then reported to the server, as the public MinIO URL
     expect(persisted).toEqual([
@@ -203,7 +212,7 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
 
     await expect(done).resolves.toBe(true);
     expect(statObject).toHaveBeenCalledWith('biblioteca', 'covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png');
-    expect(putObject).toHaveBeenCalledTimes(1);
+    expect(putObject).toHaveBeenCalledTimes(2); // PNG + request JSON
   });
 
   it('leaves a cover alone while its stored object still exists', async () => {
@@ -251,3 +260,60 @@ describe('CoverEnrichmentService randomTheme layout exclusion', () => {
     expect(picks.has('archival_monograph') || picks.has('constructivist')).toBe(true);
   });
 });
+
+/**
+ * The admin path: generateNow renders synchronously and replaces the work's
+ * cover; storedRequest reads back the JSON a cover was rendered from.
+ */
+describe('CoverEnrichmentService on-demand cover and its stored request', () => {
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  let persisted: any[];
+  let stored: Map<string, Buffer>;
+  let originalFetch: any;
+
+  function makeService() {
+    persisted = [];
+    stored = new Map();
+    const svc = new CoverEnrichmentService({ async persistEnrichment(update: any) { persisted.push(update); } } as any, {
+      minioUrl: 'http://minio.test', minioCred: 'key:secret', coversApiUrl: 'http://covers.test',
+    } as any);
+    jest.spyOn((svc as any).minio!, 'putObject').mockImplementation(async (_b: any, key: any, body: any) => { stored.set(key, Buffer.from(body)); return {} as any; });
+    jest.spyOn((svc as any).minio!, 'getObject').mockImplementation(async (_b: any, key: any) => {
+      if (!stored.has(key)) throw Object.assign(new Error('missing'), { code: 'NoSuchKey' });
+      return (async function* () { yield stored.get(key)!; })() as any;
+    });
+    return svc;
+  }
+
+  beforeAll(() => {
+    originalFetch = (global as any).fetch;
+    (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
+      ? { ok: false, status: 500, json: async () => ({}) }
+      : { ok: true, status: 200, arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.length) }) as any;
+  });
+  afterAll(() => { (global as any).fetch = originalFetch; });
+
+  it('generateNow replaces the current cover and returns the new URL with its request JSON, which storedRequest reads back', async () => {
+    const svc = makeService();
+    const result = await svc.generateNow({ id: 5, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu', coverUrl: 'http://minio.test/covers/eminescu/poezii-old.png' });
+    expect(result.coverUrl).toMatch(/^http:\/\/minio\.test\/covers\/eminescu\/poezii-[0-9a-f]{12}\.png$/);
+    expect(result.request).toMatchObject({ title: 'Poezii', publisher: 'Ediții Scriptorium', date: '2026', pubPlace: 'București', series: 'Scriptorium Classique' });
+    expect(persisted).toEqual([{ opusId: 5, coverUrl: result.coverUrl, replaceCover: true }]);
+    expect(await svc.storedRequest(result.coverUrl)).toEqual(result.request);
+  });
+
+  it('storedRequest is null for covers rendered before requests were recorded, and for foreign URLs', async () => {
+    const svc = makeService();
+    expect(await svc.storedRequest('http://minio.test/covers/old/work-0123456789ab.png')).toBeNull();
+    expect(await svc.storedRequest('https://upload.wikimedia.org/some.jpg')).toBeNull();
+    expect(await svc.storedRequest(undefined)).toBeNull();
+  });
+
+  it('routine (queued) renders only fill the cover - no replaceCover', async () => {
+    const svc = makeService();
+    await svc.enqueue({ id: 6, path: 'cehov/teatru', title: 'Teatru', author: 'Cehov' });
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].replaceCover).toBeUndefined();
+  });
+});
+

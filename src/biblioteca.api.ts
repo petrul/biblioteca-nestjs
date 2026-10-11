@@ -649,6 +649,7 @@ export interface EnrichmentUpdateDto {
   writingLanguage?: string;
   imageUrls?: string[];
   coverUrl?: string;
+  replaceCover?: boolean;
 }
 
 export interface CreateCollectionRequest {

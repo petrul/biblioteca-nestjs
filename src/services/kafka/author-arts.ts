@@ -18,3 +18,28 @@ export async function randomAuthorArt(tbc: BibliotecaClient, strId: string): Pro
   const arts = await authorArts(tbc, strId);
   return arts.length ? arts[Math.floor(Math.random() * arts.length)] : undefined;
 }
+
+/**
+ * The cover candidate for an opus as served by /api/divs: its title, its
+ * author's display name and one of the author's images at random (none
+ * when the media lookup fails - the cover then renders without art).
+ */
+export async function coverCandidateFor(tbc: BibliotecaClient, opus: any, onArtError?: (error: any) => void) {
+  const author = opus?.author;
+  let artUrl: string | undefined;
+  if (author?.strId) {
+    try {
+      artUrl = await randomAuthorArt(tbc, author.strId);
+    } catch (error: any) {
+      onArtError?.(error);
+    }
+  }
+  return {
+    id: opus.id as number,
+    path: opus.path as string,
+    title: opus.head as string,
+    author: (author?.displayName || author?.visualName || author?.strId || 'Anonymous') as string,
+    coverUrl: opus.coverUrl as string | undefined,
+    artUrl,
+  };
+}

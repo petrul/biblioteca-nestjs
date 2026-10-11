@@ -253,7 +253,7 @@ export class BibliotecaClient {
       }
     }
 
-    async persistEnrichment(update: { opusId: number; coverUrl?: string }): Promise<void> {
+    async persistEnrichment(update: { opusId: number; coverUrl?: string; replaceCover?: boolean }): Promise<void> {
       const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

@@ -21,17 +21,27 @@ type CoverCandidate = {
   artUrl?: string;
 };
 
-/** Every generated cover's publishing house. */
-export const COVER_PUBLISHER = 'Ediții Scriptorium';
-/** The series printed on every generated cover. */
-export const COVER_SERIES = 'Classique';
+/** A stored cover and the request JSON it was rendered from. */
+export type GeneratedCover = { coverUrl: string; request: Record<string, unknown> };
+
+/**
+ * The imprint printed on every generated cover - CoverRenderRequest's own
+ * publisher/date/pubPlace/series fields, set explicitly rather than left
+ * to the renderer's defaults.
+ */
+export const COVER_IMPRINT = {
+  publisher: 'Ediții Scriptorium',
+  date: '2026',
+  pubPlace: 'București',
+  series: 'Scriptorium Classique',
+} as const;
 
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
 @Injectable()
 export class CoverEnrichmentService {
   private readonly log = new Logger("cover-enrichment");
   private readonly pending = new Set<string>();
-  private readonly queue: { candidate: CoverCandidate; resolve: (ok: boolean) => void }[] = [];
+  private readonly queue: { candidate: CoverCandidate; force: boolean; resolve: (ok: boolean) => void }[] = [];
   private active = 0;
   private static readonly MAX_CONCURRENT = 2;
   private readonly minio?: MinioClient;
@@ -184,7 +194,7 @@ export class CoverEnrichmentService {
         return false;
       }
       return new Promise<boolean>(resolve => {
-        this.queue.push({ candidate, resolve });
+        this.queue.push({ candidate, force: !!opts.force, resolve });
         this.drain();
       });
     })();
@@ -228,9 +238,9 @@ export class CoverEnrichmentService {
 
   private drain(): void {
     while (this.active < CoverEnrichmentService.MAX_CONCURRENT && this.queue.length) {
-      const { candidate, resolve } = this.queue.shift()!;
+      const { candidate, force, resolve } = this.queue.shift()!;
       this.active++;
-      void this.generate(candidate).then(resolve).finally(() => {
+      void this.generate(candidate, force).then(result => resolve(result !== null)).finally(() => {
         this.pending.delete(candidate.path!);
         this.active--;
         this.drain();
@@ -243,8 +253,7 @@ export class CoverEnrichmentService {
     return {
       title: candidate.title,
       author: candidate.author,
-      publisher: COVER_PUBLISHER,
-      series: COVER_SERIES,
+      ...COVER_IMPRINT,
       // The renderer's coverArtUrl: same-origin path, data URL or
       // remote https URL (auto-proxied, see biblioteca-covers'
       // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
@@ -269,7 +278,50 @@ export class CoverEnrichmentService {
     };
   }
 
-  private async generate(candidate: CoverCandidate): Promise<boolean> {
+  /**
+   * Renders one cover right now and waits for it - the reader's admin
+   * "generate cover" (POST /api/covers/work). Always replaces the work's
+   * current cover; refuses while the same work is already being rendered.
+   */
+  async generateNow(candidate: CoverCandidate): Promise<GeneratedCover> {
+    if (!candidate.path) throw new Error(`opus ${candidate.id} has no stable path`);
+    if (!this.minio) throw new Error('MinIO cover cache not configured');
+    if (this.pending.has(candidate.path)) throw new Error(`a cover for ${candidate.path} is already being rendered`);
+    this.pending.add(candidate.path);
+    try {
+      const result = await this.generate(candidate, true);
+      if (!result) throw new Error(`cover generation failed for ${candidate.path} (see the nestjs log)`);
+      return result;
+    } finally {
+      this.pending.delete(candidate.path);
+    }
+  }
+
+  /**
+   * The request JSON a cover was rendered from, stored next to its PNG by
+   * generate(); null for covers rendered before that was recorded, or not
+   * ours (a URL outside the cover cache).
+   */
+  async storedRequest(coverUrl: string | undefined): Promise<Record<string, unknown> | null> {
+    const key = coverUrl ? this.ownObjectKey(coverUrl) : undefined;
+    if (!key || !this.minio) return null;
+    try {
+      const stream = await this.minio.getObject(this.bucket, CoverEnrichmentService.requestKey(key));
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } catch (error: any) {
+      if (error?.code === 'NoSuchKey' || error?.code === 'NotFound') return null;
+      throw error;
+    }
+  }
+
+  /** The object key of a cover's request JSON: the PNG's key with .json. */
+  static requestKey(pngKey: string): string {
+    return pngKey.replace(/\.png$/, '') + '.json';
+  }
+
+  private async generate(candidate: CoverCandidate, replace = false): Promise<GeneratedCover | null> {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
     try {
@@ -306,13 +358,25 @@ export class CoverEnrichmentService {
         this.log.error(`MINIO unavailable while storing cover at ${endpoint} (bucket ${this.bucket}, key ${key}): ${error?.message || error}`);
         throw error;
       }
+      // The request it was rendered from, next to the PNG: what the reader's
+      // admin section shows for the current cover (storedRequest).
+      const requestJson = Buffer.from(JSON.stringify(request, null, 2));
+      try {
+        await this.minio!.putObject(this.bucket, CoverEnrichmentService.requestKey(key), requestJson, requestJson.length, {
+          'Content-Type': 'application/json; charset=utf-8',
+        });
+      } catch (error: any) {
+        // The cover itself is stored; a missing request record only hides it from the admin view.
+        this.log.warn(`cover request JSON not stored for ${candidate.path}: ${error?.message || error}`);
+      }
       const url = this.publicUrl(key);
-      await this.biblioteca.persistEnrichment({ opusId: candidate.id, coverUrl: url });
+      // A forced render must become the work's cover (server-side fill-only otherwise).
+      await this.biblioteca.persistEnrichment({ opusId: candidate.id, coverUrl: url, ...(replace ? { replaceCover: true } : {}) });
       this.log.log(`generated cover ${candidate.path} in ${this.elapsed(started)}`);
-      return true;
+      return { coverUrl: url, request };
     } catch (error: any) {
       this.log.warn(`cover generation failed for ${candidate.path} after ${this.elapsed(started)}: ${error?.message || error}`);
-      return false;
+      return null;
     }
   }
 

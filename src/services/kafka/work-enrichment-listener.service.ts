@@ -5,7 +5,7 @@ import { BibliotecaClient } from '../biblioteca_client.service';
 import { CoverEnrichmentService } from '../cover-enrichment.service';
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from 'src/configuration';
 import { describeKafkaError, isMembershipError } from './error-details';
-import { randomAuthorArt } from './author-arts';
+import { coverCandidateFor } from './author-arts';
 
 // Its own group: the cover requests are a separate stream from the
 // import/reimport events the other listeners consume.
@@ -86,26 +86,12 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
       this.log.log(`work ${strId} already has a cover - nothing to do`);
       return false;
     }
-    const author = opus.author;
-    let artUrl: string | undefined;
-    if (author?.strId) {
-      try {
-        artUrl = await randomAuthorArt(this.tbc, author.strId);
-      } catch (error: any) {
-        this.log.warn(`author media lookup failed for ${author.strId}; rendering without art: ${error?.message || error}`);
-      }
-    }
-    this.log.log(`cover requested for ${opus.path}${artUrl ? ` (art ${artUrl})` : ''}`);
+    const candidate = await coverCandidateFor(this.tbc, opus, error =>
+      this.log.warn(`author media lookup failed for ${opus.author?.strId}; rendering without art: ${error?.message || error}`));
+    this.log.log(`cover requested for ${opus.path}${candidate.artUrl ? ` (art ${candidate.artUrl})` : ''}`);
     // Fire-and-forget like the import listener: a render takes far longer
     // than a consumer session; CoverEnrichmentService queues and dedupes.
-    void this.covers.enqueue({
-      id: opus.id,
-      path: opus.path,
-      title: opus.head,
-      author: author?.displayName || author?.visualName || author?.strId || 'Anonymous',
-      coverUrl: opus.coverUrl,
-      artUrl,
-    });
+    void this.covers.enqueue(candidate);
     return true;
   }
 
