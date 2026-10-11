@@ -7,6 +7,7 @@ import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from 'src/configuration'
 import { Util } from 'src/util';
 import { CoverEnrichmentService } from '../cover-enrichment.service';
 import { describeKafkaError, isMembershipError } from './error-details';
+import { randomAuthorArt } from './author-arts';
 
 // Deliberately its own consumer group, not VectorizerKafkaListenerService's
 // KAFKA_GROUP_ID (used for vectorizing) - two consumers sharing one group
@@ -121,8 +122,7 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
             // only stands in when the server has nothing associated yet.
             if (author?.strId) {
               try {
-                const arts = await this.authorArts(author.strId);
-                if (arts.length) artUrl = arts[Math.floor(Math.random() * arts.length)];
+                artUrl = (await randomAuthorArt(this.tbc, author.strId)) ?? artUrl;
               } catch (error: any) {
                 this.log.warn(`author media lookup failed for ${author.strId}; continuing with ${artUrl ? 'the enrichment art' : 'no artwork'}: ${error?.message || error}`);
               }
@@ -179,15 +179,6 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
         }
       }),
     });
-  }
-
-  /** The author's image URLs as the server associates them, deduplicated. */
-  private async authorArts(strId: string): Promise<string[]> {
-    const author = await this.tbc.getAuthor(strId);
-    return [
-      ...(Array.isArray(author?.imageUrls) ? author.imageUrls : []),
-      ...(author?.image_href ? [author.image_href] : []),
-    ].filter((url, i, all) => typeof url === 'string' && url.length > 0 && all.indexOf(url) === i);
   }
 
   onApplicationShutdown(_signal?: string) {

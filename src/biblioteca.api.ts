@@ -35,40 +35,6 @@ export interface RepresentationModelObject {
   _links?: Links;
 }
 
-export interface EntityModelOpusVectorizingStat {
-  /** @format date-time */
-  recordedAt?: string;
-  /** @format int64 */
-  opusId?: number;
-  /** @format int32 */
-  totalParas?: number;
-  /** @format int32 */
-  totalBatches?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
-  _links?: Links;
-}
-
-export interface PageMetadata {
-  /** @format int64 */
-  size?: number;
-  /** @format int64 */
-  totalElements?: number;
-  /** @format int64 */
-  totalPages?: number;
-  /** @format int64 */
-  number?: number;
-}
-
-export interface PagedModelEntityModelOpusVectorizingStat {
-  _embedded?: {
-    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
 export interface EntityModelTeiDiv {
   /** @format int64 */
   id?: number;
@@ -118,6 +84,17 @@ export interface EntityModelTeiDiv {
   leaf?: boolean;
   completePath?: string;
   _links?: Links;
+}
+
+export interface PageMetadata {
+  /** @format int64 */
+  size?: number;
+  /** @format int64 */
+  totalElements?: number;
+  /** @format int64 */
+  totalPages?: number;
+  /** @format int64 */
+  number?: number;
 }
 
 export interface PagedModelEntityModelTeiDiv {
@@ -227,6 +204,28 @@ export interface TeiFile {
   author?: Author;
 }
 
+export interface EntityModelTeiOpus {
+  description?: string;
+  significantQuote?: string;
+  coverUrl?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiOpus {
+  _embedded?: {
+    teiOpuses?: EntityModelTeiOpus[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelObject {
+  _embedded?: {
+    objects?: any[];
+  };
+  _links?: Links;
+}
+
 export interface EntityModelTeiElem {
   xpath?: string;
   domPath?: string;
@@ -277,46 +276,24 @@ export interface PagedModelEntityModelTeiElem {
   page?: PageMetadata;
 }
 
-export interface EntityModelTeiOpus {
-  description?: string;
-  significantQuote?: string;
-  coverUrl?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiOpus {
-  _embedded?: {
-    teiOpuses?: EntityModelTeiOpus[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelObject {
-  _embedded?: {
-    objects?: any[];
-  };
-  _links?: Links;
-}
-
-export interface EntityModelEmbeddingBatchStat {
+export interface EntityModelOpusVectorizingStat {
   /** @format date-time */
   recordedAt?: string;
-  /** @format int32 */
-  batchSize?: number;
   /** @format int64 */
-  totalChars?: number;
+  opusId?: number;
   /** @format int32 */
-  vectorDimension?: number;
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
   embedderModel?: string;
   /** @format int64 */
   durationMs?: number;
   _links?: Links;
 }
 
-export interface PagedModelEntityModelEmbeddingBatchStat {
+export interface PagedModelEntityModelOpusVectorizingStat {
   _embedded?: {
-    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
   };
   _links?: Links;
   page?: PageMetadata;
@@ -392,6 +369,29 @@ export interface CollectionModelEntityModelAuthor {
     authors?: EntityModelAuthor[];
   };
   _links?: Links;
+}
+
+export interface EntityModelEmbeddingBatchStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
+  /** @format int64 */
+  totalChars?: number;
+  /** @format int32 */
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelEmbeddingBatchStat {
+  _embedded?: {
+    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
 }
 
 export interface AuthorRequestBody {
@@ -702,6 +702,7 @@ export interface AuthorDto {
   worksCount?: number;
   opera?: OpusDto[];
   image_href?: string;
+  imageUrls?: string[];
 }
 
 export interface CatalogPageDtoTeiDivDto {
@@ -742,6 +743,7 @@ export interface OpusDto {
   author?: any;
   leaf?: boolean;
   opus?: boolean;
+  imageUrls?: string[];
   authors?: AuthorDto[];
 }
 
@@ -772,6 +774,7 @@ export interface TeiDivDto {
   author?: AuthorDto;
   leaf?: boolean;
   opus?: boolean;
+  imageUrls?: string[];
 }
 
 export interface TeiElemDto {
@@ -834,6 +837,60 @@ export interface RebuildStatus {
   indexedDocs?: number;
 }
 
+/** Book metadata available to cover themes - matches schemas/book-metadata.schema.json exactly. title/author/publisher/date always come back (possibly ""); every other field is omitted entirely when this work's TEI source has nothing for it - which is most works, most fields, in this corpus. */
+export interface BookMetadataDto {
+  /**
+   * Main title of the book. Required - always present, from this corpus's own reliable DB field.
+   * @example "Poezii"
+   */
+  title?: string;
+  /**
+   * Subtitle or descriptive heading, read live from the opus's own TEI <subtitle> when present. Often absent.
+   * @example "(1864)"
+   */
+  subtitle?: string;
+  /**
+   * Primary author or creator. Required - always present, from this corpus's own reliable DB field.
+   * @example "Costache Negri"
+   */
+  author?: string;
+  /** Editor or compiler, read live from the TEI header's titleStmt/editor. Almost always absent in this corpus. */
+  editor?: string;
+  /** Translator, read live from the TEI header's titleStmt/editor[@role='translator']. Almost always absent in this corpus. */
+  translator?: string;
+  /**
+   * Publishing house / imprint name. Required - always present; this platform's own fixed value, not read from the TEI source.
+   * @example "Biblioteca"
+   */
+  publisher?: string;
+  /** City or place of publication, read live from the TEI header's publicationStmt/pubPlace. Almost always absent in this corpus. */
+  pubPlace?: string;
+  /**
+   * Publication year/date. Required - always present (possibly ""). Reads the TEI header's editionStmt/edition/date, which in this corpus is the digitization date, not an original publication date - there usually isn't one to read.
+   * @example "2024"
+   */
+  date?: string;
+  /** ISBN identifier, read live from the TEI header's sourceDesc//idno[@type='ISBN']. Almost always absent - this corpus predates ISBNs or never recorded them. */
+  isbn?: string;
+  /** Book series or collection title, read live from the TEI header's seriesStmt/title. Almost always absent in this corpus. */
+  series?: string;
+  /** Volume number or designation (e.g. 'I', '2', 'Vol. 1'), read live from the TEI header's seriesStmt/biblScope[@unit='volume']. Almost always absent. */
+  volume?: string;
+  /** Epigraph quote or front-cover blurb, read live from the opus's own TEI <epigraph>. Almost always absent in this corpus. */
+  taglineQuote?: string;
+  /** Genre / subject classification, read live from the TEI header's profileDesc/textClass/keywords. Almost always absent in this corpus. */
+  genre?: string;
+  /** Notice such as 'First Edition', 'Critical Edition', etc., read live from the TEI header's editionStmt/edition text. Almost always absent. */
+  editionNotice?: string;
+  /**
+   * Language code, from this corpus's own reliable DB field.
+   * @example "ro"
+   */
+  language?: string;
+  /** Raw TEI-XML source of this opus/div, only included when the request sets ?includeRawTei=true (omitted by default - can be large). */
+  rawTei?: string;
+}
+
 export interface CatalogPageDtoAuthorDto {
   items?: AuthorDto[];
   /** @format int32 */
@@ -844,6 +901,12 @@ export interface CatalogPageDtoAuthorDto {
   totalItems?: number;
   /** @format int32 */
   totalPages?: number;
+}
+
+export interface AuthorMediaDto {
+  strId?: string;
+  displayName?: string;
+  imageUrls?: string[];
 }
 
 export interface Embedder {
@@ -861,6 +924,7 @@ export interface Kafka {
   newOpusImportedTopic?: string;
   opusReimportedTopic?: string;
   opusRemovedTopic?: string;
+  enrichWorkTopic?: string;
 }
 
 export interface Milvus {
@@ -1433,9 +1497,24 @@ export class Api<
      *
      * @tags author-search-controller
      * @name ExecuteSearchAuthorGet7
+     * @request GET:/api/drest/authors/search/findOrphanedAuthors
+     */
+    executeSearchAuthorGet7: (params: RequestParams = {}) =>
+      this.request<CollectionModelEntityModelAuthor, void>({
+        path: `/api/drest/authors/search/findOrphanedAuthors`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags author-search-controller
+     * @name ExecuteSearchAuthorGet8
      * @request GET:/api/drest/authors/search/getByOriginalNameInTeiFile
      */
-    executeSearchAuthorGet7: (
+    executeSearchAuthorGet8: (
       query?: {
         originalName?: string;
       },
@@ -1453,10 +1532,10 @@ export class Api<
      * No description
      *
      * @tags author-search-controller
-     * @name ExecuteSearchAuthorGet8
+     * @name ExecuteSearchAuthorGet9
      * @request GET:/api/drest/authors/search/getByStrId
      */
-    executeSearchAuthorGet8: (
+    executeSearchAuthorGet9: (
       query?: {
         strId?: string;
       },
@@ -1474,10 +1553,10 @@ export class Api<
      * No description
      *
      * @tags author-search-controller
-     * @name ExecuteSearchAuthorGet9
+     * @name ExecuteSearchAuthorGet10
      * @request GET:/api/drest/authors/search/getTeiFiles
      */
-    executeSearchAuthorGet9: (
+    executeSearchAuthorGet10: (
       query?: {
         /** @format int64 */
         authorId?: number;
@@ -1486,6 +1565,28 @@ export class Api<
     ) =>
       this.request<CollectionModelEntityModelAuthor, void>({
         path: `/api/drest/authors/search/getTeiFiles`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags author-search-controller
+     * @name ExecuteSearchAuthorGet11
+     * @request GET:/api/drest/authors/search/lockForFileDeletion
+     */
+    executeSearchAuthorGet11: (
+      query: {
+        /** @format int64 */
+        id: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<number, void>({
+        path: `/api/drest/authors/search/lockForFileDeletion`,
         method: "GET",
         query: query,
         format: "json",
@@ -2078,9 +2179,24 @@ export class Api<
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet1
-     * @request GET:/api/drest/teiDivs/search/findAllOpera
+     * @request GET:/api/drest/teiDivs/search/deleteElemsWithoutTeiFile
      */
     executeSearchTeidivGet1: (params: RequestParams = {}) =>
+      this.request<number, void>({
+        path: `/api/drest/teiDivs/search/deleteElemsWithoutTeiFile`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet2
+     * @request GET:/api/drest/teiDivs/search/findAllOpera
+     */
+    executeSearchTeidivGet2: (params: RequestParams = {}) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
         path: `/api/drest/teiDivs/search/findAllOpera`,
         method: "GET",
@@ -2092,10 +2208,25 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet2
+     * @name ExecuteSearchTeidivGet3
+     * @request GET:/api/drest/teiDivs/search/findAllOperaRowsForDav
+     */
+    executeSearchTeidivGet3: (params: RequestParams = {}) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findAllOperaRowsForDav`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet4
      * @request GET:/api/drest/teiDivs/search/findByHead
      */
-    executeSearchTeidivGet2: (
+    executeSearchTeidivGet4: (
       query?: {
         head?: string;
       },
@@ -2113,10 +2244,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet3
+     * @name ExecuteSearchTeidivGet5
      * @request GET:/api/drest/teiDivs/search/findByHeadContainingIgnoreCase
      */
-    executeSearchTeidivGet3: (
+    executeSearchTeidivGet5: (
       query?: {
         excerpt?: string;
         /**
@@ -2148,10 +2279,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet4
+     * @name ExecuteSearchTeidivGet6
      * @request GET:/api/drest/teiDivs/search/findByLang
      */
-    executeSearchTeidivGet4: (
+    executeSearchTeidivGet6: (
       query?: {
         lang?:
           | "BG"
@@ -2202,10 +2333,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet5
+     * @name ExecuteSearchTeidivGet7
      * @request GET:/api/drest/teiDivs/search/findByTeiFile
      */
-    executeSearchTeidivGet5: (
+    executeSearchTeidivGet7: (
       query?: {
         teiFile?: TeiFile;
       },
@@ -2223,10 +2354,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet6
+     * @name ExecuteSearchTeidivGet8
      * @request GET:/api/drest/teiDivs/search/findByTeiFileAndXpath
      */
-    executeSearchTeidivGet6: (
+    executeSearchTeidivGet8: (
       query?: {
         teiFile?: TeiFile;
         xpath?: string;
@@ -2245,10 +2376,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet7
+     * @name ExecuteSearchTeidivGet9
      * @request GET:/api/drest/teiDivs/search/findByUrlFragmentAndParent
      */
-    executeSearchTeidivGet7: (
+    executeSearchTeidivGet9: (
       query?: {
         urlFragment?: string;
         parent?: TeiDivRequestBody;
@@ -2267,10 +2398,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet8
+     * @name ExecuteSearchTeidivGet10
      * @request GET:/api/drest/teiDivs/search/findOpera
      */
-    executeSearchTeidivGet8: (
+    executeSearchTeidivGet10: (
       query?: {
         /**
          * Zero-based page index (0..N)
@@ -2301,10 +2432,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet9
+     * @name ExecuteSearchTeidivGet11
      * @request GET:/api/drest/teiDivs/search/findOperaByLang
      */
-    executeSearchTeidivGet9: (
+    executeSearchTeidivGet11: (
       query?: {
         lang?:
           | "BG"
@@ -2355,10 +2486,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet10
+     * @name ExecuteSearchTeidivGet12
      * @request GET:/api/drest/teiDivs/search/findOperaByStablePath
      */
-    executeSearchTeidivGet10: (
+    executeSearchTeidivGet12: (
       query?: {
         authorId?: string;
         opusId?: string;
@@ -2377,10 +2508,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet11
+     * @name ExecuteSearchTeidivGet13
      * @request GET:/api/drest/teiDivs/search/findOperaCatalogPage
      */
-    executeSearchTeidivGet11: (
+    executeSearchTeidivGet13: (
       query: {
         q: string;
         language:
@@ -2432,10 +2563,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet12
+     * @name ExecuteSearchTeidivGet14
      * @request GET:/api/drest/teiDivs/search/findOperaForAuthorStrId
      */
-    executeSearchTeidivGet12: (
+    executeSearchTeidivGet14: (
       query?: {
         authorStrId?: string;
       },
@@ -2453,10 +2584,25 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet13
+     * @name ExecuteSearchTeidivGet15
+     * @request GET:/api/drest/teiDivs/search/findOrphanedOperaIds
+     */
+    executeSearchTeidivGet15: (params: RequestParams = {}) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/findOrphanedOperaIds`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet16
      * @request GET:/api/drest/teiDivs/search/getAuthors
      */
-    executeSearchTeidivGet13: (
+    executeSearchTeidivGet16: (
       query?: {
         /** @format int64 */
         id?: number;
@@ -2475,10 +2621,25 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet14
+     * @name ExecuteSearchTeidivGet17
+     * @request GET:/api/drest/teiDivs/search/getBottomDivIds
+     */
+    executeSearchTeidivGet17: (params: RequestParams = {}) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/getBottomDivIds`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet18
      * @request GET:/api/drest/teiDivs/search/getByTeiFileAndXpath
      */
-    executeSearchTeidivGet14: (
+    executeSearchTeidivGet18: (
       query?: {
         teiFile?: TeiFile;
         xpath?: string;
@@ -2497,25 +2658,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet15
-     * @request GET:/api/drest/teiDivs/search/getNrOfBottomDivs
-     */
-    executeSearchTeidivGet15: (params: RequestParams = {}) =>
-      this.request<number, void>({
-        path: `/api/drest/teiDivs/search/getNrOfBottomDivs`,
-        method: "GET",
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet16
+     * @name ExecuteSearchTeidivGet19
      * @request GET:/api/drest/teiDivs/search/getOperaForTeiFileId
      */
-    executeSearchTeidivGet16: (
+    executeSearchTeidivGet19: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -2534,10 +2680,10 @@ export class Api<
      * No description
      *
      * @tags tei-div-search-controller
-     * @name ExecuteSearchTeidivGet17
+     * @name ExecuteSearchTeidivGet20
      * @request GET:/api/drest/teiDivs/search/getOperaPathsForTeiFileId
      */
-    executeSearchTeidivGet17: (
+    executeSearchTeidivGet20: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -3033,6 +3179,38 @@ export class Api<
     /**
      * No description
      *
+     * @tags user-preferences-rest-controller
+     * @name Get
+     * @request GET:/api/users/me/preferences
+     */
+    get: (params: RequestParams = {}) =>
+      this.request<Record<string, any>, any>({
+        path: `/api/users/me/preferences`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags user-preferences-rest-controller
+     * @name Put
+     * @request PUT:/api/users/me/preferences
+     */
+    put: (data: Record<string, any>, params: RequestParams = {}) =>
+      this.request<Record<string, any>, any>({
+        path: `/api/users/me/preferences`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags reading-progress-rest-controller
      * @name Mine
      * @request GET:/api/reading-progress
@@ -3100,10 +3278,10 @@ export class Api<
      * No description
      *
      * @tags runtime-config-rest-controller
-     * @name Get
+     * @name Get1
      * @request GET:/api/admin/runtime-config/{key}
      */
-    get: (
+    get1: (
       key: string,
       query?: {
         /** @default false */
@@ -3244,6 +3422,26 @@ export class Api<
     addItem: (name: string, data: AddItemRequest, params: RequestParams = {}) =>
       this.request<DivCollectionItemDto, any>({
         path: `/api/collections/mine/${name}/items`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags google-auth-controller
+     * @name RefreshGoogleProfile
+     * @request POST:/api/auth/google/profile
+     */
+    refreshGoogleProfile: (
+      data: Record<string, string>,
+      params: RequestParams = {},
+    ) =>
+      this.request<Record<string, any>, any>({
+        path: `/api/auth/google/profile`,
         method: "POST",
         body: data,
         type: ContentType.Json,
@@ -3590,6 +3788,33 @@ export class Api<
       }),
 
     /**
+     * @description Returns one work's metadata in the cover renderer's own BookMetadata shape (schemas/book-metadata.schema.json, stored in this project). title/author/publisher/date always come back, possibly as ""; every other field is only present when this work's TEI source actually carries it - which is uncommon in this corpus, so expect most of those to be missing most of the time. Pass ?includeRawTei=true to also get the raw TEI XML.
+     *
+     * @tags div-rest-controller
+     * @name GetCoverMetadata
+     * @summary Book metadata for a cover theme (BookMetadata schema)
+     * @request GET:/api/divs/{id}/cover-metadata
+     */
+    getCoverMetadata: (
+      id: string,
+      query?: {
+        /**
+         * Also include the raw TEI-XML source in the response's rawTei field. Off by default - it can be large.
+         * @default false
+         */
+        includeRawTei?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<BookMetadataDto, any>({
+        path: `/api/divs/${id}/cover-metadata`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * @description Returns all child elements of the given div
      *
      * @tags div-rest-controller
@@ -3731,10 +3956,10 @@ export class Api<
      * No description
      *
      * @tags div-collection-rest-controller
-     * @name Get1
+     * @name Get2
      * @request GET:/api/collections/mine/{name}
      */
-    get1: (name: string, params: RequestParams = {}) =>
+    get2: (name: string, params: RequestParams = {}) =>
       this.request<DivCollectionDto, any>({
         path: `/api/collections/mine/${name}`,
         method: "GET",
@@ -3813,6 +4038,21 @@ export class Api<
         path: `/api/authors/page`,
         method: "GET",
         query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags author-rest-controller
+     * @name GetAllAuthorMedia
+     * @request GET:/api/authors/media
+     */
+    getAllAuthorMedia: (params: RequestParams = {}) =>
+      this.request<AuthorMediaDto[], any>({
+        path: `/api/authors/media`,
+        method: "GET",
         format: "json",
         ...params,
       }),

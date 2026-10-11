@@ -48,12 +48,12 @@ export class BibliotecaClient {
 
     async getAllOpera(pageNr = 0, pageSize = 20) {
       const watch = new StopWatch();
-      // executeSearchTeidivGet8 is Spring Data REST's generated name for
+      // executeSearchTeidivGet10 is Spring Data REST's generated name for
       // findOpera - its numeric suffix shifts
       // whenever a sibling /api/drest/teiDivs/search/* endpoint is added or
       // removed elsewhere, so it has to be re-checked (grep biblioteca.api.ts
       // for `findOpera`) every time the client gets regenerated.
-      const resp = await this.tb.api.executeSearchTeidivGet8({ page: pageNr, size: pageSize});
+      const resp = await this.tb.api.executeSearchTeidivGet10({ page: pageNr, size: pageSize});
       const divs = resp.data._embedded.teiDivs;
       this.log.log(`GET ${this.conf.bibliotecaUrl}/api/drest/teiDivs/search/findOpera?page=${pageNr}&size=${pageSize} : done, got ${divs.length} opi, took ${watch}`);
       return divs;
@@ -98,6 +98,7 @@ export class BibliotecaClient {
           newOpusImportedTopic: cfg.kafka.newOpusImportedTopic,
           opusReimportedTopic: cfg.kafka.opusReimportedTopic,
           opusRemovedTopic: cfg.kafka.opusRemovedTopic,
+          enrichWorkTopic: cfg.kafka.enrichWorkTopic,
         },
         milvus: {
           collection: cfg.milvus.collection,

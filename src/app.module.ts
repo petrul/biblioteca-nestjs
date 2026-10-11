@@ -5,6 +5,7 @@ import { VectorizingJobService } from './services/vectorizing_job.service';
 import { ProducerService } from './services/kafka/producer.service';
 import { VectorizerKafkaListenerService } from './services/kafka/vectorizer-listener.service';
 import { AuthorEnrichmentKafkaListenerService } from './services/kafka/author-enrichment-listener.service';
+import { WorkEnrichmentKafkaListenerService } from './services/kafka/work-enrichment-listener.service';
 import { KafkaService } from './services/kafka/kafka.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
@@ -60,6 +61,7 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     ProducerService,
     VectorizerKafkaListenerService,
     AuthorEnrichmentKafkaListenerService,
+    WorkEnrichmentKafkaListenerService,
     KafkaService,
     EnrichmentService,
     EnrichmentAdminService,

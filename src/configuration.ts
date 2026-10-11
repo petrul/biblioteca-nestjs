@@ -83,6 +83,10 @@ export interface SharedTextbaseConfig {
         newOpusImportedTopic: string;
         opusReimportedTopic: string;
         opusRemovedTopic: string;
+        /** Cover requests for served works without one (biblioteca-server's
+         *  CoverEnrichmentRequests); absent on servers older than it, which
+         *  leaves WorkEnrichmentKafkaListenerService idle. */
+        enrichWorkTopic?: string;
     };
     milvus: {
         collection: string;
