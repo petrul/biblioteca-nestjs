@@ -81,14 +81,17 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
       }
       throw err;
     }
-    if (!opus?.id || !opus?.path || !opus?.head) return false;
+    if (!opus?.id || !opus?.path || !opus?.head) {
+      this.log.log(`work enrichment ${strId}: nothing to do - the server returned no work for it`);
+      return false;
+    }
     if (opus.coverUrl) {
-      this.log.log(`work ${strId} already has a cover - nothing to do`);
+      this.log.log(`work enrichment ${strId}: nothing to do - it already has a cover (${opus.coverUrl})`);
       return false;
     }
     const candidate = await coverCandidateFor(this.tbc, opus, error =>
       this.log.warn(`author media lookup failed for ${opus.author?.strId}; rendering without art: ${error?.message || error}`));
-    this.log.log(`cover requested for ${opus.path}${candidate.artUrl ? ` (art ${candidate.artUrl})` : ''}`);
+    this.log.log(`work enrichment ${strId}: cover requested${candidate.artUrl ? ` (art ${candidate.artUrl})` : ' (no author art)'}`);
     // Fire-and-forget like the import listener: a render takes far longer
     // than a consumer session; CoverEnrichmentService queues and dedupes.
     void this.covers.enqueue(candidate);
