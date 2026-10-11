@@ -1,6 +1,6 @@
 {
   "name": "biblioteca-nestjs",
-  "version": "0.9.12-SNAPSHOT",
+  "version": "0.9.13-SNAPSHOT",
   "releaseName": "Bronze Basilica",
   "description": "",
   "main": "dist/main.js",
