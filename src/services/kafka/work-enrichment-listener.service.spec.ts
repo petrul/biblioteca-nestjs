@@ -32,12 +32,10 @@ describe('WorkEnrichmentKafkaListenerService', () => {
     expect(['https://img/a.jpg', 'https://img/b.jpg']).toContain(enqueued[0].artUrl);
   });
 
-  it('leaves a work alone that has a cover by the time the request arrives, and says so at INFO', async () => {
-    const { listener, covers } = makeListener({ ...work, coverUrl: 'https://test.scriptorium.ro/biblioteca/covers/x.png' });
-    const info = jest.spyOn((listener as any).log, 'log').mockImplementation(() => undefined);
-    expect(await listener.handleEnrichWork('eminescu/poezii')).toBe(false);
-    expect(covers.enqueue).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith('work enrichment eminescu/poezii: nothing to do - it already has a cover (https://test.scriptorium.ro/biblioteca/covers/x.png)');
+  it('hands a work that already has a cover to enqueue, which verifies the stored cover still exists', async () => {
+    const { listener, enqueued } = makeListener({ ...work, path: 'eminescu/poezii', id: 7, coverUrl: 'https://test.scriptorium.ro/biblioteca/covers/x.png' });
+    expect(await listener.handleEnrichWork('eminescu/poezii')).toBe(true);
+    expect(enqueued[0]).toMatchObject({ coverUrl: 'https://test.scriptorium.ro/biblioteca/covers/x.png' });
   });
 
   it('drops requests for unknown works and malformed ids without asking for a cover', async () => {

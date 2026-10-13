@@ -39,6 +39,7 @@ export const COVER_IMPRINT = {
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
 @Injectable()
 export class CoverEnrichmentService {
+  
   private readonly log = new Logger("cover-enrichment");
   private readonly pending = new Set<string>();
   private readonly queue: { candidate: CoverCandidate; force: boolean; resolve: (ok: boolean) => void }[] = [];
@@ -188,13 +189,18 @@ export class CoverEnrichmentService {
     }
     this.pending.add(candidate.path);
     return (async () => {
-      if (!opts.force && candidate.coverUrl && await this.coverExists(candidate.coverUrl)) {
-        this.log.log(`cover skipped for ${candidate.path}: already has ${candidate.coverUrl}`);
-        this.pending.delete(candidate.path!);
-        return false;
+      let force = !!opts.force;
+      if (!force && candidate.coverUrl) {
+        if (await this.coverExists(candidate.coverUrl)) {
+          this.log.log(`cover skipped for ${candidate.path}: already has ${candidate.coverUrl}`);
+          this.pending.delete(candidate.path!);
+          return false;
+        }
+        // The stored object is gone: the new cover must replace the dead URL.
+        force = true;
       }
       return new Promise<boolean>(resolve => {
-        this.queue.push({ candidate, force: !!opts.force, resolve });
+        this.queue.push({ candidate, force, resolve });
         this.drain();
       });
     })();
