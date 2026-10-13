@@ -460,7 +460,11 @@ endpoints carry ready-made named examples in their request body).
 
 The invariant the surface is built around: **every step is fill-only by
 default** - it only enriches what is not enriched yet, and existing data is
-never touched. That is enforced in three independent layers, so a bug in one
+never touched. For covers, "enriched" means verified, not merely present:
+a stored `coverUrl` whose MinIO object is missing - or holds a non-image
+body - counts as unenriched and the cover is re-rendered (one ranged read
+per stored URL, asked by `CoverEnrichmentService.hasUsableCover` from the
+Kafka work-enrichment listener and the manual run alike). That is enforced in three independent layers, so a bug in one
 cannot destroy anything: candidate selection (an enriched entity never even
 becomes a candidate), the guards inside the enrichment/cover services
 themselves, and biblioteca-server's persistence endpoint, which fills blank

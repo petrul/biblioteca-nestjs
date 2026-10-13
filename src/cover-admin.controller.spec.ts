@@ -90,7 +90,7 @@ describe('CoverAdminController (independent /api/covers surface)', () => {
         yield { id: 2, head: 'Coverless', completePath: 'p2' };
       },
     };
-    const covers: any = { enqueued: [] as any[], enqueue(candidate: any, opts: any = {}) { this.enqueued.push({ ...candidate, force: opts.force }); } };
+    const covers: any = { enqueued: [] as any[], hasUsableCover: async (url?: string) => !!url, enqueue(candidate: any, opts: any = {}) { this.enqueued.push({ ...candidate, force: opts.force }); } };
     const svc = new EnrichmentAdminService(tbc, { tryBeginRun: () => true, endRun: () => {}, storedAuthorArt: async () => undefined } as any, covers, {} as any, { status: () => ({ running: false }) } as any);
     const controller = new CoverAdminController(svc);
 

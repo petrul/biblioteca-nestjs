@@ -195,7 +195,7 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
       (global as any).fetch = (async () => ({
         ok: true,
         status: 200,
-        arrayBuffer: async () => PNG.buffer,
+        arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.byteLength),
       })) as any;
     }
     expect(putObject).not.toHaveBeenCalled();
@@ -204,20 +204,21 @@ describe('CoverEnrichmentService stores the rendered cover in MinIO', () => {
 
   it('re-renders a cover whose stored object was deleted from MinIO', async () => {
     const { svc, putObject } = makeStoredService();
-    const statObject = jest.spyOn((svc as any).minio!, 'statObject')
+    const getPartialObject = jest.spyOn((svc as any).minio!, 'getPartialObject')
       .mockRejectedValue(Object.assign(new Error('Not Found'), { code: 'NotFound' }));
     const coverUrl = 'http://minio.test/covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png';
 
     const done = svc.enqueue({ id: 9, path: 'dostoyevskii/bratya_karamazovy', title: 'T', author: 'A', coverUrl });
 
     await expect(done).resolves.toBe(true);
-    expect(statObject).toHaveBeenCalledWith('biblioteca', 'covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png');
+    expect(getPartialObject).toHaveBeenCalledWith('biblioteca', 'covers/dostoyevskii/bratya_karamazovy-c510c48cd6d9.png', 0, 12);
     expect(putObject).toHaveBeenCalledTimes(2); // PNG + request JSON
   });
 
-  it('leaves a cover alone while its stored object still exists', async () => {
+  it('leaves a cover alone while its stored object still exists and carries image bytes', async () => {
     const { svc, putObject } = makeStoredService();
-    jest.spyOn((svc as any).minio!, 'statObject').mockResolvedValue({ size: 1 } as any);
+    jest.spyOn((svc as any).minio!, 'getPartialObject')
+      .mockResolvedValue((async function* () { yield Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); })() as any);
 
     const done = svc.enqueue({ id: 9, path: 'p9', title: 'T', author: 'A', coverUrl: 'http://minio.test/covers/p9-abc.png' });
 
@@ -266,7 +267,7 @@ describe('CoverEnrichmentService randomTheme layout exclusion', () => {
  * cover; storedRequest reads back the JSON a cover was rendered from.
  */
 describe('CoverEnrichmentService on-demand cover and its stored request', () => {
-  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   let persisted: any[];
   let stored: Map<string, Buffer>;
   let originalFetch: any;
@@ -317,3 +318,84 @@ describe('CoverEnrichmentService on-demand cover and its stored request', () => 
   });
 });
 
+
+/**
+ * The database's coverUrl is a claim, not a fact: the MinIO object behind
+ * it must exist AND carry image bytes. JSON error bodies stored under .png
+ * keys by a misbehaving renderer and objects deleted behind the database's
+ * back both count as "no cover" - callers that skip generation on coverUrl
+ * alone (Kafka listener, manual admin run) ask hasUsableCover instead of
+ * trusting the database field.
+ */
+describe('stored cover verification (hasUsableCover)', () => {
+  const PNG_HEAD = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const JPEG_HEAD = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
+  const JSON_HEAD = Buffer.from('{"status":"ok","book":{');
+
+  function makeVerifyingService(objects: Record<string, Buffer | Error>) {
+    const svc = new CoverEnrichmentService({ async persistEnrichment(_update: any) { /* recorded by callers that care */ } } as any, {
+      minioUrl: 'http://minio.test',
+      minioCred: 'key:secret',
+      coversApiUrl: 'http://covers.test',
+    } as any);
+    jest.spyOn((svc as any).minio!, 'getPartialObject').mockImplementation(async (_b: any, key: any) => {
+      const value = objects[key];
+      if (!value) throw Object.assign(new Error('missing'), { code: 'NoSuchKey' });
+      if (value instanceof Error) throw value;
+      const body = value;
+      return (async function* () { yield body; })() as any;
+    });
+    return svc;
+  }
+
+  it('accepts a stored object that exists and carries image bytes (PNG and JPEG signatures)', async () => {
+    const svc = makeVerifyingService({ 'covers/a/png-1.png': PNG_HEAD, 'covers/a/jpg-1.png': JPEG_HEAD });
+    expect(await svc.hasUsableCover('http://minio.test/covers/a/png-1.png')).toBe(true);
+    expect(await svc.hasUsableCover('http://minio.test/covers/a/jpg-1.png')).toBe(true);
+  });
+
+  it('rejects a stored object that holds a JSON body instead of an image', async () => {
+    const svc = makeVerifyingService({ 'covers/a/b-1.png': JSON_HEAD });
+    expect(await svc.hasUsableCover('http://minio.test/covers/a/b-1.png')).toBe(false);
+  });
+
+  it('rejects a stored object that is missing from the bucket', async () => {
+    const svc = makeVerifyingService({});
+    expect(await svc.hasUsableCover('http://minio.test/covers/a/gone-1.png')).toBe(false);
+  });
+
+  it('trusts the stored URL when MinIO itself cannot answer', async () => {
+    const svc = makeVerifyingService({ 'covers/a/err-1.png': Object.assign(new Error('socket hang up'), { code: 'Unknown' }) });
+    expect(await svc.hasUsableCover('http://minio.test/covers/a/err-1.png')).toBe(true);
+  });
+
+  it('treats no stored URL as unusable and foreign URLs as trusted', async () => {
+    const svc = makeVerifyingService({});
+    expect(await svc.hasUsableCover(undefined)).toBe(false);
+    expect(await svc.hasUsableCover('https://upload.wikimedia.org/some.jpg')).toBe(true);
+  });
+
+  it('trusts every stored URL when the MinIO cover cache is not configured', async () => {
+    const svc = new CoverEnrichmentService({} as any, { coversApiUrl: 'http://covers.test' } as any);
+    expect(await svc.hasUsableCover('https://anything.example/c.png')).toBe(true);
+    expect(await svc.hasUsableCover(undefined)).toBe(false);
+  });
+
+  it('a poisoned stored cover lets enqueue through to a re-render', async () => {
+    const svc = makeVerifyingService({ 'covers/a/b-1.png': JSON_HEAD });
+    const putObject = jest.spyOn((svc as any).minio!, 'putObject').mockImplementation(async () => ({}) as any);
+    const originalFetch = (global as any).fetch;
+    let renders = 0;
+    (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
+      ? { ok: false, status: 500, json: async () => ({}) }
+      : (renders++, { ok: true, status: 200, arrayBuffer: async () => PNG_HEAD.buffer.slice(PNG_HEAD.byteOffset, PNG_HEAD.byteOffset + PNG_HEAD.length) })) as any;
+    try {
+      const done = svc.enqueue({ id: 3, path: 'a/b', title: 'T', author: 'A', coverUrl: 'http://minio.test/covers/a/b-1.png' });
+      await expect(done).resolves.toBe(true);
+    } finally {
+      (global as any).fetch = originalFetch;
+    }
+    expect(renders).toBe(1);
+    expect(putObject).toHaveBeenCalled();
+  });
+});

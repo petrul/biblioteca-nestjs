@@ -157,10 +157,10 @@ export class CoverEnrichmentService {
   }
 
   /**
-   * Fill-only by default: an opus that already has a coverUrl is left
-   * alone. opts.force - the manual admin runs' explicit overwrite switch,
-   * never an automatic caller - is the only way to re-render an existing
-   * cover.
+   * Fill-only by default: an opus whose stored coverUrl verifies in MinIO
+   * (present AND image bytes) is left alone. opts.force - the manual admin
+   * runs' explicit overwrite switch, never an automatic caller - is the
+   * only way to re-render a verified cover.
    */
   /**
    * @returns whether the cover actually got generated and stored - false
@@ -188,30 +188,40 @@ export class CoverEnrichmentService {
     }
     this.pending.add(candidate.path);
     return (async () => {
-      if (!opts.force && candidate.coverUrl && await this.coverExists(candidate.coverUrl)) {
-        this.log.log(`cover skipped for ${candidate.path}: already has ${candidate.coverUrl}`);
-        this.pending.delete(candidate.path!);
-        return false;
+      let force = !!opts.force;
+      if (!force && candidate.coverUrl) {
+        if (await this.coverExists(candidate.coverUrl)) {
+          this.log.log(`cover skipped for ${candidate.path}: already has ${candidate.coverUrl}`);
+          this.pending.delete(candidate.path!);
+          return false;
+        }
+        // The server is fill-only: a new cover only replaces the dead stored URL if asked to.
+        force = true;
       }
       return new Promise<boolean>(resolve => {
-        this.queue.push({ candidate, force: !!opts.force, resolve });
+        this.queue.push({ candidate, force, resolve });
         this.drain();
       });
     })();
   }
 
   /**
-   * Whether a stored coverUrl still points at a real cover. A URL into our
-   * own cache is checked against MinIO - an object deleted there must be
-   * re-rendered, or fill-only would skip that opus forever. Any other URL
-   * (a cover set by hand elsewhere) is trusted as-is.
+   * Whether a stored coverUrl can be left alone without re-rendering.
+   * A URL into our own cache must verify against MinIO: the object must
+   * exist AND really carry image bytes - buckets have held JSON error
+   * bodies stored under .png keys by a misbehaving renderer, and objects
+   * deleted behind the database's back must re-render or fill-only would
+   * skip that opus forever. Any other URL (a cover set by hand elsewhere)
+   * is trusted as-is.
    */
   private async coverExists(coverUrl: string): Promise<boolean> {
     const key = this.ownObjectKey(coverUrl);
     if (!key) return true;
     try {
-      await this.minio!.statObject(this.bucket, key);
-      return true;
+      const head = await this.objectPrefix(key);
+      if (CoverEnrichmentService.looksLikeImage(head)) return true;
+      this.log.warn(`stored cover ${coverUrl} is not an image (starts with ${JSON.stringify(head.toString('utf8').slice(0, 40))}); re-rendering`);
+      return false;
     } catch (error: any) {
       if (error?.code === 'NotFound' || error?.code === 'NoSuchKey') {
         this.log.log(`stored cover ${coverUrl} is missing from MinIO; re-rendering`);
@@ -221,6 +231,43 @@ export class CoverEnrichmentService {
       this.log.warn(`cannot verify stored cover ${coverUrl}: ${error?.message || error}`);
       return true;
     }
+  }
+
+  /**
+   * Whether a stored coverUrl can be trusted as-is. False with no stored
+   * URL, or when the URL is ours and the MinIO object behind it is missing
+   * or not an image; true when the object verifies, when the URL is not
+   * one of ours (hand-set elsewhere - trusted by coverExists), and when
+   * MinIO is not configured at all (nothing to verify against - the
+   * pre-cache behavior). Callers that skip cover generation on the
+   * database's coverUrl alone - the work-enrichment Kafka listener, the
+   * manual admin run's skip arithmetic - must ask here instead of trusting
+   * the database field.
+   */
+  async hasUsableCover(coverUrl: string | undefined): Promise<boolean> {
+    if (!coverUrl) return false;
+    if (!this.minio) return true;
+    return this.coverExists(coverUrl);
+  }
+
+  /** First bytes of a stored object - enough for an image-signature check. */
+  private async objectPrefix(key: string, length = 12): Promise<Buffer> {
+    const stream = await this.minio!.getPartialObject(this.bucket, key, 0, length);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream as any) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
+  /** PNG/JPEG/GIF/WEBP/BMP/SVG magic - anything else is not a cover image. */
+  private static looksLikeImage(head: Buffer): boolean {
+    if (head.length >= 8 && head.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return true; // PNG
+    if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true; // JPEG
+    if (head.subarray(0, 4).toString('latin1').startsWith('GIF8')) return true;
+    if (head.length >= 12 && head.subarray(0, 4).toString('latin1') === 'RIFF' && head.subarray(8, 12).toString('latin1') === 'WEBP') return true;
+    if (head.length >= 2 && head[0] === 0x42 && head[1] === 0x4d) return true; // BMP
+    return head.toString('utf8').trimStart().startsWith('<'); // SVG (<?xml / <svg)
   }
 
   /** The cache object key behind one of our own cover URLs, else undefined. */
@@ -340,6 +387,14 @@ export class CoverEnrichmentService {
       });
       if (!response.ok) throw new Error(`cover renderer HTTP ${response.status}`);
       const body = Buffer.from(await response.arrayBuffer());
+      // A 200 with a non-image body (an error document, a JSON stub) must
+      // never reach the cover cache: hasUsableCover would keep re-rendering
+      // it forever and the reader would keep falling back - refuse at the
+      // source. See the stored-cover poisoning the verification check exists
+      // to catch.
+      if (!CoverEnrichmentService.looksLikeImage(body.subarray(0, 12))) {
+        throw new Error(`cover renderer returned a non-image body (starts with ${JSON.stringify(body.subarray(0, 40).toString('utf8').slice(0, 40))})`);
+      }
       const key = this.objectKey(candidate.path!, body);
       try {
         await this.minio!.putObject(this.bucket, key, body, body.length, {

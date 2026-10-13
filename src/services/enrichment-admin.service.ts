@@ -377,7 +377,7 @@ export class EnrichmentAdminService {
         }
         if (wantsCover && opus.id && opus.completePath && opus.head) {
           const coverCounters = job.steps.cover!;
-          if (opus.coverUrl && !force) { coverCounters.skippedExisting++; }
+          if (opus.coverUrl && !force && await this.covers.hasUsableCover(opus.coverUrl)) { coverCounters.skippedExisting++; }
           else {
             coverCounters.candidates++;
             // CoverEnrichmentService.enqueue enforces the same fill-only

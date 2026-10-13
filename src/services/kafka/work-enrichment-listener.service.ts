@@ -86,8 +86,14 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
       return false;
     }
     if (opus.coverUrl) {
-      this.log.log(`work enrichment ${strId}: nothing to do - it already has a cover (${opus.coverUrl})`);
-      return false;
+      // The database field alone is not proof of a cover: the MinIO object
+      // behind it may be gone, or may hold a non-image body - verify before
+      // trusting it, or dead coverUrls would freeze a work coverless.
+      if (await this.covers.hasUsableCover(opus.coverUrl)) {
+        this.log.log(`work enrichment ${strId}: nothing to do - it already has a cover (${opus.coverUrl})`);
+        return false;
+      }
+      this.log.warn(`work enrichment ${strId}: stored cover failed verification - ordering a fresh one (${opus.coverUrl})`);
     }
     const candidate = await coverCandidateFor(this.tbc, opus, error =>
       this.log.warn(`author media lookup failed for ${opus.author?.strId}; rendering without art: ${error?.message || error}`));

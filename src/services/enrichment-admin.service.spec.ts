@@ -60,6 +60,13 @@ class FakeEnrichment {
 class FakeCovers {
   enqueued: { id: number; hasCoverUrl: boolean; force?: boolean }[] = [];
   enqueuedCandidates: any[] = [];
+  /** Per-URL verification verdicts; URLs absent from the map verify as usable. */
+  usable = new Map<string, boolean>();
+  hasUsableCoverCalls: (string | undefined)[] = [];
+  async hasUsableCover(coverUrl: string | undefined): Promise<boolean> {
+    this.hasUsableCoverCalls.push(coverUrl);
+    return coverUrl === undefined ? false : (this.usable.get(coverUrl) ?? true);
+  }
   enqueue(candidate: any, opts: { force?: boolean } = {}): Promise<boolean> {
     this.enqueued.push({ id: candidate.id, hasCoverUrl: !!candidate.coverUrl, force: opts.force });
     this.enqueuedCandidates.push(candidate);
@@ -226,6 +233,23 @@ describe('EnrichmentAdminService', () => {
       { id: 1, hasCoverUrl: true, force: true },
       { id: 2, hasCoverUrl: false, force: true },
     ]);
+  });
+
+  it('a covered work whose stored cover fails MinIO verification is re-enqueued even without overwrite', async () => {
+    const tbc = new FakeTbc();
+    tbc.opera = [
+      { id: 1, head: 'Dead Cover', completePath: 'p1', coverUrl: 'https://x/dead.png' },
+      { id: 2, head: 'Live Cover', completePath: 'p2', coverUrl: 'https://x/live.png' },
+    ];
+    const covers = new FakeCovers();
+    covers.usable.set('https://x/dead.png', false);
+    const svc = makeSvc(tbc, new FakeEnrichment(), covers, new FakeVectorizer());
+
+    const job = await waitJob(svc, (await svc.start({ steps: ['cover'] })).id);
+
+    expect(covers.hasUsableCoverCalls).toEqual(['https://x/dead.png', 'https://x/live.png']);
+    expect(covers.enqueued).toEqual([{ id: 1, hasCoverUrl: true, force: false }]);
+    expect(job.steps.cover).toMatchObject({ candidates: 1, processed: 1, skippedExisting: 1, failed: 0 });
   });
 
   it('a walk opus with no embedded author resolves its name and portrait from the authors list', async () => {
