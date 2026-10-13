@@ -65,7 +65,7 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
     });
   }
 
-  /** One request: schedule a random cover for the work unless it has a live one (enqueue checks a stored cover still exists in MinIO). Returns whether a cover was enqueued. */
+  /** One request: schedule a random cover for the work, unless it has one. Returns whether a cover was enqueued. */
   async handleEnrichWork(strId: string): Promise<boolean> {
     if (!strId || !/^[^/]+\/[^/]+$/.test(strId)) {
       this.log.warn(`ignoring work enrichment request with an invalid strId: ${strId}`);
@@ -83,6 +83,10 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
     }
     if (!opus?.id || !opus?.path || !opus?.head) {
       this.log.log(`work enrichment ${strId}: nothing to do - the server returned no work for it`);
+      return false;
+    }
+    if (opus.coverUrl) {
+      this.log.log(`work enrichment ${strId}: nothing to do - it already has a cover (${opus.coverUrl})`);
       return false;
     }
     const candidate = await coverCandidateFor(this.tbc, opus, error =>
