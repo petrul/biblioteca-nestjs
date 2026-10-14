@@ -61,8 +61,11 @@ export class CoverEnrichmentService {
   // selectable layout everywhere else, just never auto-picked for a
   // batch-generated cover.
   private static readonly EXCLUDED_RANDOM_LAYOUTS = ['storybook_whimsy'];
+  // The one layout drawn without any picture: a work with no art of its
+  // own and an author with no portrait is only ever given this one.
+  static readonly NO_ART_LAYOUT = 'pure_typographic';
   private coverMeta?: { layouts: string[]; palettes: string[] };
-  private async randomTheme(): Promise<{ layout: string; paletteId: string }> {
+  private async randomTheme(hasArt = true): Promise<{ layout: string; paletteId: string }> {
     if (!this.coverMeta) {
       try {
         const resp = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover/meta`);
@@ -83,7 +86,8 @@ export class CoverEnrichmentService {
     }
     const pick = (ids: string[] | undefined, fallback: string) =>
       ids && ids.length ? ids[Math.floor(Math.random() * ids.length)] : fallback;
-    return { layout: pick(this.coverMeta?.layouts, 'archival_monograph'), paletteId: pick(this.coverMeta?.palettes, 'archival_alabaster') };
+    const layout = hasArt ? pick(this.coverMeta?.layouts, 'archival_monograph') : CoverEnrichmentService.NO_ART_LAYOUT;
+    return { layout, paletteId: pick(this.coverMeta?.palettes, 'archival_alabaster') };
   }
 
   constructor(
@@ -330,18 +334,33 @@ export class CoverEnrichmentService {
    * "generate cover" (POST /api/covers/work). Always replaces the work's
    * current cover; refuses while the same work is already being rendered.
    */
-  async generateNow(candidate: CoverCandidate): Promise<GeneratedCover> {
+  /**
+   * Renders one cover right now and waits for it - the reader's admin
+   * "generate cover" (POST /api/covers/work). Always replaces the work's
+   * current cover; refuses while the same work is already being rendered.
+   * An admin-supplied request (the reader's editable JSON) is used verbatim,
+   * skipping the random theme.
+   */
+  async generateNow(candidate: CoverCandidate, request?: Record<string, unknown>): Promise<GeneratedCover> {
     if (!candidate.path) throw new Error(`opus ${candidate.id} has no stable path`);
     if (!this.minio) throw new Error('MinIO cover cache not configured');
     if (this.pending.has(candidate.path)) throw new Error(`a cover for ${candidate.path} is already being rendered`);
     this.pending.add(candidate.path);
     try {
-      const result = await this.generate(candidate, true);
+      const result = await this.generate(candidate, true, request);
       if (!result) throw new Error(`cover generation failed for ${candidate.path} (see the nestjs log)`);
       return result;
     } finally {
       this.pending.delete(candidate.path);
     }
+  }
+
+  /**
+   * A fresh random cover request for a candidate, WITHOUT rendering it -
+   * the reader admin's "New random JSON" button fills its editor with this.
+   */
+  async randomRequest(candidate: CoverCandidate): Promise<Record<string, unknown>> {
+    return this.coverRequest(candidate, await this.randomTheme(!!candidate.artUrl));
   }
 
   /**
@@ -368,17 +387,20 @@ export class CoverEnrichmentService {
     return pngKey.replace(/\.png$/, '') + '.json';
   }
 
-  private async generate(candidate: CoverCandidate, replace = false): Promise<GeneratedCover | null> {
+  private async generate(candidate: CoverCandidate, replace = false, requestOverride?: Record<string, unknown>): Promise<GeneratedCover | null> {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
     try {
       // Random layout + palette per cover (see randomTheme) - the point
       // of the whole cover feature is a varied shelf, not one house
-      // design repeated two thousand times.
-      const theme = await this.randomTheme();
-      const request = this.coverRequest(candidate, theme);
+      // design repeated two thousand times. An admin-supplied request
+      // (the reader's editable JSON) overrides the theme entirely.
+      // Without any art (neither the work's nor its author's) only the
+      // typographic layout - the others are built around a picture.
+      const theme = requestOverride ? null : await this.randomTheme(!!candidate.artUrl);
+      const request = requestOverride ?? this.coverRequest(candidate, theme!);
       // The exact JSON sent to biblioteca-covers, one line per cover.
-      this.log.log(`cover request ${candidate.path}: ${JSON.stringify(request)}`);
+      this.log.log(`cover request ${candidate.path}: ${requestOverride ? '(admin-supplied) ' : ''}${JSON.stringify(request)}`);
       const response = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover`, {
         method: 'POST',
         headers: { Accept: 'image/png', 'Content-Type': 'application/json', 'X-Biblioteca-Work-Id': candidate.path! },

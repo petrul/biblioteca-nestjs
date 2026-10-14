@@ -260,6 +260,27 @@ describe('CoverEnrichmentService randomTheme layout exclusion', () => {
     // The pool isn't just accidentally empty - the other two still get picked.
     expect(picks.has('archival_monograph') || picks.has('constructivist')).toBe(true);
   });
+
+  it('without any art (no work image, no author portrait) only ever picks the typographic layout', async () => {
+    (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
+      ? { ok: true, status: 200, json: async () => ({
+          layouts: [{ id: 'archival_monograph' }, { id: 'constructivist' }, { id: 'pure_typographic' }],
+          palettes: [{ id: 'archival_alabaster' }, { id: 'midnight' }],
+        }) }
+      : { ok: false, status: 500, json: async () => ({}) }) as any;
+
+    const svc = makeService();
+    for (let i = 0; i < 30; i++) {
+      expect((await (svc as any).randomTheme(false)).layout).toBe('pure_typographic');
+    }
+    // the random JSON for an art-less work, and with art the pool is the usual one
+    expect((await svc.randomRequest({ id: 1, path: 'a/b', title: 'T', author: 'A' })).layout).toBe('pure_typographic');
+    const withArt = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      withArt.add((await svc.randomRequest({ id: 1, path: 'a/b', title: 'T', author: 'A', artUrl: 'https://upload.wikimedia.org/a.jpg' })).layout as string);
+    }
+    expect(withArt.size).toBeGreaterThan(1);
+  });
 });
 
 /**
@@ -301,6 +322,39 @@ describe('CoverEnrichmentService on-demand cover and its stored request', () => 
     expect(result.request).toMatchObject({ title: 'Poezii', publisher: 'Ediții Scriptorium', date: '2026', pubPlace: 'București', series: 'Scriptorium Classique' });
     expect(persisted).toEqual([{ opusId: 5, coverUrl: result.coverUrl, replaceCover: true }]);
     expect(await svc.storedRequest(result.coverUrl)).toEqual(result.request);
+  });
+
+  it('generateNow renders an admin-supplied request verbatim, skipping the random theme', async () => {
+    const svc = makeService();
+    const bodies: string[] = [];
+    const originalFetch = (global as any).fetch;
+    (global as any).fetch = (async (_url: any, init: any) => {
+      bodies.push(String(init?.body ?? ''));
+      return { ok: true, status: 200, arrayBuffer: async () => PNG.buffer.slice(PNG.byteOffset, PNG.byteOffset + PNG.length) };
+    }) as any;
+    try {
+      const request = { title: 'Poezii', author: 'Mihai Eminescu', layout: 'swiss_grid' };
+      const result = await svc.generateNow({ id: 5, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu' }, request);
+      // The renderer got exactly the admin JSON - no random theme mixed in.
+      expect(bodies).toEqual([JSON.stringify(request)]);
+      expect(result.request).toEqual(request);
+      expect(await svc.storedRequest(result.coverUrl)).toEqual(request);
+    } finally {
+      (global as any).fetch = originalFetch;
+    }
+  });
+
+  it('randomRequest returns a fresh random request without rendering anything', async () => {
+    const svc = makeService();
+    const fetchSpy = jest.spyOn(global as any, 'fetch');
+    const request = await svc.randomRequest({ id: 5, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu' });
+    expect(request).toMatchObject({ title: 'Poezii', author: 'Mihai Eminescu', layout: expect.any(String) });
+    // Only the theme-discovery probe may hit the renderer - never POST /api/cover.
+    for (const call of fetchSpy.mock.calls) {
+      expect(String(call[0])).not.toMatch(/\/api\/cover$/);
+      expect(String((call[1] as any)?.method ?? 'GET')).not.toBe('POST');
+    }
+    expect(stored.size).toBe(0);
   });
 
   it('storedRequest is null for covers rendered before requests were recorded, and for foreign URLs', async () => {
