@@ -71,11 +71,15 @@ const LABELS = {
 class FakeFetch {
   calls: { url: string; init?: RequestInit }[] = [];
   pages: Record<string, any> = {};
+  // How Wikipedia answers: an article (default), no article (404), or a failed request.
+  wiki: 'ok' | 'missing' | 'down' = 'ok';
 
   stub = async (url: any, init?: any) => {
     this.calls.push({ url: String(url), init });
     if (url.startsWith('https://en.wikipedia.org/api/rest_v1/')) {
-      return { ok: true, json: async () => this.pages['wiki'] ?? null };
+      if (this.wiki === 'missing') return { ok: false, status: 404, json: async () => ({}) };
+      if (this.wiki === 'down') throw new Error('network down');
+      return { ok: true, status: 200, json: async () => this.pages['wiki'] ?? null };
     }
     const entity = url.match(/Special:EntityData\/(Q\d+)\.json/);
     if (entity) {
@@ -119,10 +123,10 @@ describe('EnrichmentService', () => {
   beforeAll(() => { originalFetch = (global as any).fetch; });
   afterAll(() => { (global as any).fetch = originalFetch; });
 
-  it('skips authors with a bio and opera with a description - no call at all', async () => {
+  it('skips authors with a bio and opera with a summary - no call at all', async () => {
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri', bio: 'already there' }];
-    tbc.opera = [{ id: 7, head: 'Lume', description: 'already there' }];
+    tbc.opera = [{ id: 7, head: 'Lume', summary: 'already there' }];
     const fetchMock = new FakeFetch();
     await service(tbc, fetchMock).dailySweep();
     expect(fetchMock.calls).toHaveLength(0);
@@ -229,13 +233,45 @@ describe('EnrichmentService', () => {
 
   it('skips an already-enriched work when called directly without force - no call at all', async () => {
     const tbc = new FakeTbc();
-    // either marker identifies a completed enrichment (see dailySweep's own
-    // comment) - description here, significantQuote would do the same
-    const opus = { id: 7, head: 'Lume', description: 'old summary' };
+    // either marker identifies a completed lookup: the summary, or the
+    // workEnrichedAt stamp of a lookup that found no article
+    for (const opus of [{ id: 7, head: 'Lume', summary: 'old summary' }, { id: 7, head: 'Lume', workEnrichedAt: '2026-10-13T10:00:00Z' }]) {
+      const fetchMock = new FakeFetch();
+      await service(tbc, fetchMock).enrichWork(opus);
+      // no Wikipedia, no Wikidata, no persistence - not even a partial touch
+      expect(fetchMock.calls).toHaveLength(0);
+    }
+  });
+
+  it("enriches a work whose only text is its TEI description - that is the server's import text, not enrichment", async () => {
+    const opus = { id: 7, head: 'Lume', description: 'The opening paragraphs of the TEI' };
     const fetchMock = new FakeFetch();
-    await service(tbc, fetchMock).enrichWork(opus);
-    // no Wikipedia, no Wikidata, no persistence - not even a partial touch
-    expect(fetchMock.calls).toHaveLength(0);
+    fetchMock.pages['wiki'] = wikiSummaryPage({ wikibase_item: undefined });
+    const images = await service(new FakeTbc(), fetchMock).enrichWork(opus);
+
+    // the work's own art comes back for the cover, and is stored with the work
+    expect(images).toEqual(['https://upload.wikimedia.org/alecsandri.jpg']);
+    expect(fetchMock.persisted()).toEqual([expect.objectContaining({
+      opusId: 7,
+      summary: expect.any(String),
+      summarySourceUrl: 'https://en.wikipedia.org/wiki/Lume',
+      imageUrls: ['https://upload.wikimedia.org/alecsandri.jpg'],
+      workEnriched: true,
+    })]);
+  });
+
+  it('stamps a work as looked up when Wikipedia has no article, but not when the lookup failed', async () => {
+    const missing = new FakeFetch();
+    missing.wiki = 'missing';
+    expect(await service(new FakeTbc(), missing).enrichWork({ id: 7, head: 'Lume' })).toBeUndefined();
+    expect(missing.persisted()).toEqual([expect.objectContaining({ opusId: 7, workEnriched: true })]);
+    expect(missing.persisted()[0].summary).toBeUndefined();
+
+    const down = new FakeFetch();
+    down.wiki = 'down';
+    expect(await service(new FakeTbc(), down).enrichWork({ id: 7, head: 'Lume' })).toBeUndefined();
+    // nothing stamped: a later sweep or view tries again
+    expect(down.persisted()).toHaveLength(0);
   });
 
   it('force re-enriches an already-enriched author and asks the server to overwrite', async () => {
@@ -252,7 +288,7 @@ describe('EnrichmentService', () => {
 
   it('force re-enriches an already-enriched work too', async () => {
     const tbc = new FakeTbc();
-    const opus = { id: 7, head: 'Lume', description: 'old summary' };
+    const opus = { id: 7, head: 'Lume', summary: 'old summary' };
     const fetchMock = new FakeFetch();
     fetchMock.pages['wiki'] = wikiSummaryPage({ wikibase_item: undefined });
     await service(tbc, fetchMock).enrichWork(opus, { force: true });
@@ -279,7 +315,7 @@ describe('EnrichmentService', () => {
       // enriched by this sweep -> cover ordered with the work's own art
       { id: 7, head: 'Lume Rdicată', completePath: 'alecsandri/lume', author: { strId: 'alecsandri', displayName: 'Vasile Alecsandri' } },
       // already enriched -> cover ordered with the author portrait instead
-      { id: 8, head: 'Desteptarea', completePath: 'alecsandri/desteptarea', description: 'already there', author: { strId: 'alecsandri', displayName: 'Vasile Alecsandri' } },
+      { id: 8, head: 'Desteptarea', completePath: 'alecsandri/desteptarea', summary: 'already there', author: { strId: 'alecsandri', displayName: 'Vasile Alecsandri' } },
     ];
     const fetchMock = new FakeFetch();
     fetchMock.pages['wiki'] = wikiSummaryPage();
@@ -308,14 +344,14 @@ describe('EnrichmentService', () => {
     // and the name/portrait come from the authors the sweep fetched.
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'dostoyevskii', displayName: 'Федор Михайлович Достоевский', imageHref: '/img/authors/dostoyevskii.jpg', bio: 'already there' }];
-    tbc.opera = [{ id: 9, head: 'Братья Карамазовы*', completePath: 'dostoyevskii/bratya_karamazovy', description: 'already there' }];
+    tbc.opera = [{ id: 9, head: 'Братья Карамазовы*', completePath: 'dostoyevskii/bratya_karamazovy', summary: 'already there' }];
     const fetchMock = new FakeFetch();
     const enqueued: any[] = [];
     const covers = { enqueue: (candidate: any) => { enqueued.push(candidate); return Promise.resolve(true); } };
 
     await service(tbc, fetchMock, covers).dailySweep();
 
-    // no Wikipedia work enrichment (description already there), no
+    // no Wikipedia work enrichment (summary already there), no
     // author enrichment (bio already there) - yet the cover still
     // carries the resolved name and the stored portrait.
     expect(fetchMock.calls).toHaveLength(0);

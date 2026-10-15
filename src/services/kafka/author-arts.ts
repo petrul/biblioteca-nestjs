@@ -21,24 +21,24 @@ export async function randomAuthorArt(tbc: BibliotecaClient, strId: string): Pro
 
 /**
  * The cover candidate for an opus as served by /api/divs: its title, its
- * author's display name and one of the author's images at random, else one
- * of the work's own images (none when neither has any, or the media lookup
- * fails - the cover then renders without art, in the typographic layout).
+ * author's display name and its art - one of the work's own images (stored
+ * by work enrichment) at random, else one of the author's (none when
+ * neither has any, or the media lookup fails - the cover then renders
+ * without art, in the typographic layout).
  */
 export async function coverCandidateFor(tbc: BibliotecaClient, opus: any, onArtError?: (error: any) => void) {
   const author = opus?.author;
-  let artUrl: string | undefined;
-  if (author?.strId) {
+  const workImages = (Array.isArray(opus?.imageUrls) ? opus.imageUrls : [])
+    .filter((url: unknown) => typeof url === 'string' && url.length > 0);
+  let artUrl: string | undefined = workImages.length
+    ? workImages[Math.floor(Math.random() * workImages.length)]
+    : undefined;
+  if (!artUrl && author?.strId) {
     try {
       artUrl = await randomAuthorArt(tbc, author.strId);
     } catch (error: any) {
       onArtError?.(error);
     }
-  }
-  if (!artUrl) {
-    const workImages = (Array.isArray(opus?.imageUrls) ? opus.imageUrls : [])
-      .filter((url: unknown) => typeof url === 'string' && url.length > 0);
-    if (workImages.length) artUrl = workImages[Math.floor(Math.random() * workImages.length)];
   }
   return {
     id: opus.id as number,

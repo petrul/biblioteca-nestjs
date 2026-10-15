@@ -17,6 +17,11 @@ type EnrichmentUpdate = {
     bio?: string;
     bioSourceUrl?: string;
     summary?: string;
+    summarySourceUrl?: string;
+    // Work enrichment looked this work up (biblioteca-server stamps
+    // workEnrichedAt) - sent even when no article was found, so the work is
+    // not searched again on every view or sweep.
+    workEnriched?: boolean;
     significantQuote?: string;
     birthDate?: string;
     deathDate?: string;
@@ -161,15 +166,18 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
         // freeze it - covers are fill-only, an existing coverUrl is never
         // re-rendered.
         let artUrl: string | undefined;
-        if (!(opus as any).description && !(opus as any).significantQuote) {
+        const state = await this.withWorkState(opus);
+        if (!EnrichmentService.isWorkEnriched(state)) {
           try {
             this.log.log(`enrichment candidate work ${(opus as any).id} ${(opus as any).head}`);
-            const images = await this.enrichWork(opus);
+            const images = await this.enrichWork(state);
             artUrl = images?.[0];
           } catch (e: any) {
             this.log.warn(`opus enrichment failed for ${(opus as any).id} ${(opus as any).head}: ${e?.message ?? e}`);
           }
         }
+        // the work's art stored by an earlier pass
+        artUrl = artUrl || (Array.isArray(state.imageUrls) ? state.imageUrls[0] : undefined);
         if (this.covers && (opus as any).id && (opus as any).completePath && (opus as any).head) {
           // The walk's SDR projection never embeds the opus's author, so
           // the strId is the completePath's leading segment - the
@@ -262,17 +270,52 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * famous painting of the scene) - for the cover order.
    */
   async enrichWork(opus: any, opts: { force?: boolean } = {}): Promise<string[] | undefined> {
-    if (!opus?.id || !opus.head || ((opus.description || opus.significantQuote) && !opts.force)) return undefined;
-    const page = await this.wikipedia(opus.head);
-    if (!page?.extract) return undefined;
+    if (!opus?.id || !opus.head || (EnrichmentService.isWorkEnriched(opus) && !opts.force)) return undefined;
+    const { page, missing } = await this.wikipediaLookup(opus.head);
+    if (!page?.extract) {
+      // No article: stamp the lookup as done (only on a definite 404, not a
+      // network failure) so the work is not searched again and again.
+      if (missing) await this.persist({ opusId: opus.id, workEnriched: true }, opts);
+      return undefined;
+    }
     const claims = await this.wikidataClaims(page.wikibase_item);
     const imageUrls = this.images(page, claims);
     await this.persist({
       opusId: opus.id,
       summary: this.truncateMaterial(page.extract),
+      summarySourceUrl: this.wikipediaUrl(opus.head),
       imageUrls,
+      workEnriched: true,
     }, opts);
     return imageUrls;
+  }
+
+  /**
+   * Whether work enrichment already looked this work up: its encyclopedia
+   * summary is filled, or the lookup was stamped (workEnrichedAt) even
+   * though no article was found. The work's description no longer counts:
+   * biblioteca-server fills it from the TEI's opening text at import, so it
+   * made nearly every work look enriched and none was ever looked up.
+   */
+  static isWorkEnriched(opus: any): boolean {
+    return Boolean(opus?.summary || opus?.workEnrichedAt);
+  }
+
+  /**
+   * The opus with its work-enrichment state and stored images. The
+   * findOpera projection the sweeps walk carries none of the work-level
+   * fields, so they are read through /api/divs; on failure the opus is
+   * returned as is (it then simply looks not yet enriched - fill-only
+   * persistence keeps a repeat harmless).
+   */
+  async withWorkState(opus: any): Promise<any> {
+    if (!opus?.completePath || 'summary' in opus || 'workEnrichedAt' in opus) return opus;
+    try {
+      const full: any = await this.client.getElemByPath(opus.completePath);
+      return { ...opus, summary: full?.summary, workEnrichedAt: full?.workEnrichedAt, imageUrls: full?.imageUrls };
+    } catch {
+      return opus;
+    }
   }
 
   /**
@@ -283,6 +326,18 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    */
   private async wikipedia(title: string): Promise<WikiSummary | null> {
     return this.fetchJson<WikiSummary>(this.wikipediaApiUrl(title));
+  }
+
+  /** wikipedia() that also tells a missing article (404) from a failed request. */
+  private async wikipediaLookup(title: string): Promise<{ page: WikiSummary | null; missing: boolean }> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10 * 1000);
+    try {
+      const response = await fetch(this.wikipediaApiUrl(title), { headers: { 'User-Agent': EnrichmentService.USER_AGENT }, signal: controller.signal });
+      if (response.status === 404) return { page: null, missing: true };
+      return { page: response.ok ? await response.json() as WikiSummary : null, missing: false };
+    } catch { return { page: null, missing: false }; }
+    finally { clearTimeout(timeout); }
   }
 
   /**
