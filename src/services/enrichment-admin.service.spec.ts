@@ -41,6 +41,8 @@ class FakeEnrichment {
   // projection never embeds the opus's author, so the cover step asks
   // for it by the completePath's leading segment (the author strId).
   storedArt = new Map<string, string>();
+  // The walk's opera here already carry their work-enrichment state.
+  async withWorkState(opus: any) { return opus; }
   tryBeginRun() { if (!this.canBegin || this.running) return false; this.running = true; return true; }
   endRun() { this.running = false; }
   isRunning() { return this.running; }
@@ -109,7 +111,7 @@ describe('EnrichmentAdminService', () => {
       { strId: 'a2', displayName: 'Missing Two' },
     ];
     tbc.opera = [
-      { id: 1, head: 'Enriched', completePath: 'p1', description: 'already there' },
+      { id: 1, head: 'Enriched', completePath: 'p1', summary: 'already there' },
       { id: 2, head: 'Missing', completePath: 'p2' },
     ];
     const enrichment = new FakeEnrichment();
@@ -129,7 +131,7 @@ describe('EnrichmentAdminService', () => {
   it('overwrite re-enriches everyone and threads force through every call', async () => {
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'a1', displayName: 'Enriched One', bio: 'already there' }];
-    tbc.opera = [{ id: 1, head: 'Enriched', completePath: 'p1', description: 'already there' }];
+    tbc.opera = [{ id: 1, head: 'Enriched', completePath: 'p1', summary: 'already there' }];
     const enrichment = new FakeEnrichment();
     const svc = makeSvc(tbc, enrichment, new FakeCovers(), new FakeVectorizer());
 
@@ -413,7 +415,10 @@ describe('EnrichmentAdminService', () => {
     });
     expect(await svc.workStatus('p1')).toEqual({
       id: 7, head: 'Lume', path: 'p1',
-      enriched: { description: false, significantQuote: false, coverUrl: true },
+      enriched: {
+        description: false, significantQuote: false, summary: false, summarySourceUrl: false,
+        workEnrichedAt: false, imageUrls: false, coverUrl: true,
+      },
     });
     await expect(svc.authorStatus('nobody')).rejects.toThrow(NotFoundException);
     await expect(svc.workStatus('nowhere')).rejects.toThrow(NotFoundException);

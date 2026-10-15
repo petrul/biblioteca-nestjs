@@ -39,8 +39,8 @@ export const ENRICHMENT_MODULES: EnrichmentModule[] = [
   {
     id: 'work',
     title: 'Work summary (Wikipedia)',
-    description: "The opus's Wikipedia extract stored as its summary, plus lead image URLs.",
-    fills: ['summary', 'imageUrls'],
+    description: "The opus's Wikipedia extract stored as its summary (with its source URL), plus the work's own art - the article's lead image and its Wikidata Commons images - stored as the work's image URLs and preferred for its cover. Stamps workEnrichedAt even when no article exists.",
+    fills: ['summary', 'summarySourceUrl', 'imageUrls', 'workEnrichedAt'],
     overwrite: true,
   },
   {

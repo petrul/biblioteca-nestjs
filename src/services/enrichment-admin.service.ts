@@ -200,7 +200,10 @@ export class EnrichmentAdminService {
       id: opus.id,
       head: opus.head,
       path: opus.path ?? path,
-      enriched: this.presentFields(opus, ['description', 'significantQuote', 'coverUrl']),
+      // summary/summarySourceUrl/workEnrichedAt/imageUrls: what work
+      // enrichment fills (workEnrichedAt also when no article was found);
+      // description is the TEI's own opening text, set at import.
+      enriched: this.presentFields(opus, ['description', 'significantQuote', 'summary', 'summarySourceUrl', 'workEnrichedAt', 'imageUrls', 'coverUrl']),
     };
   }
 
@@ -361,12 +364,13 @@ export class EnrichmentAdminService {
         let artUrl: string | undefined;
         if (wantsWork) {
           const workCounters = job.steps.work!;
-          if ((opus.description || opus.significantQuote) && !force) { workCounters.skippedExisting++; }
+          const state = await this.enrichment.withWorkState(opus);
+          if (EnrichmentService.isWorkEnriched(state) && !force) { workCounters.skippedExisting++; }
           else {
             workCounters.candidates++;
             try {
               this.log.log(`enrichment candidate work ${opus.id} ${opus.head}`);
-              const images = await this.enrichment.enrichWork(opus, { force });
+              const images = await this.enrichment.enrichWork(state, { force });
               artUrl = images?.[0];
               workCounters.processed++;
             } catch (e: any) {

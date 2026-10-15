@@ -1,8 +1,9 @@
-import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationShutdown, OnModuleInit, Optional } from '@nestjs/common';
 import { Consumer } from 'kafkajs';
 import { KafkaService } from './kafka.service';
 import { BibliotecaClient } from '../biblioteca_client.service';
 import { CoverEnrichmentService } from '../cover-enrichment.service';
+import { EnrichmentService } from '../enrichment.service';
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from 'src/configuration';
 import { describeKafkaError, isMembershipError } from './error-details';
 import { coverCandidateFor } from './author-arts';
@@ -30,6 +31,7 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
     protected tbc: BibliotecaClient,
     protected covers: CoverEnrichmentService,
     @Inject(PROVIDER_SHARED_CONFIG) protected sharedConfig: SharedTextbaseConfig,
+    @Optional() protected enrichment?: EnrichmentService,
   ) { }
 
   async onModuleInit() {
@@ -95,9 +97,25 @@ export class WorkEnrichmentKafkaListenerService implements OnApplicationShutdown
       }
       this.log.warn(`work enrichment ${strId}: stored cover failed verification - ordering a fresh one (${opus.coverUrl})`);
     }
-    const candidate = await coverCandidateFor(this.tbc, opus, error =>
+    // Work enrichment first (fill-only - a work already looked up is
+    // skipped): the work's own art (its article's lead image, its Wikidata
+    // Commons art) is stored with the work and preferred for the cover over
+    // the author's portrait.
+    let workImages: string[] = [];
+    if (this.enrichment) {
+      try {
+        workImages = (await this.enrichment.enrichWork(opus)) ?? [];
+        if (workImages.length) this.log.log(`work enrichment ${strId}: stored ${workImages.length} work image(s)`);
+      } catch (error: any) {
+        this.log.warn(`work enrichment ${strId}: lookup failed, the cover uses what is already stored: ${error?.message || error}`);
+      }
+    }
+    const withArt = workImages.length
+      ? { ...opus, imageUrls: [...workImages, ...(Array.isArray(opus.imageUrls) ? opus.imageUrls : [])] }
+      : opus;
+    const candidate = await coverCandidateFor(this.tbc, withArt, error =>
       this.log.warn(`author media lookup failed for ${opus.author?.strId}; rendering without art: ${error?.message || error}`));
-    this.log.log(`work enrichment ${strId}: cover requested${candidate.artUrl ? ` (art ${candidate.artUrl})` : ' (no author art)'}`);
+    this.log.log(`work enrichment ${strId}: cover requested${candidate.artUrl ? ` (art ${candidate.artUrl})` : ' (no art)'}`);
     // Fire-and-forget like the import listener: a render takes far longer
     // than a consumer session; CoverEnrichmentService queues and dedupes.
     void this.covers.enqueue(candidate);
