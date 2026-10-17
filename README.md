@@ -1,6 +1,6 @@
 # Biblioteca NestJS Vectorizer
 
-A small, standalone NestJS worker that turns [textbase-server](../textbase-server)'s
+A NestJS worker that turns [biblioteca-server](../biblioteca-server)'s
 text content into vector embeddings and stores them in Milvus — so the
 main server's semantic ("vector"/"deep") search has something to search
 against.
@@ -477,3 +477,150 @@ sweep share one single-flight lock, so they never walk the corpus at the same
 time. Jobs are async (the run answers 202 with a job id), cancel is
 cooperative, and `POST /api/enrichment/run/dry-run` lists the candidates
 without making a single external call.
+
+
+# Modelling of the RAG domain in Bibliteoca NestJS project
+
+Retrieval-augmented generation, just as much as semantic search always need/query pretty much the same components which we will model in the ragmodel.ts
+
+There are also the rudiments of thi smodel in the siblinbg model.ts file. After finishing this work, that model should be adapted from the new one. 
+
+We need interfaces that specify the contracts of the services. As such, using generic interfaces described below, we can write generic indexing algorithms in a few lines of
+code, iterating on a TextSource, for ex, retrieving batches of TextItems, embedding them, storing them, then quering them back, resolving TextItems associated with stored vectors,
+feeding those TextItems into an Ollama chat generators with a question so we complete our 
+RAG. 
+
+Below, the mermaid scheme of the /src/model/ragtime-model.ts file,
+
+These components/ services are:
+
+- a TextItem is the basic unit of text that is worth indexing, and retrieving, identifying with a URL
+  it is an interface implemented by MemTextItem for example which uses RAM memory for storage. The interface should be well designed so the TextItem be lazily accessible using input streams, and retrievable in batches.
+    - a MemTextItem which actually stores the content in memory. it is a materialized implementation of the TextItem interface.  We expect to have lots of TextItems, millions of them in a TextSource, but also we can have very finite collections of TextItems of human dimensions
+    finite size loadable in memory
+- a TextIterable is an iterable of TextItem. a website should be queryable through a TextIterable (for example an implementation can use the likes of 'wget -m' to download it, convert each page into markdown, then serve each page into )
+- a TextSource is source of data, like a website, an api/, a database or what not
+- a vector store like QDrant
+- a data store like Cassandra
+- an embedder like Ollama qwen-embedder model
+- a generator like Ollama qwen3.5:4b, llama3.1:8b etc , or equiv OpenAI, Gemini, Claude apis.
+- we will call a data store, vector store, LLM  a COQ subsystem (cassadra/ollama/qdrant)
+
+On top of that there is a content resolver abstraction that, given an id of a
+retrieved vector, from the index store, for example, can produce a TextItem implementation which can retrieve the actual corresponding text for displaying to user searches for ex. or for references. The content resolver can resolve 
+using the original source (typically slower but retrieves original URL or against the cache stored in database, typically in cassandra)
+
+There are two main subsystem that use these abstractions,
+- an indexer, which, through said abstractions crawl TextSources and
+store/index them
+- a searcher which can do similarity search
+- a RAG system which answers questions, and can be integrated in a chat box attached to a site, a page etc.
+
+I want you to design the mermaid class diagrams of these abstractions,  generate the ragtime.ts typescript corresponding classes.  Also generate in a 
+file name ragtime.model.ts the abstractions usable for a generic website or
+for Biblioteca.scriptorium.ro, which is a digital library that offers a REST api  in which you can iterate over books, chapters. -- make it generic. Keep
+generic abstractions in ragtime.model.ts and particulars of implementations (for example crawling a site using a particular library, storing TextItems in a cassandra store, etc) -- in well named .ts files organized around.
+
+
+```mermaid
+classDiagram
+    %% Core Entities & Items
+    class TextItem {
+        <<interface>>
+        +String id
+        +String sourceId
+        +String url
+        +Map~string,any~ metadata
+        +getContentStream() ReadableStream
+        +getText() Promise~string~
+    }
+
+    class MemTextItem {
+        -string content
+        +getContentStream() ReadableStream
+        +getText() Promise~string~
+    }
+
+    TextItem <|.. MemTextItem
+
+    %% Sources & Iterables
+    class TextIterable~T extends TextItem~ {
+        <<interface>>
+        +AsyncIterable~T~
+        +getBatches(batchSize: number) AsyncIterable~T[]~
+    }
+
+    class TextSource~T extends TextItem~ {
+        <<interface>>
+        +String id
+        +String name
+        +TextIterable~T~ getItems()
+        +TextItem getItemById(id: string) Promise~T~
+    }
+
+    TextSource --> TextIterable : produces
+
+    %% COQ Subsystems Contracts
+    class VectorStore {
+        <<interface>>
+        +upsert(collection: string, vectors: VectorRecord[]) Promise~void~
+        +query(collection: string, vector: number[], topK: number) Promise~VectorQueryResult[]~
+    }
+
+    class DataStore~T extends TextItem~ {
+        <<interface>>
+        +save(item: T) Promise~void~
+        +saveBatch(items: T[]) Promise~void~
+        +findById(id: string) Promise~T | null~
+    }
+
+    class Embedder {
+        <<interface>>
+        +String modelName
+        +number dimension
+        +embed(text: string) Promise~number[]~
+        +embedBatch(texts: string[]) Promise~number[][]~
+    }
+
+    class Generator {
+        <<interface>>
+        +String modelName
+        +generate(prompt: string, context: TextItem[]) Promise~string~
+        +streamGenerate(prompt: string, context: TextItem[]) AsyncIterable~string~
+    }
+
+    %% Content Resolution
+    class ContentResolver~T extends TextItem~ {
+        <<interface>>
+        +resolve(vectorId: string) Promise~T~
+        +resolveBatch(vectorIds: string[]) Promise~T[]~
+    }
+
+    %% High Level Services
+    class Indexer {
+        <<interface>>
+        +indexSource(source: TextSource, collection: string) Promise~IndexingStats~
+    }
+
+    class Searcher~T extends TextItem~ {
+        <<interface>>
+        +search(query: string, collection: string, topK: number) Promise~SearchResult~T~~
+    }
+
+    class RagSystem~T extends TextItem~ {
+        <<interface>>
+        +ask(question: string, collection: string) Promise~RagResponse~T~~
+    }
+
+    Indexer --> TextSource
+    Indexer --> Embedder
+    Indexer --> VectorStore
+    Indexer --> DataStore
+
+    Searcher --> Embedder
+    Searcher --> VectorStore
+    Searcher --> ContentResolver
+
+    RagSystem --> Searcher
+    RagSystem --> Generator
+```
