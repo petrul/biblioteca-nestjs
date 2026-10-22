@@ -11,13 +11,16 @@ import { VectorizerService } from './services/vectorizer.service';
 import { ConfigModule } from '@nestjs/config';
 import { BibliotecaClient } from './services/biblioteca_client.service';
 import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
-import { MilvusCollection } from './services/milvus/milvuscollection.service';
-import { QdrantCollection } from './services/qdrant/qdrantcollection.service';
-import { MilvusColVectorStore, QdrantVectorStore, PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
-import { ContentEmbedder, PROVIDER_EMBEDDER } from './model/model';
+import { QdrantVectorStore } from './ragtime/adapters/qdrant.vector-store';
+import { OllamaChatModel } from './ragtime/adapters/ollama.chat-model';
+import { OllamaEmbedder } from './ragtime/adapters/ollama.embedder';
+import { Embedder } from './ragtime/core';
+import { BIBLIOTECA_QDRANT_TUNING, bibliotecaCollectionSpec, BibliotecaPayload } from './biblioteca-rag/biblioteca.source';
+import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from './biblioteca-rag/ragtime.providers';
+import { RagService } from './biblioteca-rag/rag.service';
+import { RagController } from './biblioteca-rag/rag.controller';
 import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
-import { BgeM3OllamaService, DynamicOllamaEmbedder, NomicEmbedOllamaService, OllamaService, Qwen3EmbeddingOllamaService } from './services/ollama/ollama.service';
-import { RetryingContentEmbedder } from './services/retrying_content_embedder';
+import { RetryingEmbedder } from './services/retrying_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
 import { log } from 'console';
 import { TerminusModule } from '@nestjs/terminus';
@@ -46,6 +49,7 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     VectorizingController,
     EnrichmentAdminController,
     CoverAdminController, CoverWorkController,
+    RagController,
     HealthController
   ],
 
@@ -69,6 +73,7 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     CoverEnrichmentService,
     BibliotecaClient,
     VectorizingJobService,
+    RagService,
     {
       // The non-secret shared-resource naming convention (Kafka topics,
       // Milvus collection, embedding model) textbase-server is the source
@@ -86,82 +91,93 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
       inject: [BibliotecaClient, PROVIDER_LOGGER]
     },
     {
-      // Whichever vector store VECTOR_STORE selects, behind the
-      // VectorStore interface - MilvusColVectorStore over MilvusCollection
-      // (the historic default) or QdrantVectorStore over QdrantCollection.
-      // Same convention-carrying collection name and data shape either way
-      // (the name comes from the server's shared config), so the
-      // vectorizer pipeline below never knows which store it writes to.
-      provide: PROVIDER_VECTOR_STORE,
+      // The paragraph vectors: ragtime's QdrantVectorStore over the
+      // convention-carrying collection name from the server's shared config
+      // (one Qdrant instance serves every environment; the name carries the
+      // per-environment prefix), unless VECTORSTORE_URL names a collection.
+      // Point ids and payload ({sha256, url, opus_path}) are the layout
+      // biblioteca-server's own vector search reads.
+      provide: PROVIDER_VECTOR_COLLECTION,
       useFactory: async (conf: VectorizerConfiguration, shared: SharedTextbaseConfig, logger: LoggerService) => {
-        const name = conf.vectorStoreType === 'qdrant' ? (conf.qdrantCollection || shared.milvus.collection) : shared.milvus.collection;
-        if (conf.vectorStoreType === 'qdrant' && conf.qdrantCollection) logger.log('Qdrant collection override: ' + name);
+        if (conf.vectorStoreType !== 'qdrant') {
+          throw new Error(`VECTOR_STORE=${conf.vectorStoreType} is not supported: the vectors live in Qdrant (Milvus is retired).`);
+        }
+        const name = conf.qdrantCollection || shared.milvus.collection;
+        if (conf.qdrantCollection) logger.log('Qdrant collection override: ' + name);
         const vectorDim = shared.embedder.dimension;
         if (!vectorDim) {
           throw new Error(`textbase-server's GET /api/admin/config didn't report an embedder dimension for model '${shared.embedder.model}'.`);
         }
-        const description = shared.embedder.description
-          ?? `Textbase paragraph embeddings created by embedder "${shared.embedder.model}"; dim=${vectorDim}.`;
+        const store = new QdrantVectorStore({
+          url: conf.vectorStoreUrl, vectorName: 'embedding', idField: BibliotecaPayload.SHA256, tuning: BIBLIOTECA_QDRANT_TUNING,
+        });
+        const vectors = new BibliotecaVectorCollection(store, store, name, bibliotecaCollectionSpec(vectorDim));
 
         // checked at startup (this factory runs during app bootstrap, before
         // anything depending on the store - including the Kafka listener -
         // is constructed): wait and retry instead of crashing the whole app
         // the moment the store happens to be unreachable.
-        if (conf.vectorStoreType === 'qdrant') {
-          // The one VECTORSTORE_URL addresses whichever store is active -
-          // here that is the shared qdrant instance (one instance serves
-          // every environment; the collection name above carries the
-          // per-environment prefix from the server's shared config).
-          const col = new QdrantCollection(name, conf.vectorStoreUrl, vectorDim, description);
-          await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Qdrant');
-          // A freshly-created collection is trivially self-consistent (create()
-          // uses this same vectorDim) - this only ever catches a genuine
-          // pre-existing mismatch (stale collection, config typo), and does so
-          // loudly at startup instead of at the first confusing insert/search
-          // failure.
-          await col.assertVectorDimensionMatches(vectorDim);
-          return new QdrantVectorStore(col);
-        }
-
-        const col = new MilvusCollection(name, conf, vectorDim, description);
-        await retryUntilAvailable(() => col.createAndLoadIfNotExists(), logger, 'Milvus');
-        await col.assertVectorDimensionMatches(vectorDim);
-        return new MilvusColVectorStore(col);
+        await retryUntilAvailable(() => vectors.ensure(), logger, 'Qdrant');
+        // A freshly-created collection is trivially self-consistent - this only
+        // ever catches a genuine pre-existing mismatch (stale collection,
+        // config typo), and does so loudly at startup instead of at the first
+        // confusing insert/search failure.
+        await vectors.assertCompatible();
+        return vectors;
       },
       inject: [PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
     SentenceTransformersService,
     AllMpnetBaseV2_StsService,
     AllMiniLmL6V2_StsService,
-    OllamaService,
-    BgeM3OllamaService,
-    Qwen3EmbeddingOllamaService,
-    NomicEmbedOllamaService,
     {
       // Whichever model textbase-server's shared config reports as active
-      // (currently BGE-M3) -- wrapped in RetryingContentEmbedder so a
-      // temporarily-unreachable Ollama server makes vectorize() wait and
-      // retry instead of failing one page at a time for nothing. The other
-      // concrete ContentEmbedder implementations above remain injectable
-      // by name for explicit/manual use.
+      // (currently BGE-M3) -- wrapped in RetryingEmbedder so a
+      // temporarily-unreachable Ollama server makes vectorize() and the
+      // searches wait and retry instead of failing for nothing. The other
+      // concrete Embedder implementations above remain injectable by name
+      // for explicit/manual use.
       provide: PROVIDER_EMBEDDER,
-      useFactory: (shared: SharedTextbaseConfig, ollama: OllamaService, logger: LoggerService) => {
+      useFactory: (shared: SharedTextbaseConfig, conf: VectorizerConfiguration, logger: LoggerService) => {
         if (!shared.embedder.ollamaModel) {
           throw new Error(`textbase-server's active embedder ('${shared.embedder.model}') isn't Ollama-backed -- biblioteca-nestjs only supports Ollama-backed embedders.`);
         }
-        const embedder = new DynamicOllamaEmbedder(ollama, shared.embedder.ollamaModel);
-        return new RetryingContentEmbedder(embedder, logger);
+        const model = shared.embedder.ollamaModel;
+        const embedder = new OllamaEmbedder({
+          url: conf.ollamaUrl,
+          model,
+          dimension: shared.embedder.dimension,
+          // bge-m3 (the server's default) and qwen3-embedding are both
+          // genuinely multilingual; an English-only model would need its
+          // languages here.
+          supportedLanguages: 'all',
+          // bge-m3: 8192-token context at a conservative ~2 chars/token; the
+          // server's paragraph.maxChars (3000) is the tighter bound anyway.
+          maxInputChars: 16384,
+          // bge-m3 is the embedding model every client of the shared Ollama
+          // keeps loaded for good, next to one generating model on the GPU:
+          // a call without keep_alive would reset that and unload it later.
+          keepAlive: model.startsWith('bge-m3') ? -1 : undefined,
+        });
+        return new RetryingEmbedder(embedder, logger);
       },
-      inject: [PROVIDER_SHARED_CONFIG, OllamaService, PROVIDER_LOGGER]
+      inject: [PROVIDER_SHARED_CONFIG, PROVIDER_CONF, PROVIDER_LOGGER]
+    },
+    {
+      // RAG answers come from the shared Ollama too: the generating model
+      // already loaded next to the pinned bge-m3, else qwen3.5:9b.
+      provide: PROVIDER_CHAT_MODEL,
+      useFactory: (conf: VectorizerConfiguration) => new OllamaChatModel({ url: conf.ollamaUrl }),
+      inject: [PROVIDER_CONF]
     },
     {
       provide: VectorizerService,
-      useFactory: (tbc: BibliotecaClient, embedder: ContentEmbedder , vecstore: VectorStore,
+      useFactory: (tbc: BibliotecaClient, embedder: Embedder, vectors: BibliotecaVectorCollection,
         conf: VectorizerConfiguration, shared: SharedTextbaseConfig ) => {
         log(conf);
-        return new VectorizerService(tbc, embedder, vecstore, shared, TB_GETPARAS_PAGE_SIZE);
+        return new VectorizerService(tbc, embedder, vectors, shared, TB_GETPARAS_PAGE_SIZE);
       },
-      inject: [BibliotecaClient, PROVIDER_EMBEDDER, PROVIDER_VECTOR_STORE, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
+      inject: [BibliotecaClient, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
     },
     
   ],

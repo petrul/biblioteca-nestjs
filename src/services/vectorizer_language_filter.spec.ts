@@ -1,9 +1,10 @@
 /// <reference types="jest" />
 import { VectorizerService } from './vectorizer.service';
 import { BibliotecaClient } from './biblioteca_client.service';
-import { Content, ContentEmbedder } from '../model/model';
 import { SharedTextbaseConfig } from '../configuration';
-import { VectorStore } from './vector_store';
+import { MemoryVectorStore } from '../ragtime/core';
+import { KeywordEmbedder } from '../ragtime/core/test-doubles';
+import { BibliotecaVectorCollection } from '../biblioteca-rag/ragtime.providers';
 import { TeiElemDto } from '../biblioteca.api';
 
 /**
@@ -42,42 +43,6 @@ class FakeTbc {
 // The English-only stand-in for AllMiniLmL6V2_StsService. Every embeddings
 // call is recorded - the assertion surface for "what did the filter let
 // through".
-class EnglishOnlyEmbedder implements ContentEmbedder {
-    readonly supportedLanguages = ['en'];
-    readonly maxContextChars = 100_000;
-    readonly calls: string[][] = [];
-    async embeddings(content: Content[]): Promise<Content[]> {
-        this.calls.push(content.map(it => it.sha256));
-        // Mutate in place, exactly like the real embedders do.
-        content.forEach(it => { it.embedding = it.sha256.split('').map(c => c.charCodeAt(0)); });
-        return content;
-    }
-    embeddedShas(): string[] { return this.calls.flat(); }
-}
-
-class FakeStore implements VectorStore {
-    rows = new Map<string, { url: string; embedding: number[] }>();
-    readonly removeOpus = jest.fn();
-    readonly reset = jest.fn();
-    async store(data: Content[]) {
-        data.forEach(it => this.rows.set(it.sha256, { url: it.url, embedding: it.embedding }));
-    }
-    async storeNewOrUpdated(data: Content[]) { await this.store(data); }
-    async flush() { /* nothing to durably flush */ }
-    async compact() { return { skipped: 'fake' }; }
-    async alreadyStored(items: { sha256: string; url: string }[]) {
-        return [...this.rows.entries()]
-            .filter(([sha]) => items.some(it => it.sha256 === sha))
-            .map(([sha, row]) => ({ sha256: sha, url: row.url }));
-    }
-    async repointUrls(items: { sha256: string; url: string }[]) {
-        items.forEach(it => {
-            const row = this.rows.get(it.sha256);
-            if (row) row.url = it.url;
-        });
-    }
-}
-
 describe('the language-aware embedding filter (ported from the retired milvus-backed spec)', () => {
 
     const shared = {
@@ -110,15 +75,16 @@ describe('the language-aware embedding filter (ported from the retired milvus-ba
     ];
 
     it('embeds only the paragraphs the encoder supports, skipping the rest', async () => {
-        const embedder = new EnglishOnlyEmbedder();
-        const store = new FakeStore();
+        // English-only, like the retired STS models
+        const embedder = new KeywordEmbedder(8, ['en']);
+        const store = new MemoryVectorStore();
         const tbc = new FakeTbc([[...EN, ...FR], UNDETECTED]);
 
         let interPageCalled = 0;
         const vectorizer = new VectorizerService(
             tbc as unknown as BibliotecaClient,
-            embedder as unknown as ContentEmbedder,
-            store as unknown as VectorStore,
+            embedder,
+            new BibliotecaVectorCollection(store, null as any, 'test', null as any),
             shared,
             5); // small page size: several pages through one vectorize() run
 
@@ -127,10 +93,11 @@ describe('the language-aware embedding filter (ported from the retired milvus-ba
         // only the English ones count as processed...
         expect(processed).toEqual(3);
         // ...are embedded...
-        expect(embedder.embeddedShas()).toEqual(['sha-en1', 'sha-en2', 'sha-en3']);
+        expect(embedder.embeddedTexts()).toEqual(EN.map(it => it.text));
         // ...and stored - never the French or undetected ones.
-        expect([...store.rows.keys()].sort()).toEqual(['sha-en1', 'sha-en2', 'sha-en3']);
-        store.rows.forEach(row => expect(row.url).toContain('english_fixture'));
+        expect((await store.retrieve('test', [...EN, ...FR, ...UNDETECTED].map(it => it.text_sha256))).map(it => it.id).sort())
+            .toEqual(['sha-en1', 'sha-en2', 'sha-en3']);
+        expect(await store.count('test', { opus_path: 'fake/english_fixture' })).toBe(3);
 
         expect(interPageCalled).toBeGreaterThan(0);
     });

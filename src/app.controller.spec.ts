@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { VectorizingJobService } from './services/vectorizing_job.service';
 import { VectorizerService } from './services/vectorizer.service';
-import { PROVIDER_VECTOR_STORE } from './services/vector_store';
+import { PROVIDER_VECTOR_COLLECTION } from './biblioteca-rag/ragtime.providers';
 
 const packageInfo: { name: string; version: string } = require('../package.json');
 
@@ -15,7 +15,7 @@ describe('AppController', () => {
     pause: jest.fn(),
     resume: jest.fn(),
   };
-  const compact = jest.fn();
+  const reset = jest.fn();
   const removeOpus = jest.fn();
 
   beforeEach(async () => {
@@ -23,7 +23,7 @@ describe('AppController', () => {
     jobMock.start.mockReset();
     jobMock.pause.mockReset();
     jobMock.resume.mockReset();
-    compact.mockReset();
+    reset.mockReset();
     removeOpus.mockReset();
 
     const app: TestingModule = await Test.createTestingModule({
@@ -38,8 +38,8 @@ describe('AppController', () => {
           useValue: { removeOpus },
         },
         {
-          provide: PROVIDER_VECTOR_STORE,
-          useValue: { compact, reset: jest.fn() },
+          provide: PROVIDER_VECTOR_COLLECTION,
+          useValue: { name: 'paragraphs', reset },
         },
       ],
     }).compile();
@@ -64,9 +64,14 @@ describe('AppController', () => {
       expect(appController.status()).toEqual({ vectorizing: jobStatus });
     });
 
-    it('optimize compacts the Milvus collection', async () => {
-      compact.mockResolvedValue('compacted');
-      expect(await appController.optimize()).toBe('compacted');
+    it('optimize is a no-op: Qdrant compacts on its own', async () => {
+      expect(await appController.optimize()).toEqual({ skipped: expect.stringContaining('Qdrant') });
+    });
+
+    it('reset drops and recreates the paragraph collection - the explicit manual operation', async () => {
+      reset.mockResolvedValue(undefined);
+      expect(await appController.reset()).toEqual({ reset: 'paragraphs' });
+      expect(reset).toHaveBeenCalledTimes(1);
     });
 
     it('parseInt', () => {

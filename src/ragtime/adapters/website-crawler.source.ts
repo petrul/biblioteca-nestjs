@@ -1,14 +1,16 @@
 import * as cheerio from 'cheerio';
-import { TextSource, TextIterable, TextItem, MemTextItem } from '../model/ragtime.model';
+import { TextSource, TextIterable, TextItem, MemTextItem, batchesOf } from '../core';
 
 export interface CrawlerOptions {
   maxDepth?: number;
   maxPages?: number;
   allowedDomainOnly?: boolean;
+  /** Pause between two page fetches, to stay polite to the site. Default 500 ms. */
+  delayMs?: number;
 }
 
 export class RecursiveWebCrawlerIterable implements TextIterable<TextItem> {
-  private visited = new Set<string>();
+  private readonly visited = new Set<string>();
 
   constructor(
     private readonly startUrl: string,
@@ -26,6 +28,7 @@ export class RecursiveWebCrawlerIterable implements TextIterable<TextItem> {
   }
 
   async *[Symbol.asyncIterator](): AsyncIterator<TextItem> {
+    this.visited.clear(); // every iteration crawls afresh
     const maxDepth = this.options.maxDepth ?? 2;
     const maxPages = this.options.maxPages ?? 100;
     const allowedDomainOnly = this.options.allowedDomainOnly ?? true;
@@ -38,6 +41,7 @@ export class RecursiveWebCrawlerIterable implements TextIterable<TextItem> {
 
       if (this.visited.has(url) || depth > maxDepth) continue;
       this.visited.add(url);
+      if (this.visited.size > 1) await new Promise((resolve) => setTimeout(resolve, this.options.delayMs ?? 500));
 
       try {
         const response = await fetch(url, {
@@ -51,14 +55,7 @@ export class RecursiveWebCrawlerIterable implements TextIterable<TextItem> {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        $('script, style, nav, footer, header, noscript').remove();
-        const mainText = $('body').text().replace(/\s+/g, ' ').trim();
-
-        if (mainText.length > 50) {
-          pageCount++;
-          yield new MemTextItem('web-crawler', url, mainText, { depth, title: $('title').text() });
-        }
-
+        // links first: navigation and footers are left out of the text, not out of the crawl
         if (depth < maxDepth) {
           $('a[href]').each((_, el) => {
             const href = $(el).attr('href');
@@ -79,24 +76,30 @@ export class RecursiveWebCrawlerIterable implements TextIterable<TextItem> {
             }
           });
         }
+
+        $('script, style, nav, footer, header, noscript, aside, form').remove();
+        // one block per paragraph-like element: the text keeps its paragraph
+        // structure (blank lines between blocks) for a TextSplitter
+        const root = $('main, article').first().length ? $('main, article').first() : $('body');
+        const blocks = root.find('h1, h2, h3, h4, h5, h6, p, li, pre, blockquote, td, dd')
+          .map((_, el) => $(el).text().replace(/\s+/g, ' ').trim()).get().filter(Boolean);
+        const mainText = (blocks.length ? blocks.join('\n\n') : root.text().replace(/\s+/g, ' ')).trim();
+
+        if (mainText.length > 50) {
+          pageCount++;
+          const title = $('title').text().trim() || undefined;
+          const language = ($('html').attr('lang') ?? '').slice(0, 2).toLowerCase() || undefined;
+          yield new MemTextItem('web-crawler', url, mainText, { depth }, { title, language });
+        }
+
       } catch (err) {
         console.warn(`Failed crawling ${url}:`, err);
       }
     }
   }
 
-  async *getBatches(batchSize: number): AsyncIterable<TextItem[]> {
-    let batch: TextItem[] = [];
-    for await (const item of this) {
-      batch.push(item);
-      if (batch.length >= batchSize) {
-        yield batch;
-        batch = [];
-      }
-    }
-    if (batch.length > 0) {
-      yield batch;
-    }
+  getBatches(batchSize: number): AsyncIterable<TextItem[]> {
+    return batchesOf(this, batchSize);
   }
 }
 
@@ -115,7 +118,8 @@ export class WebsiteTextSource implements TextSource {
     return new RecursiveWebCrawlerIterable(this.startUrl, this.options);
   }
 
-  async getItemById(id: string): Promise<TextItem | null> {
+  /** Pages are not addressable by id (a hash of url and content): search results resolve by their url. */
+  async getItemById(): Promise<TextItem | null> {
     return null;
   }
 }

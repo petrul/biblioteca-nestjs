@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Inject, Post } from '@nestjs/common';
-import { PROVIDER_VECTOR_STORE, VectorStore } from './services/vector_store';
+import { BibliotecaVectorCollection, PROVIDER_VECTOR_COLLECTION } from './biblioteca-rag/ragtime.providers';
 import { VectorizingJobService, VectorizingStatus } from './services/vectorizing_job.service';
 import { VectorizerService } from './services/vectorizer.service';
 import { EntityModelTeiDiv } from './biblioteca.api';
@@ -25,7 +25,7 @@ function enRoInFata(o1: EntityModelTeiDiv, o2: EntityModelTeiDiv) : number {
 export class AppController {
 
   constructor(protected job: VectorizingJobService,
-    @Inject(PROVIDER_VECTOR_STORE) protected vectorStore: VectorStore,
+    @Inject(PROVIDER_VECTOR_COLLECTION) protected vectors: BibliotecaVectorCollection,
     protected vectorizer: VectorizerService) {}
 
   @Get('/api/info')
@@ -46,9 +46,10 @@ export class AppController {
     return { vectorizing: this.job.status() };
   }
 
+  /** Kept for callers of the Milvus era: Qdrant optimizes its segments on its own. */
   @Post('/optimize')
   async optimize() {
-    return await this.vectorStore.compact();
+    return { skipped: 'Qdrant compacts automatically; no manual action needed.' };
   }
 
   /**
@@ -65,6 +66,7 @@ export class AppController {
 
   @Post('/api/vector-store/reset')
   async reset(): Promise<any> {
-    return await this.vectorStore.reset();
+    await this.vectors.reset();
+    return { reset: this.vectors.name };
   }
 }

@@ -1,6 +1,6 @@
 import { Util } from "../src/util";
 import { VectorizerConfiguration } from "../src/configuration";
-import { Content } from "src/model/model";
+import { VectorRecord } from "../src/ragtime/core";
 
 
 export class TestUtils {
@@ -16,17 +16,6 @@ export class TestUtils {
         sentenceTransformersServer: process.env.STS_SERVER,
     }
 
-    // The milvus-integration specs (vector_store, milvuscollection,
-    // vectorizer) exercise MilvusCollection/MilvusColVectorStore against
-    // the dedicated integration-deps Milvus instance - never whatever store
-    // VECTORSTORE_URL points the default at (the shared prod qdrant since
-    // the MILVUS_URL -> VECTORSTORE_URL migration); the server-side milvus
-    // itests pin the same address in their test properties.
-    static readonly milvusTestConf: Partial<VectorizerConfiguration> = {
-        ...TestUtils.testConf,
-        vectorStoreUrl: 'http://srv2.local:20112',
-    }
-    
     static randomAlphanumeric(n: number = 10) {
         let text = '';
     
@@ -38,15 +27,19 @@ export class TestUtils {
         return text;
     }
     
-    static randomContent(nrElems: number = 10, vectorDim: number = 384, textSize:number = 200): Content[] {
-        return Array.from( {length: nrElems}, (_, __) => {
-            const text = TestUtils.randomAlphanumeric(textSize);
+    /**
+     * Random Biblioteca-shaped vector records: real sha256 ids (Qdrant point
+     * ids derive from them) and the {sha256, url, opus_path} payload.
+     */
+    static randomRecords(nrElems: number = 10, vectorDim: number = 384, opusPath = 'author/opus'): VectorRecord[] {
+        return Array.from( {length: nrElems}, (_, idx) => {
+            const sha256 = Util.sha256AsHex(TestUtils.randomAlphanumeric(200));
+            const url = `http://server:8080/${opusPath}/chapter/_${idx + 1}`;
             return {
-                text: text,
-                url: TestUtils.randomAlphanumeric(),
-                sha256: Util.sha256AsHex(text),
-                embedding: Array.from( { length: vectorDim}, () => Math.random() )
-            }
+                id: sha256,
+                vector: Array.from( { length: vectorDim}, () => Math.random() ),
+                payload: { sha256, url, opus_path: opusPath },
+            };
         });
     }
 

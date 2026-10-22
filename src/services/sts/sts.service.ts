@@ -1,8 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { AppConfService, PROVIDER_CONF, VectorizerConfiguration } from "../../configuration";
 import { Api as StsApi } from "../../sts.api";
-import { Content, ContentEmbedder } from "src/model/model";
-import { assert } from "console";
+import { Embedder } from "../../ragtime/core";
 
 @Injectable()
 export class SentenceTransformersService {
@@ -42,7 +41,7 @@ export interface StsEncoder {
 }
 
 @Injectable()
-export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
+export class AllMpnetBaseV2_StsService implements StsEncoder, Embedder {
 
     static readonly modelName = SentenceTransformersService.NAME_ALL_MPNET_BASE_V2;
 
@@ -52,7 +51,11 @@ export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
 
     // all-mpnet-base-v2: 512-token (word-piece) context - a very
     // conservative ~2 chars per token for English text.
-    readonly maxContextChars = 1024;
+    readonly maxInputChars = 1024;
+
+    readonly dimension = 768;
+
+    get modelName(): string { return AllMpnetBaseV2_StsService.modelName; }
 
     constructor(private stsService: SentenceTransformersService) {}
 
@@ -63,25 +66,18 @@ export class AllMpnetBaseV2_StsService implements StsEncoder, ContentEmbedder {
         return this.stsService.encode(AllMpnetBaseV2_StsService.modelName, sentences);
     }
 
-    /**
-     * @param content this is an adapter to Content
-     */
-    async embeddings(content: Content[]): Promise<Content[]> {
-        const sentences = content.map(it => it.text);
-        const vectors = await this.encode(sentences);
-        assert(vectors.length == sentences.length);
-        vectors.forEach((val, i) => {
-            const emb = vectors[i];
-            assert(emb != null);
-            content[i].embedding = emb;
-        });
-        return content;
+    async embedBatch(texts: string[]): Promise<number[][]> {
+        return texts.length === 0 ? [] : this.encode(texts);
+    }
+
+    async embed(text: string): Promise<number[]> {
+        return (await this.embedBatch([text]))[0];
     }
 
 }
 
 @Injectable()
-export class AllMiniLmL6V2_StsService implements StsEncoder, ContentEmbedder {
+export class AllMiniLmL6V2_StsService implements StsEncoder, Embedder {
 
     static readonly modelName = SentenceTransformersService.NAME_ALL_MINILM_L6_V2;
 
@@ -91,7 +87,11 @@ export class AllMiniLmL6V2_StsService implements StsEncoder, ContentEmbedder {
     readonly supportedLanguages: string[] | 'all' = ['en'];
 
     // all-MiniLM-L6-v2: 256-token (word-piece) context.
-    readonly maxContextChars = 512;
+    readonly maxInputChars = 512;
+
+    readonly dimension = 384;
+
+    get modelName(): string { return AllMiniLmL6V2_StsService.modelName; }
 
     constructor(private stsService: SentenceTransformersService) {}
 
@@ -102,19 +102,12 @@ export class AllMiniLmL6V2_StsService implements StsEncoder, ContentEmbedder {
         return this.stsService.encode(AllMiniLmL6V2_StsService.modelName, sentences);
     }
 
-    /**
-     * @param content this is an adapter to Content
-     */
-    async embeddings(content: Content[]): Promise<Content[]> {
-        const sentences = content.map(it => it.text);
-        const vectors = await this.encode(sentences);
-        assert(vectors.length == sentences.length);
-        vectors.forEach((val, i) => {
-            const emb = vectors[i];
-            assert(emb != null);
-            content[i].embedding = emb;
-        });
-        return content;
+    async embedBatch(texts: string[]): Promise<number[][]> {
+        return texts.length === 0 ? [] : this.encode(texts);
+    }
+
+    async embed(text: string): Promise<number[]> {
+        return (await this.embedBatch([text]))[0];
     }
 
 }

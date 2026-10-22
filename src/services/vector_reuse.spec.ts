@@ -3,9 +3,10 @@ import { VectorizerKafkaListenerService } from './kafka/vectorizer-listener.serv
 import { KafkaService } from './kafka/kafka.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { VectorizerService } from './vectorizer.service';
-import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from '../model/model';
 import { SharedTextbaseConfig, VectorizerConfiguration } from '../configuration';
-import { PROVIDER_VECTOR_STORE, VectorStore } from './vector_store';
+import { MemoryVectorStore, VectorStore } from '../ragtime/core';
+import { KeywordEmbedder } from '../ragtime/core/test-doubles';
+import { BibliotecaVectorCollection } from '../biblioteca-rag/ragtime.providers';
 import { TeiElemDto } from '../biblioteca.api';
 import { Util } from '../util';
 
@@ -20,9 +21,9 @@ import { Util } from '../util';
  * - the embedder records every call - the central assertion surface: a
  *   call means "recomputed an embedding", which for an unchanged
  *   paragraph is precisely the wasted work this policy forbids.
- * - the fake VectorStore keeps rows in a Map, implementing the real
- *   sha/url semantics (alreadyStored/repointUrls/storeNewOrUpdated) so
- *   the reuse decisions are exercised against lifelike store behavior.
+ * - ragtime's MemoryVectorStore, with the real retrieve/setPayload
+ *   semantics, so the reuse decisions are exercised against lifelike
+ *   store behavior; deletes are counted (never expected here).
  *
  * Scenarios (mirroring how the biblio server + nestjs combo sees a repo):
  * 1. a book is renamed (author/work-title: every url changes) and two of
@@ -61,50 +62,11 @@ class FakeTbc {
 
 /**
  * The embedder mock: every call is recorded - the assertion surface for
- * "was this paragraph re-embedded (wasted) or reused". The vector it
- * returns is derived from the sha (char codes), so a reused row is recognizable later
- * by carrying the original sha-derived vector values.
+ * "was this paragraph re-embedded (wasted) or reused".
  */
-class RecordingEmbedder implements ContentEmbedder {
-    readonly supportedLanguages = 'all' as const;
-    readonly maxContextChars = 100_000;
-    readonly calls: string[][] = [];
-    async embeddings(content: Content[]): Promise<Content[]> {
-        this.calls.push(content.map(it => it.sha256));
-        // Mutate in place, exactly like the real embedders do (the
-        // vectorizer relies on that: it discards the return value).
-        content.forEach(it => { it.embedding = it.sha256.split('').map(c => c.charCodeAt(0)); });
-        return content;
-    }
-    embeddedShas(): string[] { return this.calls.flat(); }
-}
-
-/**
- * In-memory VectorStore with the real sha/url semantics: one row per
- * sha256, url repointable without touching the embedding, and removal
- * COUNTED (never expected in these scenarios - retention is the policy).
- */
-class FakeStore implements VectorStore {
-    rows = new Map<string, { url: string; embedding: number[] }>();
-    readonly removeOpus = jest.fn();
-    readonly reset = jest.fn();
-    async store(data: Content[]) {
-        data.forEach(it => this.rows.set(it.sha256, { url: it.url, embedding: it.embedding }));
-    }
-    async storeNewOrUpdated(data: Content[]) { await this.store(data); }
-    async flush() { /* nothing to durably flush */ }
-    async compact() { return { skipped: 'fake' }; }
-    async alreadyStored(items: { sha256: string; url: string }[]) {
-        return [...this.rows.entries()]
-            .filter(([sha]) => items.some(it => it.sha256 === sha))
-            .map(([sha, row]) => ({ sha256: sha, url: row.url }));
-    }
-    async repointUrls(items: { sha256: string; url: string }[]) {
-        items.forEach(it => {
-            const row = this.rows.get(it.sha256);
-            if (row) row.url = it.url; // embedding untouched - that is the point
-        });
-    }
+class RecordingEmbedder extends KeywordEmbedder {
+    constructor(private readonly shaOf: Map<string, string>) { super(8); }
+    embeddedShas(): string[] { return this.embeddedTexts().map(text => this.shaOf.get(text)!); }
 }
 
 const URL = (work: string, nr: number) => `https://biblioteca.scriptorium.ro/creanga/${work}/p${nr}`;
@@ -132,6 +94,8 @@ const BOOK_A_V2 = [
 const BOOK_B = [
     para('the sibling book keeps its own vectors through everything', 'sha-b1', URL('povesti', 1)),
 ];
+const SHA_OF = new Map([...BOOK_A_V1, ...BOOK_A_V2, ...BOOK_B].map(it => [it.text, it.text_sha256]));
+const TEXT_OF = new Map([...SHA_OF.entries()].map(([text, sha]) => [sha, text]));
 
 describe('vector reuse: vectors are precious, never dropped by the pipeline', () => {
 
@@ -145,18 +109,28 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
     const log = { log: () => undefined, debug: () => undefined, warn: () => undefined, error: () => undefined };
 
     let embedder: RecordingEmbedder;
-    let store: FakeStore;
+    let store: MemoryVectorStore;
+    let deletes: jest.SpyInstance;
     let vectorizer: VectorizerService;
     let tbc: FakeTbc;
 
+    // what the store holds for a sha: the url it serves, and the vector of
+    // the text it was embedded from (a reused row keeps its original one)
+    const row = (sha: string) => {
+        const point = store.get('test', sha);
+        return point && { url: point.payload.url, vector: point.vector };
+    };
+    const rowOf = (sha: string, url: string) => ({ url, vector: embedder.vectorOf(TEXT_OF.get(sha)!) });
+
     const buildVectorizer = (pages: TeiElemDto[][]) => {
-        embedder = new RecordingEmbedder();
-        store = new FakeStore();
+        embedder = new RecordingEmbedder(SHA_OF);
+        store = new MemoryVectorStore();
+        deletes = jest.spyOn(store, 'delete');
         tbc = new FakeTbc(pages);
         vectorizer = new VectorizerService(
             tbc as unknown as BibliotecaClient,
-            embedder as unknown as ContentEmbedder,
-            store as unknown as VectorStore,
+            embedder,
+            new BibliotecaVectorCollection(store as VectorStore, null as any, 'test', null as any),
             shared,
             2000);
     };
@@ -165,7 +139,7 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
         buildVectorizer([BOOK_A_V1]);
         await vectorizer.vectorize(1);
         expect(embedder.embeddedShas().sort()).toEqual(['sha-a1', 'sha-a2', 'sha-a3', 'sha-a4']);
-        expect(store.removeOpus).toHaveBeenCalledTimes(0);
+        expect(deletes).toHaveBeenCalledTimes(0);
 
         // The author renames the work and corrects paragraphs three and
         // four - same vectorizer, same store; only the repo moved.
@@ -184,19 +158,18 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
         // and the old edition's corrected-away shas are retained (stale
         // rows are the stale-data reporter's business, not the reimport
         // path's - see the last two assertions below).
-        expect(store.rows.size).toBe(6);
-        expect(store.rows.get('sha-a1')).toEqual({ url: URL('amintiri-din-copilarie', 1), embedding: 'sha-a1'.split('').map(c => c.charCodeAt(0)) });
-        expect(store.rows.get('sha-a2')).toEqual({ url: URL('amintiri-din-copilarie', 2), embedding: 'sha-a2'.split('').map(c => c.charCodeAt(0)) });
-        expect(store.rows.get('sha-a3-v2')).toEqual({ url: URL('amintiri-din-copilarie', 3), embedding: 'sha-a3-v2'.split('').map(c => c.charCodeAt(0)) });
-        expect(store.rows.get('sha-a4-v2')).toEqual({ url: URL('amintiri-din-copilarie', 4), embedding: 'sha-a4-v2'.split('').map(c => c.charCodeAt(0)) });
+        expect(await store.count('test')).toBe(6);
+        expect(row('sha-a1')).toEqual(rowOf('sha-a1', URL('amintiri-din-copilarie', 1)));
+        expect(row('sha-a2')).toEqual(rowOf('sha-a2', URL('amintiri-din-copilarie', 2)));
+        expect(row('sha-a3-v2')).toEqual(rowOf('sha-a3-v2', URL('amintiri-din-copilarie', 3)));
+        expect(row('sha-a4-v2')).toEqual(rowOf('sha-a4-v2', URL('amintiri-din-copilarie', 4)));
         // The old edition's corrected shas are gone from the page, but
         // their vectors were NOT deleted - retained per policy (stale
         // rows are the stale-data reporter's business, not the
         // reimport path's).
-        expect(store.rows.get('sha-a3')).toEqual({ url: URL('amintiri', 3), embedding: 'sha-a3'.split('').map(c => c.charCodeAt(0)) });
-        expect(store.rows.get('sha-a4')).toEqual({ url: URL('amintiri', 4), embedding: 'sha-a4'.split('').map(c => c.charCodeAt(0)) });
-        expect(store.removeOpus).toHaveBeenCalledTimes(0);
-        expect(store.reset).toHaveBeenCalledTimes(0);
+        expect(row('sha-a3')).toEqual(rowOf('sha-a3', URL('amintiri', 3)));
+        expect(row('sha-a4')).toEqual(rowOf('sha-a4', URL('amintiri', 4)));
+        expect(deletes).toHaveBeenCalledTimes(0);
     });
 
     it('the sibling book is never touched by another book reimport', async () => {
@@ -209,7 +182,7 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
 
         // Book B: same single embedding, same url - untouched.
         expect(embedder.embeddedShas().filter(sha => sha.startsWith('sha-b')).length).toBe(1);
-        expect(store.rows.get('sha-b1')).toEqual({ url: URL('povesti', 1), embedding: 'sha-b1'.split('').map(c => c.charCodeAt(0)) });
+        expect(row('sha-b1')).toEqual(rowOf('sha-b1', URL('povesti', 1)));
     });
 
     it('a book removed from the repo RETAINS its vectors (removal is manual-only)', async () => {
@@ -244,14 +217,13 @@ describe('vector reuse: vectors are precious, never dropped by the pipeline', ()
 
         // First the book is imported - vectors stored.
         await event('t-imported', 'creanga/amintiri');
-        expect(store.rows.size).toBe(4);
+        expect(await store.count('test')).toBe(4);
 
         // Then the book vanishes from the repo - its vectors must STAY.
         await event('t-removed', 'creanga/amintiri');
-        expect(store.rows.size).toBe(4);
-        expect(store.removeOpus).toHaveBeenCalledTimes(0);
-        expect(store.reset).toHaveBeenCalledTimes(0);
-        expect(store.rows.get('sha-a1')).toEqual({ url: URL('amintiri', 1), embedding: 'sha-a1'.split('').map(c => c.charCodeAt(0)) });
+        expect(await store.count('test')).toBe(4);
+        expect(deletes).toHaveBeenCalledTimes(0);
+        expect(row('sha-a1')).toEqual(rowOf('sha-a1', URL('amintiri', 1)));
         delaySpy.mockRestore();
     });
 });

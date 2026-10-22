@@ -2,8 +2,9 @@
 import { VectorizerService } from './vectorizer.service';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { FakeBibliotecaClient } from '../../test/fake-biblioteca-client';
-import { QdrantVectorStore } from './vector_store';
-import { QdrantCollection } from './qdrant/qdrantcollection.service';
+import { QdrantVectorStore } from '../ragtime/adapters/qdrant.vector-store';
+import { BibliotecaVectorCollection } from '../biblioteca-rag/ragtime.providers';
+import { BIBLIOTECA_QDRANT_TUNING, BibliotecaPayload, bibliotecaCollectionSpec } from '../biblioteca-rag/biblioteca.source';
 import { AllMiniLmL6V2_StsService, SentenceTransformersService } from './sts/sts.service';
 import { SharedTextbaseConfig } from '../configuration';
 import { TestUtils } from '../../test/testutils';
@@ -62,23 +63,22 @@ describe('VectorizerService (live integration)', () => {
 
     let vectServ: VectorizerService;
     let tbc: FakeBibliotecaClient;
-    let col: QdrantCollection;
-    let vecstore: QdrantVectorStore;
+    let vectors: BibliotecaVectorCollection;
+    const store = new QdrantVectorStore({ url: qdrantUrl, idField: BibliotecaPayload.SHA256, tuning: BIBLIOTECA_QDRANT_TUNING });
 
     beforeEach(async () => {
-        col = new QdrantCollection('test_' + TestUtils.randomAlphanumeric(), qdrantUrl, 384);
-        await col.createAndLoadIfNotExists();
-        vecstore = new QdrantVectorStore(col);
+        vectors = new BibliotecaVectorCollection(store, store, 'test_' + TestUtils.randomAlphanumeric(), bibliotecaCollectionSpec(384));
+        await vectors.ensure();
 
         tbc = new FakeBibliotecaClient();
         const sts = new SentenceTransformersService({ sentenceTransformersServer: stsServer } as any);
         const embedder = new AllMiniLmL6V2_StsService(sts);
-        vectServ = new VectorizerService(tbc as unknown as BibliotecaClient, embedder, vecstore, shared);
+        vectServ = new VectorizerService(tbc as unknown as BibliotecaClient, embedder, vectors, shared);
     });
 
     afterEach(async () => {
         try {
-            await col.drop();
+            await store.drop(vectors.name);
         } catch (e) {
             // the test failed before the collection existed - nothing to clean
         }
@@ -111,8 +111,8 @@ describe('VectorizerService (live integration)', () => {
         // French ones were filtered out before ever reaching qdrant.
         // (No findAll() on QdrantCollection: scroll the REST surface
         // directly - the same read the retired spec's findAll did.)
-        expect(await col.count()).toEqual(3);
-        const resp = await fetch(`${qdrantUrl}/collections/${col.name}/points/scroll`, {
+        expect(await store.count(vectors.name)).toEqual(3);
+        const resp = await fetch(`${qdrantUrl}/collections/${vectors.name}/points/scroll`, {
             method: 'post',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ limit: 10, with_payload: true, with_vector: false }),
@@ -120,8 +120,8 @@ describe('VectorizerService (live integration)', () => {
         const rows = ((await resp.json())?.result?.points ?? []).map((p: any) => p.payload);
         expect(rows.length).toEqual(3);
         rows.forEach((payload: any) => {
-            expect(payload[QdrantCollection.URL]).toContain('english_fixture');
-            expect(payload[QdrantCollection.OPUS_PATH]).toEqual('fake/english_fixture');
+            expect(payload[BibliotecaPayload.URL]).toContain('english_fixture');
+            expect(payload[BibliotecaPayload.OPUS_PATH]).toEqual('fake/english_fixture');
         });
     },
     TestUtils.TIMEOUT_TWO_MINUTES);

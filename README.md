@@ -127,7 +127,7 @@ lives in exactly four places. In reading order of "who decides what":
      `biblioteca_client.service.ts`.
 
 2. **The embedder's context clamp** lives here, per model
-   (`ContentEmbedder.maxContextChars`): bge-m3 16384 (its 8192-token
+   (`Embedder.maxInputChars`): bge-m3 16384 (its 8192-token
    context at a conservative ~2 chars/token for the corpus's
    Latin/Cyrillic text), qwen3-embedding 32768, nomic-embed-text 8192,
    the STS models 512/1024. The effective per-paragraph cap is
@@ -249,26 +249,21 @@ Kafka in this whole system, so that's the natural source of truth).
 
 ## Embedding backends
 
-Every embedder implements the `ContentEmbedder` interface
-(`embeddings(content: Content[]): Promise<Content[]>`, filling in each
-item's `embedding` field) — `VectorizerService` and everything downstream
-only ever depends on that interface (`PROVIDER_EMBEDDER`), never a
-concrete implementation. Whichever model textbase-server's shared config
-reports as active is what actually gets used at runtime; the rest remain
-registered and available for explicit/manual use.
+Every embedder implements ragtime's `Embedder` (`src/ragtime/core/model.ts`:
+`embed`/`embedBatch`, `dimension`, `supportedLanguages`, `maxInputChars`,
+optional `maxBatchSize`) - `VectorizerService`, the RAG service and
+everything downstream depend only on that interface (`PROVIDER_EMBEDDER`).
 
-| Implementation | Model | Dim | Notes |
-| --- | --- | --- | --- |
-| `Qwen3EmbeddingOllamaService` (`services/ollama`) | Qwen3-Embedding-4B via Ollama | 2560 | Was the default; superseded by BGE-M3 |
-| `BgeM3OllamaService` (`services/ollama`) | BGE-M3 via Ollama | 1024 | Currently active, per textbase-server's shared config |
-| `NomicEmbedOllamaService` (`services/ollama`) | nomic-embed-text via Ollama | 768 | Registered, not wired in as default anywhere |
-| `AllMpnetBaseV2_StsService` (`services/sts`) | all-mpnet-base-v2 via sentence-transformers | 768 | The original embedder, before the move to Ollama-backed models |
+The active one is `OllamaEmbedder` (`src/ragtime/adapters/ollama.embedder.ts`)
+for whichever model textbase-server's shared config reports (BGE-M3, 1024
+dims), wrapped in `RetryingEmbedder` (`src/services/retrying_embedder.ts`).
+bge-m3 is requested with `keep_alive: -1`: every client of the shared
+Ollama keeps it loaded next to one generating model, and a call without it
+would reset that and unload the model a few minutes later.
 
-`OllamaService` is the shared low-level client (`POST /api/embed`,
-Ollama's batch-capable endpoint) behind every Ollama-backed embedder above;
-`DynamicOllamaEmbedder` parametrizes it by model name at runtime rather
-than needing one hardcoded class per model, since Ollama has no fixed
-model catalog the way the STS server does.
+The retired sentence-transformers embedders (`services/sts`, all-mpnet-base-v2
+768 dims, all-MiniLM-L6-v2 384 dims) implement the same interface and stay
+registered for explicit use.
 
 ### Startup availability checks
 
@@ -276,7 +271,7 @@ Two dependencies are checked for reachability at startup and *waited out*
 (5s poll interval, no cap — `retryUntilAvailable` in `src/util.ts`)
 rather than crashing the process:
 
-- **The embedder** — wrapped in `RetryingContentEmbedder`;
+- **The embedder** — wrapped in `RetryingEmbedder`;
   `VectorizerService.onModuleInit()` makes an explicit throwaway call
   through it before the Kafka listener starts consuming, so an
   unreachable embedder is caught at boot, not on the first real message.
@@ -321,13 +316,13 @@ otherwise insert as new.
 | `src/app.module.ts` | Dependency wiring — the fastest place to see how every provider above actually connects |
 | `src/configuration.ts` | Env var loading (`VectorizerConfiguration`) and the `SharedTextbaseConfig` shape fetched from textbase-server |
 | `src/services/kafka/` | `KafkaService`, `ProducerService`, `VectorizerKafkaListenerService` (the consumer that triggers vectorization) |
-| `src/services/ollama/`, `src/services/sts/` | The embedder implementations (see [Embedding backends](#embedding-backends)) |
-| `src/services/milvus/` | `MilvusCollection` — collection creation, dimension assertions, upserts |
-| `src/services/vector_store.ts` | `MilvusColVectorStore` — the storage-facing side of a vectorize() call |
-| `src/services/vectorizer.service.ts` | The orchestration: fetch paragraphs → diff → embed → store |
+| `src/ragtime/core/` | Ragtime, the generic search/RAG/chat framework - see [Ragtime](#ragtime-the-implementation). Imports nothing outside itself |
+| `src/ragtime/adapters/` | Ragtime implementations: Qdrant, Ollama (embedder, chat model), Cassandra, website crawler |
+| `src/biblioteca-rag/` | Biblioteca on ragtime: paragraph source, payload layout, resolver, context expander, scopes, the RAG service and `/api/rag` |
+| `src/services/sts/` | The retired sentence-transformers embedders (see [Embedding backends](#embedding-backends)) |
+| `src/services/vectorizer.service.ts` | Vectorizing a work: ragtime's `GenericIndexer` over its paragraphs |
 | `src/services/biblioteca_client.service.ts` | `BibliotecaClient` — this worker's HTTP client into biblioteca-server (paragraphs, shared config) |
-| `src/services/retrying_content_embedder.ts`, `src/util.ts` | The `retryUntilAvailable`/retry-wrapper machinery used throughout |
-| `src/model/model.ts` | `ContentEmbedder` interface, `Content` shape, `PROVIDER_EMBEDDER` token |
+| `src/services/retrying_embedder.ts`, `src/util.ts` | The `retryUntilAvailable`/retry-wrapper machinery used throughout |
 | `test/fake-biblioteca-client.ts`, `test/res/paras.json` | Fixture data and fake client used by tests instead of a live textbase-server |
 
 For a concrete task, `app.module.ts` is the fastest way to see how
@@ -335,11 +330,15 @@ everything is actually wired together before diving into any one service.
 
 ## Notable specs
 
-- `services/ollama/ollama.service.spec.ts` — runs against a real Ollama
-  server (dimension checks, the `Content[]` adapter contract, a
-  cross-model sanity check). 2-minute per-test timeout since a
-  cold-loaded model's first call can be slow.
-- `retrying_content_embedder.spec.ts` / `util.spec.ts` — the
+- `ragtime/core/*.spec.ts` — the framework on in-memory doubles
+  (`MemoryVectorStore`, `KeywordEmbedder`, `ScriptedChatModel`); and
+  `extractable.spec.ts`, which fails the build if a core file imports
+  anything but the core and `node:` built-ins.
+- `ragtime/adapters/*.integration.spec.ts` — the Qdrant store and bge-m3
+  against the live shared instances (own `test_*` collections only).
+- `biblioteca-rag/rag.service.spec.ts` — search, ask, chat and streaming end
+  to end over a fake library (`test/fake-paragraph-reader.ts`).
+- `retrying_embedder.spec.ts` / `util.spec.ts` — the
   retry-on-failure wrapper and its underlying helper, with a mocked inner
   embedder (fast, no real network): succeeds-first-try, recovers after
   several failures, logs one short warning per attempt rather than a
@@ -368,7 +367,7 @@ pipeline itself (that's driven entirely by Kafka - see
 | `POST /api/vectorizing/start?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes. **Does not truncate** (see [Vectors are precious](#vectors-are-precious-reuse-by-sha256-never-auto-drop)): already-stored sha256s are reused, only genuinely new paragraphs get embedded |
 | `POST /api/vectorizing/pause` | Halts the running job after its current batch |
 | `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead; does not truncate, so the partial collection keeps its already-vectorized rows) |
-| `POST /optimize` | Compacts the store's storage (Milvus only; a deliberate no-op on qdrant, which compacts on its own) |
+| `POST /optimize` | A no-op kept for old callers: Qdrant compacts on its own (Milvus is retired) |
 | `POST /api/vector-store/remove-opus` | **Manual-only** drop: removes one opus's vectors (body: `{"path": "author/work"}`) |
 | `POST /api/vector-store/reset` | **Manual-only** drop: drops and recreates the whole collection |
 | `GET /api/enrichment/modules` | The enrichment module catalog: author / work / cover / vectorize, what each fills, whether overwrite applies to it |
@@ -379,6 +378,10 @@ pipeline itself (that's driven entirely by Kafka - see
 | `POST /api/enrichment/jobs/:id/cancel` | Cooperative stop of a running job, honored between entities |
 | `GET /api/enrichment/author/:strId` | Which enrichment fields one author already has |
 | `GET /api/enrichment/work?path=` | Which enrichment fields one work already has |
+| `POST /api/rag/search` | The paragraphs nearest in meaning to `query`, within `scope.opusPaths` (one work, a collection, or none = the whole library) |
+| `POST /api/rag/ask` | An answer generated from the nearest passages, citing them as `[n]`; optional caller-kept `history` |
+| `POST /api/rag/ask/stream` | The same as newline-delimited JSON: the passages first, then `{"delta"}` chunks, then `{"done": true}` |
+| `POST /api/rag/chat` | The next turn of a conversation (`conversationId` from the previous reply; kept in memory). Follow-ups are rewritten into standalone queries before searching |
 
 `@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
 at `/api/ui` - same mechanism, one instance per this app rather than a
@@ -624,3 +627,55 @@ classDiagram
     RagSystem --> Searcher
     RagSystem --> Generator
 ```
+
+## Ragtime: the implementation
+
+The design above is implemented in three layers:
+
+- **`src/ragtime/core/`** - the reusable framework. `model.ts` holds every
+  contract: `TextItem`/`TextSource`/`TextIterable`, `TextSplitter`,
+  `VectorStore` and `VectorCollectionManager` (with a store-neutral
+  `CollectionSpec`), `DataStore`, `Embedder` (query/passage purposes,
+  `maxBatchSize`), `ChatModel` + `PromptBuilder` (together a `Generator`),
+  `ContentResolver`, `Reranker`, `ContextExpander`, `Indexer`, `Searcher`,
+  `RagSystem` (`ask`, `streamAsk`), `QueryRewriter`, `ConversationStore`,
+  `Chatbot`. The generic implementations: `GenericIndexer` (dedup, language
+  filter, truncation, vector reuse by id with payload repointing, sub-batching,
+  hooks), `GenericSearcher` (score threshold read by score kind, `accept`,
+  reranking), `PromptedGenerator`/`DefaultPromptBuilder`, `RagtimeSystem`,
+  `RagChatbot` with `LlmQueryRewriter`, `MemoryConversationStore`,
+  `ParagraphSplitter`, `MemoryVectorStore`, `DataStoreContentResolver`, and
+  test doubles. The core imports only itself and `node:` built-ins
+  (`extractable.spec.ts` enforces it), so it can be lifted into a package
+  as it is.
+- **`src/ragtime/adapters/`** - `QdrantVectorStore` (REST; deterministic UUID
+  point ids, the item id in the payload, rescoring on quantized collections),
+  `OllamaEmbedder`, `OllamaChatModel` (reuses the generating model already
+  loaded on the shared GPU, else qwen3.5:9b; editii-translator's generation
+  options), `CassandraDataStore`, `WebsiteTextSource`.
+- **`src/biblioteca-rag/`** - Biblioteca on ragtime: `BibliotecaDivSource`
+  (a work's paragraphs, id = sha256), the `{sha256, url, opus_path}` payload
+  and point ids biblioteca-server's own vector search shares,
+  `BibliotecaContentResolver` (hits back to paragraph text through their div,
+  titled "Author, Work - Chapter"), `BibliotecaContextExpander` (each hit with
+  its neighbouring paragraphs), scopes (`opusPaths`: a book, a collection, or
+  the whole library) and `RagService` behind `/api/rag/*`.
+
+Known limits:
+
+- Conversations live in memory (`MemoryConversationStore`): lost on restart,
+  per instance. A persistent `ConversationStore` is the next step for a real
+  chat UI.
+- User collections are per user on biblioteca-server; the caller (reader or
+  server) turns a collection into its `opusPaths`.
+- `/api/rag/*` costs GPU time on the shared Ollama (one request at a time)
+  and has no authentication or rate limit: keep it internal, behind the
+  reader or the server.
+- Resolving a hit reads its div's paragraphs (cached); a server endpoint
+  returning paragraphs by URL (following relocations) would be cheaper.
+  `GET /api/divs?path=` cannot do it: for a paragraph path it answers 500
+  (it merges an unpersisted paragraph inside a read-only transaction).
+- Answer quality is the generating model's: retrieval finds the right
+  passages, qwen3.5:9b still slips on facts. A reranker and evaluation
+  questions per work are the next levers.
+

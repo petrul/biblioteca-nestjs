@@ -1,15 +1,15 @@
-import { Inject, Injectable, Logger, LoggerService, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { BibliotecaClient } from "./biblioteca_client.service";
-import { Content, ContentEmbedder, PROVIDER_EMBEDDER } from "../model/model";
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from "../configuration";
-import { TeiElemDto } from "../biblioteca.api";
-import { assert } from "console";
-import { PROVIDER_VECTOR_STORE, VectorStore } from "./vector_store";
 import { StopWatch, Util } from "../util";
+import { Embedder, GenericIndexer } from "../ragtime/core";
+import { BibliotecaDivSource, BibliotecaPayload, bibliotecaPayload, normalizeOpusPath } from "../biblioteca-rag/biblioteca.source";
+import { BibliotecaVectorCollection, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from "../biblioteca-rag/ragtime.providers";
 
 /**
- * central service that  coordinates calling sub-services to get paragraphs, ask for their
- * embedding and then store them.
+ * Vectorizes Biblioteca works: ragtime's GenericIndexer over a work's
+ * paragraphs (BibliotecaDivSource), embedding into the paragraph collection
+ * only what is not stored yet.
  */
 @Injectable()
 export class VectorizerService implements OnModuleInit {
@@ -33,21 +33,23 @@ export class VectorizerService implements OnModuleInit {
         return this.stopRequested;
     }
 
+    /** Deletes one work's vectors - an exact match on its 'author/opus' path, never a prefix. */
     async removeOpus(opusPath: string): Promise<void> {
-        await this.vecstore.removeOpus(opusPath);
-        await this.vecstore.flush();
-        this.log.log(`Removed vectors for opus ${opusPath}`);
+        const path = normalizeOpusPath(opusPath ?? '');
+        if (!path.includes('/'))
+            throw new Error(`Cannot remove vectors for '${opusPath}': not an author/opus path`);
+        await this.vectors.store.delete(this.vectors.name, { [BibliotecaPayload.OPUS_PATH]: path });
+        this.log.log(`Removed vectors for opus ${path}`);
     }
 
     /**
-     * @param pageSize same value is used for all paged services: the textbase client,
-     * the embedder (sentence transformer service) and the vector store.
+     * @param pageSize same value is used for all paged services: the biblioteca
+     * client, the embedder and the vector store.
      */
     constructor(
         protected tbc: BibliotecaClient,
-        @Inject(PROVIDER_EMBEDDER) protected embedder: ContentEmbedder,
-        @Inject(PROVIDER_VECTOR_STORE) protected vecstore: VectorStore,
-        // protected log: LoggerService,
+        @Inject(PROVIDER_EMBEDDER) protected embedder: Embedder,
+        @Inject(PROVIDER_VECTOR_COLLECTION) protected vectors: BibliotecaVectorCollection,
         @Inject(PROVIDER_SHARED_CONFIG) protected shared: SharedTextbaseConfig,
         pageSize = 2000) {
             this.pageSize = pageSize;
@@ -59,187 +61,95 @@ export class VectorizerService implements OnModuleInit {
      * message consumption from starting until the embedder is confirmed
      * reachable, not just Milvus (already checked in the MilvusCollection
      * provider factory in app.module.ts). PROVIDER_EMBEDDER is wrapped in
-     * RetryingContentEmbedder, so a throwaway call here already waits and
+     * RetryingEmbedder, so a throwaway call here already waits and
      * retries on failure - this just makes sure that happens at startup
      * instead of on the first real Kafka message.
      */
     async onModuleInit() {
-        await this.embedder.embeddings([
-            { text: 'startup healthcheck', url: 'startup-healthcheck', sha256: 'startup-healthcheck' },
-        ]);
+        await this.embedder.embed('startup healthcheck');
         this.log.log('Embedder confirmed available at startup.');
     }
 
     /**
-     * @param offset skipping the initial offset elements (usable for paging)
-     * @param limit only process a maximum of limit (usable for paging)
      * @param divId this should be the id of an opus, but it can be really any div id (even smaller).
      * @param interPageJob do this after each processed page (usable for kafka heartbeats)
-     * @returns the nr of processed elements 
+     * @param offset skipping the initial offset elements (usable for paging)
+     * @param limit only process a maximum of limit (usable for paging)
+     * @returns the nr of processed (embeddable) paragraphs, embedded now or before
      */
-    async vectorize(divId: number, 
-        interPageJob: () => Promise<any> = () => { return Promise.resolve();  },
-        offset = 0, limit = Number.POSITIVE_INFINITY, 
+    async vectorize(divId: number,
+        interPageJob: () => Promise<any> = () => Promise.resolve(),
+        offset = 0, limit = Number.POSITIVE_INFINITY,
     ) : Promise<number> {
-
-        var processed = 0;
-        var totalBatches = 0;
         const opusWatch = new StopWatch();
+        let totalBatches = 0;
 
-        var hasMore = true;
-        const gen = this.tbc.getParagraphs(divId, this.pageSize, offset, limit);
-
-        let i = 0;
-        for (; i < offset; i++) {
-            const next = await gen.next();
-            if (next.done) {
-                return 
-            }
-        }
-
-        do {
-            // page per page so that we can ask embeddings per page.
-            const crtPage: TeiElemDto[] = [];
-            for (let i = 0 ; (i < this.pageSize) && hasMore ; i++) {
-                const crt = await gen.next();                
-                if (!crt.done) {
-                    const crtValue: TeiElemDto = crt.value as TeiElemDto
-                    crtPage.push(crtValue);
-                }
-                hasMore = ! crt.done
-            }
-
-            const contentArr = crtPage.map<Content>(it => { return {
-                text:     it.text,
-                sha256:   it.text_sha256,
-                url:      it.url,
-                language: it.language,
-            }});
-            // Paragraph size window from the server's shared config
-            // (vectorizer.para.* in its application.properties): the
-            // too-short are corpus noise and get skipped; the too-long are
-            // truncated to maxChars - NOT dropped - so long expository
-            // paragraphs and <table> blocks stay searchable. The effective
-            // max also clamps to this embedder's context window, so a
-            // raised maxChars can never overflow the model with inputs it
-            // would silently truncate or reject on its own. The sha256
-            // stays the FULL source paragraph's hash either way: it is the
-            // row's identity for the reimport dedup, not a digest of what
-            // got embedded.
-            const minChars = this.shared.paragraph.minChars;
-            const maxChars = Math.min(this.shared.paragraph.maxChars, this.embedder.maxContextChars);
-            const filtered = contentArr.filter(it =>
-                    it.text != null
-                    && it.sha256 != null
-                    && it.url != null
-                    && it.text.length > minChars
-            ).map(it =>
-                it.text.length > maxChars
-                    ? { ...it, text: it.text.slice(0, maxChars) }
-                    : it
-            );
-
-            assert (filtered.length <= this.pageSize);
-
-            // Only embed what this specific encoder can actually make sense
-            // of - e.g. the STS models are English-only (see
-            // AllMiniLmL6V2_StsService.supportedLanguages) despite being the
-            // production default, so non-English paragraphs would otherwise
-            // silently get embedded through a model that was never trained
-            // on their language, producing vectors that look valid but carry
-            // no real semantic meaning. Unknown language (undetected) is
-            // treated the same as unsupported - conservative on purpose.
-            const supported = this.embedder.supportedLanguages;
-            const embeddable = filtered.filter(it =>
-                supported === 'all' || (it.language != null && supported.includes(it.language))
-            );
-            if (embeddable.length != filtered.length) {
-                this.log.log(`skipping ${filtered.length - embeddable.length} of ${filtered.length} paras: `
-                    + `language not supported by this encoder (supports: ${supported})`);
-            }
-
-            if (embeddable.length > 0) {
-
-                // "Vectors are precious": a full corpus embed takes days,
-                // not an index rebuild - so before embedding anything, ask
-                // the store which of this page's paragraphs already have a
-                // vector (by sha256, the row's identity). A reimport that
-                // renames the book changes every url but no text: all those
-                // paragraphs are repointed to their new urls below and NONE
-                // of them re-embedded; only genuinely new/changed paragraphs
-                // cost an embedder call.
-                const stored = await this.vecstore.alreadyStored(embeddable);
-                const storedUrlBySha = new Map(stored.map(it => [it.sha256, it.url]));
-                const toEmbed = embeddable.filter(it => !storedUrlBySha.has(it.sha256));
-                const toRepoint = embeddable.filter(it => {
-                    const oldUrl = storedUrlBySha.get(it.sha256);
-                    return oldUrl !== undefined && oldUrl !== it.url; // renamed book: url moved, text did not
-                });
-                if (stored.length > 0) {
-                    this.log.log(`reusing ${stored.length - toRepoint.length} already-stored vectors, `
-                        + `repointing ${toRepoint.length} renamed ones, embedding ${toEmbed.length} new paras`);
-                }
-
-                if (toRepoint.length > 0) {
-                    var watch = new StopWatch();
-                    await this.vecstore.repointUrls(toRepoint);
-                    this.log.log(`repointing ${toRepoint.length} reused vectors took ${watch}`);
-                }
-
-                if (toEmbed.length > 0) {
-                    var watch = new StopWatch();
-
-                    await this.embedder.embeddings(toEmbed);
-                    const embedMs = watch.elapsedMs();
-                    this.log.log(`embedding ${toEmbed.length} paras took ${watch}`);
+        // Paragraph size window from the server's shared config
+        // (vectorizer.para.* in its application.properties): the
+        // too-short are corpus noise and get skipped; the too-long are
+        // truncated to maxChars - NOT dropped - so long expository
+        // paragraphs and <table> blocks stay searchable. The indexer also
+        // clamps to the embedder's own maxInputChars, so a raised maxChars
+        // can never overflow the model. The id stays the FULL source
+        // paragraph's sha256 either way: it is the row's identity for the
+        // reimport dedup, not a digest of what got embedded.
+        //
+        // Only paragraphs in a language this encoder supports are embedded
+        // (unknown language counts as unsupported - conservative on
+        // purpose): see ragtime's embeds().
+        //
+        // "Vectors are precious": a full corpus embed takes days, not an
+        // index rebuild - the indexer asks the store which paragraphs
+        // already have a vector (by sha256, the row's identity). A
+        // reimport that renames the book changes every url but no text:
+        // those paragraphs are repointed to their new urls and NONE of them
+        // re-embedded; only genuinely new/changed paragraphs cost an
+        // embedder call.
+        const minChars = this.shared.paragraph.minChars;
+        const maxChars = this.shared.paragraph.maxChars;
+        const indexer = new GenericIndexer(this.embedder, this.vectors.store);
+        const stats = await indexer.indexSource(
+            new BibliotecaDivSource(this.tbc, divId, { pageSize: this.pageSize, offset, limit }),
+            this.vectors.name,
+            {
+                batchSize: this.pageSize,
+                prepareText: (text) => text.length > minChars ? text.slice(0, maxChars) : null,
+                payloadOf: bibliotecaPayload,
+                onEmbedded: async (batch) => {
                     totalBatches++;
+                    this.log.log(`embedding and storing ${batch.items} paras took ${batch.durationMs}ms of embedding`);
                     await this.tbc.recordEmbeddingBatchStat({
-                        batchSize: toEmbed.length,
-                        totalChars: toEmbed.reduce((sum, it) => sum + it.text.length, 0),
-                        vectorDimension: toEmbed[0]?.embedding?.length ?? 0,
+                        batchSize: batch.items,
+                        totalChars: batch.chars,
+                        vectorDimension: batch.dimension,
                         embedderModel: this.shared.embedder.model,
-                        durationMs: embedMs,
+                        durationMs: batch.durationMs,
                     });
-
-                    watch = new StopWatch();
-                    await this.vecstore.storeNewOrUpdated(toEmbed);
-                    this.log.log(`storing ${toEmbed.length} vectors took ${watch}`);
-
-                    await this.vecstore.flush();
-
-                    // Keep the encoder's CPU from being pegged continuously - wait
-                    // roughly as long as that batch's embedding call itself took
-                    // (e.g. 100 paragraphs taking 20s means a ~20s pause) before
-                    // starting the next one, deliberately trading throughput for
-                    // not exhausting the (shared, CPU-bound) sentence-transformers
-                    // server. Timed off the embed call specifically, not the
-                    // store+flush steps above, since those run against the store,
-                    // not the encoder.
-                    if (embedMs > 0) {
-                        this.log.log(`pausing ${embedMs}ms before the next batch`);
-                        await Util.delay(embedMs);
+                    // Keep the encoder from being pegged continuously - wait
+                    // roughly as long as that batch's embedding call itself
+                    // took (e.g. 100 paragraphs taking 20s means a ~20s
+                    // pause) before the next one, deliberately trading
+                    // throughput for not exhausting the shared encoder.
+                    // Timed off the embed call specifically, not the store
+                    // step, since that runs against the store.
+                    if (batch.durationMs > 0) {
+                        this.log.log(`pausing ${batch.durationMs}ms before the next batch`);
+                        await Util.delay(batch.durationMs);
                     }
-                }
-            }
-
-            processed += embeddable.length;
-
-            await interPageJob();
-
-        } while(hasMore && i < (offset + limit) && !this.stopRequested)
-
-
-        // flush at the end of the opus
-        await this.vecstore.flush();
+                },
+                afterBatch: interPageJob,
+                shouldStop: () => this.stopRequested,
+                log: (message) => this.log.log(message),
+            });
 
         await this.tbc.recordOpusVectorizingStat({
             opusId: divId,
-            totalParas: processed,
+            totalParas: stats.processedItems,
             totalBatches,
             embedderModel: this.shared.embedder.model,
             durationMs: opusWatch.elapsedMs(),
         });
 
-        return processed;
+        return stats.processedItems;
     }
 }
