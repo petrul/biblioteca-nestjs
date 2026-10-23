@@ -1,6 +1,9 @@
 import { TeiElemDto } from '../biblioteca.api';
 import {
   CollectionSpec,
+  MemoryKeywordIndex,
+  Retriever,
+  RetrieveOptions,
   ContentResolver,
   ContextExpander,
   GeneratorTextIterable,
@@ -318,5 +321,69 @@ export class BibliotecaContextExpander implements ContextExpander<BibliotecaPara
       return new MemTextItem(item.sourceId, item.url, text, { ...item.metadata, expanded: true },
         { id: item.id, title: item.title, language: item.language });
     });
+  }
+}
+
+export interface BibliotecaKeywordRetrieverOptions {
+  /** Scopes of more works than this get no keyword search (each work is read whole once). Default 5. */
+  maxWorks?: number;
+  /** Works kept indexed in memory. Default 20. */
+  maxCachedWorks?: number;
+}
+
+/**
+ * Keyword (BM25) search within a scope of a few works - exact names and terms
+ * that embeddings blur ("Fezziwig", "turkey"). Each work of the scope is read
+ * once, lazily, through its div and kept indexed (least recently used works
+ * forgotten). Library-wide searches get no keyword candidates.
+ */
+export class BibliotecaKeywordRetriever implements Retriever {
+  private readonly index = new MemoryKeywordIndex();
+  /** Works indexed (or being indexed), least recently used first. */
+  private readonly works = new Map<string, Promise<boolean>>();
+
+  constructor(
+    private readonly reader: BibliotecaParagraphReader,
+    private readonly options: BibliotecaKeywordRetrieverOptions = {},
+  ) {}
+
+  async retrieve(query: string, _collection: string, options: RetrieveOptions): Promise<VectorQueryResult[]> {
+    const scoped = options.filter?.[BibliotecaPayload.OPUS_PATH];
+    const works = (Array.isArray(scoped) ? scoped : scoped ? [scoped] : []).map(String);
+    if (works.length === 0 || works.length > (this.options.maxWorks ?? 5)) return [];
+    const ready = await Promise.all(works.map((work) => this.load(work)));
+    const lists = await Promise.all(works.filter((_, i) => ready[i]).map((work) => this.index.retrieve(query, work, options)));
+    return lists.flat().sort((a, b) => b.score - a.score).slice(0, options.topK);
+  }
+
+  private load(work: string): Promise<boolean> {
+    let loading = this.works.get(work);
+    if (loading) {
+      this.works.delete(work); // most recently used: last
+    } else {
+      loading = this.read(work).catch(() => {
+        this.forget(work); // gone, or the server failed: tried again next time
+        return false;
+      });
+    }
+    this.works.set(work, loading);
+    while (this.works.size > (this.options.maxCachedWorks ?? 20)) this.forget(this.works.keys().next().value as string);
+    return loading;
+  }
+
+  private forget(work: string): void {
+    this.works.delete(work);
+    this.index.drop(work);
+  }
+
+  private async read(work: string): Promise<boolean> {
+    const opus = await this.reader.getElemByPath(`/${work}`);
+    if (opus.id == null) return false;
+    const items: { id: string; text: string; payload: Record<string, unknown> }[] = [];
+    for await (const paragraph of new BibliotecaDivSource(this.reader, opus.id).getItems()) {
+      items.push({ id: paragraph.id, text: paragraph.text, payload: bibliotecaPayload(paragraph) });
+    }
+    await this.index.add(work, items);
+    return true;
   }
 }

@@ -43,9 +43,10 @@ export class MemoryConversationStore implements ConversationStore {
 }
 
 export const REWRITE_PROMPT = [
-  'Rewrite the last user message as one standalone search query that can be understood without the conversation:',
-  'resolve pronouns and references from the conversation, keep names and key terms, keep the language of the message.',
-  'Reply with the query only.',
+  'Rewrite the last user message so that it can be understood without the conversation, changing as little as possible:',
+  'only replace pronouns and references ("he", "his ghost", "that book") with what they refer to in the conversation.',
+  'Keep the question itself, its words and its language; add nothing else - no titles, authors or explanations.',
+  'If the message is already understandable on its own, repeat it unchanged. Reply with the message only.',
 ].join(' ');
 
 export interface LlmQueryRewriterOptions {
@@ -78,7 +79,7 @@ export class LlmQueryRewriter implements QueryRewriter {
       const rewritten = (await this.model.complete([
         { role: 'system', content: REWRITE_PROMPT },
         { role: 'user', content: `Conversation:\n${conversation}\n\nLast user message: ${message}` },
-      ], { signal: options.signal })).trim().replace(/^["']|["']$/g, '');
+      ], { signal: options.signal, deterministic: true })).trim().replace(/^["']|["']$/g, '');
       return rewritten || message;
     } catch (error) {
       if (options.signal?.aborted) throw error;

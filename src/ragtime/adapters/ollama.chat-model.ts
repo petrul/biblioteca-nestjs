@@ -1,4 +1,5 @@
 import { ChatMessage, ChatModel, CompletionOptions } from '../core';
+import { DEFAULT_GENERATION_MODEL, OllamaGenerativeModelFinder } from './ollama.model-finder';
 
 /**
  * The same /api/chat options as editii-translator's GENERATION_OPTIONS -
@@ -19,14 +20,16 @@ export const GENERATION_OPTIONS = Object.freeze({
 
 export interface OllamaChatModelOptions {
   url: string;
-  /** The model used when no generating model is loaded. Default qwen3.5:9b. */
+  /** The model used when no generating model is loaded (or always, when fixed). Default qwen3.5:9b. */
   defaultModel?: string;
   /**
-   * 'loaded' (default): reuse the generating model Ollama already has loaded,
-   * whichever it is, rather than force a swap on a shared GPU; 'fixed':
-   * always defaultModel.
+   * 'loaded' (default): an OllamaGenerativeModelFinder picks the generating
+   * model Ollama already has loaded, else defaultModel; 'fixed': always
+   * defaultModel (comparable runs).
    */
   modelChoice?: 'loaded' | 'fixed';
+  /** A finder shared with other clients; one is made from url/defaultModel otherwise. */
+  finder?: OllamaGenerativeModelFinder;
   options?: Record<string, unknown>;
   timeoutMs?: number;
   /** How long a picked model is reused before asking Ollama again. Default 60 s. */
@@ -46,67 +49,23 @@ function eitherSignal(a: AbortSignal, b: AbortSignal): AbortSignal {
 /** ChatModel over Ollama's /api/chat. */
 export class OllamaChatModel implements ChatModel {
   private readonly url: string;
-  private picked: { model: string; expiresAt: number } | null = null;
-  private readonly generates = new Map<string, boolean>();
+  private readonly finder?: OllamaGenerativeModelFinder;
 
   constructor(private readonly options: OllamaChatModelOptions) {
     this.url = options.url.replace(/\/+$/, '');
-  }
-
-  private get defaultModel(): string {
-    return this.options.defaultModel ?? 'qwen3.5:9b';
+    if (options.modelChoice !== 'fixed') {
+      this.finder = options.finder
+        ?? new OllamaGenerativeModelFinder({ url: options.url, defaultModel: options.defaultModel, ttlMs: options.modelPickTtlMs });
+    }
   }
 
   /** The model of the latest (or next) call. */
   get modelName(): string {
-    return this.picked?.model ?? this.defaultModel;
+    return this.finder?.current ?? this.options.defaultModel ?? DEFAULT_GENERATION_MODEL;
   }
 
-  async pickModel(): Promise<string> {
-    if (this.options.modelChoice === 'fixed') return this.defaultModel;
-    const now = Date.now();
-    if (this.picked && this.picked.expiresAt > now) return this.picked.model;
-    let model = this.defaultModel;
-    try {
-      const response = await fetch(`${this.url}/api/ps`, { signal: AbortSignal.timeout(3000) });
-      if (response.ok) {
-        const { models } = (await response.json()) as { models?: { name: string }[] };
-        for (const loaded of models ?? []) {
-          if (loaded?.name && (await this.canGenerate(loaded.name))) {
-            model = loaded.name;
-            break;
-          }
-        }
-      }
-    } catch {
-      // Ollama unreachable for /api/ps: the chat call itself reports it
-    }
-    this.picked = { model, expiresAt: now + (this.options.modelPickTtlMs ?? 60_000) };
-    return model;
-  }
-
-  // Only a model with the "completion" capability generates text: a pinned
-  // embedding model (bge-m3) answers chat calls with HTTP 400. A model's
-  // capabilities never change, so they are remembered; unreadable ones are
-  // not reused.
-  private async canGenerate(model: string): Promise<boolean> {
-    const known = this.generates.get(model);
-    if (known !== undefined) return known;
-    try {
-      const response = await fetch(`${this.url}/api/show`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model }),
-        signal: AbortSignal.timeout(3000),
-      });
-      if (!response.ok) return false;
-      const { capabilities } = (await response.json()) as { capabilities?: string[] };
-      const generates = Array.isArray(capabilities) && capabilities.includes('completion');
-      this.generates.set(model, generates);
-      return generates;
-    } catch {
-      return false;
-    }
+  pickModel(): Promise<string> {
+    return this.finder ? this.finder.find() : Promise.resolve(this.modelName);
   }
 
   private async chat(messages: ChatMessage[], options: CompletionOptions, stream: boolean): Promise<Response> {
@@ -119,14 +78,14 @@ export class OllamaChatModel implements ChatModel {
         model,
         stream,
         think: false,
-        options: this.options.options ?? GENERATION_OPTIONS,
+        options: { ...(this.options.options ?? GENERATION_OPTIONS), ...(options.deterministic ? { temperature: 0 } : {}) },
         ...(options.json ? { format: 'json' } : {}),
         messages,
       }),
       signal: options.signal ? eitherSignal(options.signal, timeout) : timeout,
     });
     if (!response.ok) {
-      this.picked = null; // a model that vanished or cannot chat: pick again next time
+      this.finder?.invalidate(); // a model that vanished or cannot chat: find again next time
       throw new Error(`Ollama chat with ${model} failed: HTTP ${response.status} ${await response.text()}`);
     }
     return response;

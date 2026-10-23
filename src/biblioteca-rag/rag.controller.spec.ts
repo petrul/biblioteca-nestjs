@@ -5,7 +5,7 @@ import { KeywordEmbedder, ScriptedChatModel } from '../ragtime/core/test-doubles
 import { BibliotecaClient } from '../services/biblioteca_client.service';
 import { bibliotecaCollectionSpec } from './biblioteca.source';
 import { RagController } from './rag.controller';
-import { RagService } from './rag.service';
+import { BIBLIOTECA_SYSTEM_PROMPT, RagService } from './rag.service';
 import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from './ragtime.providers';
 
 /** RagController and RagService resolve through Nest's container with the providers app.module gives them. */
@@ -24,6 +24,6 @@ describe('RagController wiring', () => {
     }).compile();
     const controller = moduleRef.get(RagController);
     expect(await controller.ask({ question: 'Ce fura Nică?' })).toMatchObject({ answer: '', model: null, passages: [] });
-    expect(model.calls).toHaveLength(0);
+    expect(model.calls.filter((call) => call.messages[0].content === BIBLIOTECA_SYSTEM_PROMPT)).toHaveLength(0);
   });
 });

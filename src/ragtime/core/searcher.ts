@@ -26,7 +26,7 @@ export interface GenericSearcherOptions<T extends TextItem = TextItem> {
    * passages, which embeddings place near everything. The vector store then
    * returns candidateFactor x topK candidates.
    */
-  accept?: (item: T) => boolean;
+  accept?: (item: T, options: SearchOptions) => boolean;
   /** Candidates per result wanted when reranking or filtering with accept. Default 4. */
   candidateFactor?: number;
 }
@@ -53,7 +53,7 @@ export class GenericSearcher<T extends TextItem = TextItem> implements Searcher<
     let results: SearchResultItem<T>[] = [];
     matches.forEach((match, idx) => {
       const item = items[idx];
-      if (item && (this.options.accept?.(item) ?? true)) results.push({ item, score: match.score, scoreKind: match.scoreKind });
+      if (item && (this.options.accept?.(item, options) ?? true)) results.push({ item, score: match.score, scoreKind: match.scoreKind });
     });
     if (this.options.reranker) results = await this.options.reranker.rerank(query, results, topK);
     return { query, results: results.slice(0, topK) };

@@ -637,12 +637,16 @@ The design above is implemented in three layers:
   `VectorStore` and `VectorCollectionManager` (with a store-neutral
   `CollectionSpec`), `DataStore`, `Embedder` (query/passage purposes,
   `maxBatchSize`), `ChatModel` + `PromptBuilder` (together a `Generator`),
-  `ContentResolver`, `Reranker`, `ContextExpander`, `Indexer`, `Searcher`,
+  `ContentResolver`, `Reranker`, `ContextExpander`, `Retriever`,
+  `QueryExpander`, `KeywordIndex`, `Indexer`, `Searcher`,
   `RagSystem` (`ask`, `streamAsk`), `QueryRewriter`, `ConversationStore`,
   `Chatbot`. The generic implementations: `GenericIndexer` (dedup, language
   filter, truncation, vector reuse by id with payload repointing, sub-batching,
   hooks), `GenericSearcher` (score threshold read by score kind, `accept`,
-  reranking), `PromptedGenerator`/`DefaultPromptBuilder`, `RagtimeSystem`,
+  reranking), `HybridSearcher` (question and expansions, vector and keyword
+  retrievers, pooled round-robin, reranked), `VectorRetriever`,
+  `MemoryKeywordIndex` (BM25), `HypotheticalAnswerExpander` (HyDE),
+  `LlmReranker`, `PromptedGenerator`/`DefaultPromptBuilder`, `RagtimeSystem`,
   `RagChatbot` with `LlmQueryRewriter`, `MemoryConversationStore`,
   `ParagraphSplitter`, `MemoryVectorStore`, `DataStoreContentResolver`, and
   test doubles. The core imports only itself and `node:` built-ins
@@ -650,16 +654,28 @@ The design above is implemented in three layers:
   as it is.
 - **`src/ragtime/adapters/`** - `QdrantVectorStore` (REST; deterministic UUID
   point ids, the item id in the payload, rescoring on quantized collections),
-  `OllamaEmbedder`, `OllamaChatModel` (reuses the generating model already
-  loaded on the shared GPU, else qwen3.5:9b; editii-translator's generation
-  options), `CassandraDataStore`, `WebsiteTextSource`.
+  `OllamaEmbedder`, `OllamaChatModel` (editii-translator's generation
+  options) with `OllamaGenerativeModelFinder` (lazily, on first use: the
+  generating model already loaded on the shared GPU, else qwen3.5:9b),
+  `CassandraDataStore`, `WebsiteTextSource`.
 - **`src/biblioteca-rag/`** - Biblioteca on ragtime: `BibliotecaDivSource`
   (a work's paragraphs, id = sha256), the `{sha256, url, opus_path}` payload
   and point ids biblioteca-server's own vector search shares,
   `BibliotecaContentResolver` (hits back to paragraph text through their div,
   titled "Author, Work - Chapter"), `BibliotecaContextExpander` (each hit with
-  its neighbouring paragraphs), scopes (`opusPaths`: a book, a collection, or
-  the whole library) and `RagService` behind `/api/rag/*`.
+  its neighbouring paragraphs), `BibliotecaKeywordRetriever` (BM25 over the
+  works of a small scope, read once and cached), scopes (`opusPaths`: a book,
+  a collection, or the whole library) and `RagService` behind `/api/rag/*`.
+
+Why questions search harder than `/api/rag/search`: measured on "A Christmas
+Carol" (743 paragraphs), the paragraph answering a plot question ranks far
+down by the question's vector alone - "whose Christmas ball...?" ~320th,
+"what does Scrooge send...?" ~280th. Ask and chat therefore search with the
+question and a drafted answer (HyDE), by vectors and, within a scope, by
+keywords, then let the chat model rerank the pooled 60 candidates.
+`novel-chat.integration.spec.ts` chats with the book (who/what questions,
+follow-ups) against the live models, with tolerant assertions. A turn takes
+~5-30 s on the shared GPU (rewrite, draft, rerank, answer).
 
 Known limits:
 

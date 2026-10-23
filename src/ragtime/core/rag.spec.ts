@@ -96,6 +96,7 @@ describe('LlmQueryRewriter', () => {
     const history = [{ role: 'user' as const, content: 'who is Nica?' }, { role: 'assistant' as const, content: 'a boy' }];
     expect(await rewriter.rewrite('and what did he steal?', history)).toBe('what did Nica steal');
     expect(model.calls[0].messages.at(-1)!.content).toContain('User: who is Nica?');
+    expect(model.calls[0].options).toMatchObject({ deterministic: true });
     expect(model.calls[0].messages.at(-1)!.content).not.toContain('a boy'); // answers left out by default
     await new LlmQueryRewriter(model, { includeAnswers: true }).rewrite('and then?', history);
     expect(model.calls[1].messages.at(-1)!.content).toContain('Assistant: a boy');

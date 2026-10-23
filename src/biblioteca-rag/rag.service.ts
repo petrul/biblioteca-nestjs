@@ -7,17 +7,23 @@ import {
     DefaultPromptBuilder,
     Embedder,
     GenericSearcher,
+    HybridSearcher,
+    HypotheticalAnswerExpander,
     LlmQueryRewriter,
+    LlmReranker,
     MemoryConversationStore,
     PromptedGenerator,
     RagChatbot,
     RagtimeSystem,
+    SearchOptions,
     SearchResultItem,
     VectorFilter,
+    VectorRetriever,
 } from "../ragtime/core";
 import {
     BibliotecaContentResolver,
     BibliotecaContextExpander,
+    BibliotecaKeywordRetriever,
     BibliotecaParagraph,
     BibliotecaScope,
     bibliotecaFilter,
@@ -33,8 +39,9 @@ export interface RagPassage {
     title?: string;
     language?: string;
     text: string;
-    /** Euclid distance to the question: lower is closer. */
+    /** distance: Euclid distance to the question (vector match, lower is closer); similarity: keyword (BM25) match, higher is better. */
     score: number;
+    scoreKind: 'distance' | 'similarity';
 }
 
 export interface RagSearchResponse {
@@ -83,17 +90,29 @@ export const BIBLIOTECA_SYSTEM_PROMPT = [
 ].join(' ');
 
 /**
- * Passages shorter than this are never results: an exclamation or a line of
- * dialogue ("Crrr... Crrr...") embeds near almost any query and says nothing.
+ * Library-wide, passages shorter than this are not results: an exclamation
+ * or a line of dialogue ("Crrr... Crrr...") embeds near almost any query.
+ * Within a scope they are kept - in a novel, a short line ("Expect the first
+ * to-morrow, when the bell tolls One.") can be the answer.
  */
 export const MIN_PASSAGE_CHARS = 80;
+
+export function acceptPassage(paragraph: BibliotecaParagraph, options: SearchOptions): boolean {
+    return options.filter !== undefined || paragraph.text.trim().length >= MIN_PASSAGE_CHARS;
+}
 
 /**
  * Semantic search, RAG and chat over Biblioteca's paragraph vectors, scoped
  * to one work ("chat with a book"), several (a collection) or the whole
- * library. Composes ragtime's generic searcher, RAG system and chatbot with
- * the Biblioteca resolver and context expander; the stores and models come
- * in through the providers.
+ * library. Composes ragtime's generic pieces with the Biblioteca resolver,
+ * keyword retriever and context expander; the stores and models come in
+ * through the providers.
+ *
+ * /search is plain vector search (fast). Questions and chat search harder:
+ * the question and a drafted answer (HyDE), by vectors and - within a scope -
+ * by keywords, the pooled candidates reranked by the chat model. Measured on
+ * "A Christmas Carol": the paragraph answering "whose ball...?" ranks ~320th
+ * of 743 by the question's vector alone, first this way.
  */
 @Injectable()
 export class RagService {
@@ -108,11 +127,14 @@ export class RagService {
         @Inject(PROVIDER_CHAT_MODEL) private readonly chatModel: ChatModel,
     ) {
         const resolver = new BibliotecaContentResolver(tbc);
-        this.searcher = new GenericSearcher(embedder, vectors.store, resolver, {
-            accept: (paragraph) => paragraph.text.trim().length >= MIN_PASSAGE_CHARS,
-        });
+        this.searcher = new GenericSearcher(embedder, vectors.store, resolver, { accept: acceptPassage });
+        const deepSearcher = new HybridSearcher(
+            [new VectorRetriever(embedder, vectors.store), new BibliotecaKeywordRetriever(tbc)],
+            resolver,
+            { expander: new HypotheticalAnswerExpander(chatModel), reranker: new LlmReranker(chatModel), accept: acceptPassage },
+        );
         const generator = new PromptedGenerator(chatModel, new DefaultPromptBuilder({ systemPrompt: BIBLIOTECA_SYSTEM_PROMPT }));
-        this.rag = new RagtimeSystem(this.searcher, generator, { expander: new BibliotecaContextExpander(resolver) });
+        this.rag = new RagtimeSystem(deepSearcher, generator, { expander: new BibliotecaContextExpander(resolver) });
         this.chatbot = new RagChatbot(this.rag, new MemoryConversationStore(), { rewriter: new LlmQueryRewriter(chatModel) });
     }
 
@@ -230,5 +252,6 @@ function passages(results: SearchResultItem<BibliotecaParagraph>[]): RagPassage[
         ...(result.item.language ? { language: result.item.language } : {}),
         text: result.item.text,
         score: result.score,
+        scoreKind: result.scoreKind,
     }));
 }

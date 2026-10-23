@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto';
  *
  *   TextSource --items--> [TextSplitter] --> Indexer --> Embedder + VectorStore (+ DataStore)
  *   question --> Searcher: Embedder, VectorStore, ContentResolver, [Reranker], [ContextExpander]
+ *            or HybridSearcher: [QueryExpander] + Retrievers (vector, keyword) + ContentResolver + [Reranker]
  *            --> RagSystem: Searcher + Generator (= ChatModel + PromptBuilder)
  *            --> Chatbot: RagSystem + ConversationStore + [QueryRewriter]
  */
@@ -224,6 +225,8 @@ export interface CompletionOptions {
   signal?: AbortSignal;
   /** Ask for a JSON answer, when the model supports it. */
   json?: boolean;
+  /** Least random sampling (temperature 0): for helpers whose output should repeat, such as rerankers. */
+  deterministic?: boolean;
 }
 
 /** A chat LLM: messages in, text out (e.g., Ollama qwen3.5, OpenAI, Claude). */
@@ -271,7 +274,11 @@ export interface SearchResultItem<T extends TextItem = TextItem> {
   scoreKind: ScoreKind;
 }
 
-/** Re-orders search results with a finer model (e.g. a cross-encoder) and keeps the best topK. */
+/**
+ * Re-orders search results with a finer model (a cross-encoder, an LLM) and
+ * keeps the best topK. It may return fewer than topK - only what it judged
+ * useful.
+ */
 export interface Reranker {
   rerank<T extends TextItem>(query: string, results: SearchResultItem<T>[], topK: number): Promise<SearchResultItem<T>[]>;
 }
@@ -283,6 +290,39 @@ export interface Reranker {
  */
 export interface ContextExpander<T extends TextItem = TextItem> {
   expand(results: SearchResultItem<T>[]): Promise<TextItem[]>;
+}
+
+/** Candidates for a query, from one kind of index (vectors, keywords...). */
+export interface RetrieveOptions {
+  topK: number;
+  filter?: VectorFilter;
+  /**
+   * For retrievers whose scores it can be compared with (see
+   * SearchOptions.scoreThreshold); keyword retrievers ignore it - an
+   * exact-term match is evidence of its own.
+   */
+  scoreThreshold?: number;
+  signal?: AbortSignal;
+}
+
+export interface Retriever {
+  /** Best first; each match's payload is what a ContentResolver resolves. */
+  retrieve(query: string, collection: string, options: RetrieveOptions): Promise<VectorQueryResult[]>;
+}
+
+/**
+ * More ways to search for one query: e.g. a hypothetical passage that would
+ * answer it (HyDE), whose words and embedding are closer to the text that
+ * actually answers than the question's are.
+ */
+export interface QueryExpander {
+  expand(query: string, options?: { signal?: AbortSignal }): Promise<string[]>;
+}
+
+/** A searchable index of words (BM25 and the like), complementing vectors with exact names and terms. */
+export interface KeywordIndex extends Retriever {
+  add(collection: string, items: { id: string; text: string; payload: Record<string, unknown> }[]): Promise<void>;
+  count(collection: string): Promise<number>;
 }
 
 export interface SearchResult<T extends TextItem = TextItem> {

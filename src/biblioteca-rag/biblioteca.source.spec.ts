@@ -5,6 +5,7 @@ import {
   BibliotecaContentResolver,
   BibliotecaContextExpander,
   BibliotecaDivSource,
+  BibliotecaKeywordRetriever,
   BibliotecaParagraph,
   bibliotecaFilter,
   bibliotecaPayload,
@@ -96,5 +97,27 @@ describe('BibliotecaContextExpander', () => {
     const [expanded] = await new BibliotecaContextExpander(resolver).expand([{ item: hit!, score: 0.5, scoreKind: 'distance' }]);
     expect(await expanded.getText()).toBe('Stau câteodată și-mi aduc aminte.\n\nNică fura cireșe.\n\nMătușa Mărioara îl prinde.');
     expect(expanded).toMatchObject({ id: hit!.id, url: hit!.url, title: hit!.title });
+  });
+});
+
+describe('BibliotecaKeywordRetriever', () => {
+  it('searches the words of the scoped works only, reading each work once', async () => {
+    const reader = library();
+    const retriever = new BibliotecaKeywordRetriever(reader);
+    const hits = await retriever.retrieve('cireșe', 'c', { topK: 5, filter: { opus_path: ['creanga/amintiri'] } });
+    expect(hits).toHaveLength(1);
+    expect(hits[0].payload).toEqual({ ...match(reader, CHAPTER, 2).payload, opus_path: 'creanga/amintiri' });
+    await retriever.retrieve('Mătușa', 'c', { topK: 5, filter: { opus_path: 'creanga/amintiri' } });
+    expect(reader.paragraphReads).toHaveLength(1);
+  });
+
+  it('gives nothing library-wide or for too wide a scope, and forgets a work that is gone', async () => {
+    const reader = library();
+    const retriever = new BibliotecaKeywordRetriever(reader, { maxWorks: 1 });
+    expect(await retriever.retrieve('cireșe', 'c', { topK: 5 })).toEqual([]);
+    expect(await retriever.retrieve('cireșe', 'c', { topK: 5, filter: { opus_path: ['creanga/amintiri', 'eminescu/luceafarul'] } })).toEqual([]);
+    expect(await retriever.retrieve('x', 'c', { topK: 5, filter: { opus_path: 'removed/work' } })).toEqual([]);
+    expect(await retriever.retrieve('x', 'c', { topK: 5, filter: { opus_path: 'removed/work' } })).toEqual([]);
+    expect(reader.pathLookups.filter((p) => p === '/removed/work')).toHaveLength(2); // looked up again: not cached as gone
   });
 });

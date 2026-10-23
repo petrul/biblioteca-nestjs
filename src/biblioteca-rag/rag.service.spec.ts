@@ -6,7 +6,10 @@ import { FakeParagraphReader } from '../../test/fake-paragraph-reader';
 import { BibliotecaClient } from '../services/biblioteca_client.service';
 import { BibliotecaDivSource, bibliotecaCollectionSpec, bibliotecaPayload } from './biblioteca.source';
 import { BibliotecaVectorCollection } from './ragtime.providers';
-import { RagService } from './rag.service';
+import { BIBLIOTECA_SYSTEM_PROMPT, RagService } from './rag.service';
+
+/** The model calls that answered (HyDE drafts and reranking call the model too). */
+const answering = (model: ScriptedChatModel) => model.calls.filter((call) => call.messages[0].content === BIBLIOTECA_SYSTEM_PROMPT);
 
 /**
  * RagService end to end over a fake library: the real ragtime searcher, RAG
@@ -50,17 +53,17 @@ describe('RagService', () => {
     const answer = await rag.ask('Ce fura Nică?', { scope: { opusPaths: ['creanga/amintiri'] }, topK: 1 });
     expect(answer).toMatchObject({ answer: 'Nică fura cireșe [1].', model: 'scripted' });
     expect(answer.passages).toHaveLength(1);
-    const prompt = model.calls[0].messages.at(-1)!.content;
+    const prompt = answering(model)[0].messages.at(-1)!.content;
     expect(prompt).toContain('[1] Ion Creangă, Amintiri din copilărie');
     expect(prompt).toContain(`Nică merge la școală la Humulești.${PAD}\n\nNică fura cireșe din grădina mătușii.${PAD}\n\nMătușa îl prinde în cireș.${PAD}`);
-    expect(model.calls[0].messages[0].content).toContain('Biblioteca');
+    expect(answering(model)).toHaveLength(1);
   });
 
-  it('generates nothing when the scope has no close enough passage', async () => {
+  it('generates nothing when the scope has no close enough passage (and none sharing a word)', async () => {
     const { rag, model } = await setup();
-    const answer = await rag.ask('cireșe', { scope: { opusPaths: ['creanga/amintiri'] }, maxDistance: 0.0001 });
+    const answer = await rag.ask('quantum chromodynamics', { scope: { opusPaths: ['creanga/amintiri'] }, maxDistance: 0.0001 });
     expect(answer).toMatchObject({ answer: '', model: null, passages: [] });
-    expect(model.calls).toHaveLength(0);
+    expect(answering(model)).toHaveLength(0);
   });
 
   it('chats: a follow-up is rewritten from the conversation before searching', async () => {
@@ -69,7 +72,7 @@ describe('RagService', () => {
     const first = await rag.chat('Cine fura cireșe?', { scope: { opusPaths: ['creanga/amintiri'] } });
     const second = await rag.chat('Și ea ce face?', { conversationId: first.conversationId, scope: { opusPaths: ['creanga/amintiri'] } });
     expect(second).toMatchObject({ conversationId: first.conversationId, message: 'Și ea ce face?', question: 'ce face mătușa când îl prinde pe Nică în cireș' });
-    const answered = model.calls.at(-1)!.messages;
+    const answered = answering(model).at(-1)!.messages;
     expect(answered.map((m) => m.content)).toEqual(expect.arrayContaining(['Cine fura cireșe?', 'answer [1]']));
   });
 

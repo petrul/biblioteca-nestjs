@@ -13,6 +13,7 @@ import { BibliotecaClient } from './services/biblioteca_client.service';
 import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
 import { QdrantVectorStore } from './ragtime/adapters/qdrant.vector-store';
 import { OllamaChatModel } from './ragtime/adapters/ollama.chat-model';
+import { DEFAULT_GENERATION_MODEL } from './ragtime/adapters/ollama.model-finder';
 import { OllamaEmbedder } from './ragtime/adapters/ollama.embedder';
 import { Embedder } from './ragtime/core';
 import { BIBLIOTECA_QDRANT_TUNING, bibliotecaCollectionSpec, BibliotecaPayload } from './biblioteca-rag/biblioteca.source';
@@ -165,9 +166,10 @@ import { CoverEnrichmentService } from './services/cover-enrichment.service';
     },
     {
       // RAG answers come from the shared Ollama too: the generating model
-      // already loaded next to the pinned bge-m3, else qwen3.5:9b.
+      // already loaded next to the pinned bge-m3 (found lazily, on the first
+      // question), else qwen3.5:9b.
       provide: PROVIDER_CHAT_MODEL,
-      useFactory: (conf: VectorizerConfiguration) => new OllamaChatModel({ url: conf.ollamaUrl }),
+      useFactory: (conf: VectorizerConfiguration) => new OllamaChatModel({ url: conf.ollamaUrl, defaultModel: DEFAULT_GENERATION_MODEL }),
       inject: [PROVIDER_CONF]
     },
     {

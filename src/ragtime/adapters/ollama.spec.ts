@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import { OllamaEmbedder } from './ollama.embedder';
 import { GENERATION_OPTIONS, OllamaChatModel } from './ollama.chat-model';
+import { DEFAULT_GENERATION_MODEL, OllamaGenerativeModelFinder } from './ollama.model-finder';
 
 const restores: (() => void)[] = [];
 function mockFetch(handler: (url: string, body: any) => { status?: number; body?: any; stream?: string[] }) {
@@ -61,6 +62,8 @@ describe('OllamaChatModel', () => {
     const chat = calls.find((c) => c.url.endsWith('/api/chat'))!;
     expect(chat.body).toMatchObject({ model: 'gemma3:12b', stream: false, think: false, options: GENERATION_OPTIONS, format: 'json', messages: [{ role: 'user', content: 'hi' }] });
     expect(model.modelName).toBe('gemma3:12b');
+    await model.complete([{ role: 'user', content: 'rank' }], { deterministic: true });
+    expect(calls.filter((c) => c.url.endsWith('/api/chat')).at(-1)!.body.options).toEqual({ ...GENERATION_OPTIONS, temperature: 0 });
   });
 
   it('falls back to the default model when nothing generating is loaded, or always uses it when fixed', async () => {
@@ -79,5 +82,35 @@ describe('OllamaChatModel', () => {
     const chunks: string[] = [];
     for await (const chunk of new OllamaChatModel({ url: 'http://o' }).stream([{ role: 'user', content: 'hi' }])) chunks.push(chunk);
     expect(chunks.join('')).toBe('Hello');
+  });
+});
+
+describe('OllamaGenerativeModelFinder', () => {
+  it('defaults to qwen3.5:9b', () => {
+    expect(DEFAULT_GENERATION_MODEL).toBe('qwen3.5:9b');
+    expect(new OllamaGenerativeModelFinder({ url: 'http://o' }).current).toBe('qwen3.5:9b');
+  });
+
+  it('is lazy: asks Ollama on first use only, once for concurrent callers, then reuses the answer', async () => {
+    const calls = mockFetch((url, body) => url.endsWith('/api/ps')
+      ? { body: { models: [{ name: 'bge-m3:latest' }, { name: 'gemma3:12b' }] } }
+      : { body: { capabilities: body.model === 'gemma3:12b' ? ['completion', 'vision'] : ['embedding'] } });
+    const finder = new OllamaGenerativeModelFinder({ url: 'http://o' });
+    expect(calls).toHaveLength(0);
+    expect(await Promise.all([finder.find(), finder.find()])).toEqual(['gemma3:12b', 'gemma3:12b']);
+    expect(calls.filter((c) => c.url.endsWith('/api/ps'))).toHaveLength(1);
+    expect(await finder.find()).toBe('gemma3:12b');
+    expect(calls.filter((c) => c.url.endsWith('/api/ps'))).toHaveLength(1);
+    expect(finder.current).toBe('gemma3:12b');
+  });
+
+  it('falls back to the default model when Ollama is unreachable, and looks again once invalidated', async () => {
+    mockFetch(() => { throw new Error('ECONNREFUSED'); });
+    const finder = new OllamaGenerativeModelFinder({ url: 'http://o', defaultModel: 'llama3.1:8b' });
+    expect(await finder.find()).toBe('llama3.1:8b');
+    const calls = mockFetch((url) => url.endsWith('/api/ps') ? { body: { models: [{ name: 'qwen3.5:9b' }] } } : { body: { capabilities: ['completion'] } });
+    finder.invalidate();
+    expect(await finder.find()).toBe('qwen3.5:9b');
+    expect(calls.length).toBeGreaterThan(0);
   });
 });
