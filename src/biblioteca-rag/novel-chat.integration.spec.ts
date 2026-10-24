@@ -37,6 +37,8 @@ describe('chatting with a novel (live bge-m3 and Ollama)', () => {
     { message: 'What is the name of his youngest son, the lame one?', expected: /Tiny Tim/i, inPassages: /Tiny Tim/, followUpOf: /Cratchit|Bob/i },
     { message: "Whose Christmas ball does the first spirit show Scrooge from his apprenticeship?", expected: /Fezziwig/i, inPassages: /Fezziwig/ },
     { message: 'What does Scrooge send to the Cratchits on Christmas morning?', expected: /turkey/i, inPassages: /turkey/i },
+    { message: 'Despre ce este vorba în acest roman?', expected: /Scrooge|Christmas|Cratchit|Marley/i, inPassages: /Scrooge|Christmas|Marley/i },
+    { message: 'Cine sunt personajele principale?', expected: /Scrooge|Marley|Cratchit|Tiny Tim/i, inPassages: /Scrooge|Marley|Cratchit/i },
   ];
 
   beforeAll(async () => {
