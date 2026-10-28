@@ -471,7 +471,10 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    */
   private async persist(body: EnrichmentUpdate, opts: { force?: boolean } = {}) {
     const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` } : {}) }, body: JSON.stringify({ ...body, overwrite: opts.force === true }) });
-    if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`
+      + ([401, 403].includes(response.status)
+        ? ' - check that BIBLIOTECA_INTERNAL_API_TOKEN is set and matches biblioteca-server\'s'
+        : ''));
   }
 
   private wikipediaApiUrl(title: string) { return `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/\s+/g, '_'))}`; }

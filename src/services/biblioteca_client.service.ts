@@ -15,6 +15,9 @@ export class BibliotecaClient {
 
     constructor(@Inject(PROVIDER_CONF) protected conf: AppConfService) {
         this.log.log(`will connect to biblioteca url: ${conf.bibliotecaUrl}`)
+        if (!process.env.BIBLIOTECA_INTERNAL_API_TOKEN)
+            this.log.warn('BIBLIOTECA_INTERNAL_API_TOKEN is not set: biblioteca-server will refuse '
+                + 'its internal calls (enrichment and cover persistence, GraphQL, vectorizing stats)');
         this.tb = new Api({
             baseUrl:  conf.bibliotecaUrl,
             baseApiParams: {
