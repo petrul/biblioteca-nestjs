@@ -20,8 +20,8 @@ export class BibliotecaClient {
             baseApiParams: {
               headers: {
                 Accept: 'application/json',
-                ...(process.env.NESTJS_INTERNAL_API_TOKEN
-                  ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+                ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN
+                  ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` }
                   : {}),
               }
             }
@@ -229,8 +229,8 @@ export class BibliotecaClient {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(process.env.NESTJS_INTERNAL_API_TOKEN
-              ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+            ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN
+              ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` }
               : {}),
           },
           body: JSON.stringify(stat),
@@ -252,8 +252,8 @@ export class BibliotecaClient {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(process.env.NESTJS_INTERNAL_API_TOKEN
-              ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+            ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN
+              ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` }
               : {}),
           },
           body: JSON.stringify(stat),
@@ -272,8 +272,8 @@ export class BibliotecaClient {
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
-          ...(process.env.NESTJS_INTERNAL_API_TOKEN
-            ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+          ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN
+            ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` }
             : {}),
         },
         body: JSON.stringify(update),

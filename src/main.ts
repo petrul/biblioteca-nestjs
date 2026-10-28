@@ -24,7 +24,7 @@ async function bootstrap() {
     );
     if (!protectedMutation) return next();
 
-    const token = process.env.NESTJS_INTERNAL_API_TOKEN;
+    const token = process.env.BIBLIOTECA_INTERNAL_API_TOKEN;
     if (!token) return res.status(503).json({ error: 'Internal API authorization is not configured' });
     const supplied = Buffer.from(req.get('authorization') || '');
     const expected = Buffer.from(`Bearer ${token}`);

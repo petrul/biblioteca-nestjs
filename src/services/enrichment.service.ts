@@ -470,7 +470,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
    * update replaces already-populated fields.
    */
   private async persist(body: EnrichmentUpdate, opts: { force?: boolean } = {}) {
-    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(process.env.NESTJS_INTERNAL_API_TOKEN ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` } : {}) }, body: JSON.stringify({ ...body, overwrite: opts.force === true }) });
+    const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(process.env.BIBLIOTECA_INTERNAL_API_TOKEN ? { Authorization: `Bearer ${process.env.BIBLIOTECA_INTERNAL_API_TOKEN}` } : {}) }, body: JSON.stringify({ ...body, overwrite: opts.force === true }) });
     if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`);
   }
 
