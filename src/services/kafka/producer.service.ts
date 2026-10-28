@@ -6,6 +6,7 @@ import { Producer } from 'kafkajs';
 export class ProducerService implements OnModuleInit, OnApplicationShutdown {
 
     producer: Producer;
+    private connected: Promise<void> = Promise.resolve();
 
     constructor(kserv: KafkaService) {
         this.producer = kserv.kafka.producer();
@@ -16,7 +17,12 @@ export class ProducerService implements OnModuleInit, OnApplicationShutdown {
     }
 
     onModuleInit() {
-        this.producer.connect();
+        this.connected = this.producer.connect();
+    }
+
+    async sendJson(topic: string, value: unknown): Promise<void> {
+        await this.connected;
+        await this.producer.send({ topic, messages: [{ value: JSON.stringify(value) }] });
     }
 
 }

@@ -20,6 +20,9 @@ export class BibliotecaClient {
             baseApiParams: {
               headers: {
                 Accept: 'application/json',
+                ...(process.env.NESTJS_INTERNAL_API_TOKEN
+                  ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+                  : {}),
               }
             }
           });
@@ -224,7 +227,12 @@ export class BibliotecaClient {
       try {
         const res = await fetch(`${this.conf.bibliotecaUrl}/api/drest/embeddingBatchStats`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.NESTJS_INTERNAL_API_TOKEN
+              ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+              : {}),
+          },
           body: JSON.stringify(stat),
         });
         if (!res.ok) {
@@ -242,7 +250,12 @@ export class BibliotecaClient {
       try {
         const res = await fetch(`${this.conf.bibliotecaUrl}/api/drest/opusVectorizingStats`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(process.env.NESTJS_INTERNAL_API_TOKEN
+              ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+              : {}),
+          },
           body: JSON.stringify(stat),
         });
         if (!res.ok) {
@@ -256,7 +269,13 @@ export class BibliotecaClient {
     async persistEnrichment(update: { opusId: number; coverUrl?: string; replaceCover?: boolean }): Promise<void> {
       const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(process.env.NESTJS_INTERNAL_API_TOKEN
+            ? { Authorization: `Bearer ${process.env.NESTJS_INTERNAL_API_TOKEN}` }
+            : {}),
+        },
         body: JSON.stringify(update),
       });
       if (!response.ok) throw new Error(`enrichment persistence returned HTTP ${response.status}`);

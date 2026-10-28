@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
 import { BibliotecaClient } from "../services/biblioteca_client.service";
 import {
     ChatModel,
@@ -29,6 +29,7 @@ import {
     bibliotecaFilter,
 } from "./biblioteca.source";
 import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from "./ragtime.providers";
+import { NotificationPublisher } from "../services/notifications/notification-publisher.service";
 
 export interface RagPassage {
     /** 1-based: the [n] the answer cites. */
@@ -125,6 +126,7 @@ export class RagService {
         @Inject(PROVIDER_EMBEDDER) embedder: Embedder,
         @Inject(PROVIDER_VECTOR_COLLECTION) private readonly vectors: BibliotecaVectorCollection,
         @Inject(PROVIDER_CHAT_MODEL) private readonly chatModel: ChatModel,
+        @Optional() private readonly notifications?: NotificationPublisher,
     ) {
         const resolver = new BibliotecaContentResolver(tbc);
         this.searcher = new GenericSearcher(embedder, vectors.store, resolver, { accept: acceptPassage });
@@ -183,7 +185,7 @@ export class RagService {
             conversationId: request.conversationId, message: m, filter,
             topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), scoreThreshold: validDistance(request.maxDistance),
         });
-        return {
+        const result = {
             conversationId: reply.conversationId,
             message: reply.message,
             question: reply.question,
@@ -192,6 +194,8 @@ export class RagService {
             model: reply.citations.length > 0 ? this.chatModel.modelName : null,
             passages: passages(reply.citations),
         };
+        await this.notifications?.chatUsed(result.message, result.scope, result.conversationId);
+        return result;
     }
 }
 
