@@ -87,6 +87,9 @@ export interface SharedTextbaseConfig {
          *  CoverEnrichmentRequests); absent on servers older than it, which
          *  leaves WorkEnrichmentKafkaListenerService idle. */
         enrichWorkTopic?: string;
+        /** biblioteca_events: interesting human events (chat, RAG search, ask) -
+         *  see HumanEventPublisher; absent on servers older than it. */
+        humanEventsTopic?: string;
     };
     milvus: {
         collection: string;

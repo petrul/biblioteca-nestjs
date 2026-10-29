@@ -31,7 +31,7 @@ import { EnrichmentAdminController } from './enrichment-admin.controller';
 import { CoverAdminController } from './cover-admin.controller';
 import { CoverWorkController } from './cover-work.controller';
 import { CoverEnrichmentService } from './services/cover-enrichment.service';
-import { NotificationPublisher } from './services/notifications/notification-publisher.service';
+import { HumanEventPublisher } from './services/events/human-events.publisher';
 
 @Module({
   imports: [
@@ -64,7 +64,7 @@ import { NotificationPublisher } from './services/notifications/notification-pub
       useClass: AppConfService,
     },
     ProducerService,
-    NotificationPublisher,
+    HumanEventPublisher,
     VectorizerKafkaListenerService,
     AuthorEnrichmentKafkaListenerService,
     WorkEnrichmentKafkaListenerService,

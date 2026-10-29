@@ -7,6 +7,7 @@ import { BibliotecaClient } from '../services/biblioteca_client.service';
 import { BibliotecaDivSource, bibliotecaCollectionSpec, bibliotecaPayload } from './biblioteca.source';
 import { BibliotecaVectorCollection } from './ragtime.providers';
 import { BIBLIOTECA_SYSTEM_PROMPT, RagService } from './rag.service';
+import { HumanEventPublisher } from '../services/events/human-events.publisher';
 
 /** The model calls that answered (HyDE drafts and reranking call the model too). */
 const answering = (model: ScriptedChatModel) => model.calls.filter((call) => call.messages[0].content === BIBLIOTECA_SYSTEM_PROMPT);
@@ -19,7 +20,7 @@ const answering = (model: ScriptedChatModel) => model.calls.filter((call) => cal
 const PAD = ' — o frază mai lungă, ca un paragraf adevărat de carte, cu destule cuvinte.';
 
 describe('RagService', () => {
-  async function setup(script?: ConstructorParameters<typeof ScriptedChatModel>[0]) {
+  async function setup(script?: ConstructorParameters<typeof ScriptedChatModel>[0], events?: HumanEventPublisher) {
     const reader = new FakeParagraphReader()
       .div('creanga/amintiri', 'Amintiri din copilărie', 'Ion Creangă', [
         'Nică merge la școală la Humulești. — o frază mai lungă, ca un paragraf adevărat de carte, cu destule cuvinte.', 'Nică fura cireșe din grădina mătușii. — o frază mai lungă, ca un paragraf adevărat de carte, cu destule cuvinte.', 'Mătușa îl prinde în cireș. — o frază mai lungă, ca un paragraf adevărat de carte, cu destule cuvinte.', 'Hm!'])
@@ -32,7 +33,7 @@ describe('RagService', () => {
       await new GenericIndexer(embedder, store).indexSource(new BibliotecaDivSource(reader, divId), vectors.name, { payloadOf: bibliotecaPayload });
     }
     const model = new ScriptedChatModel(script);
-    return { rag: new RagService(reader as unknown as BibliotecaClient, embedder, vectors, model), model };
+    return { rag: new RagService(reader as unknown as BibliotecaClient, embedder, vectors, model, events), model };
   }
 
   it('searches the whole library, or only the works of the scope', async () => {
@@ -96,6 +97,24 @@ describe('RagService', () => {
     const { rag } = await setup();
     const [question, request] = args() as [string, any];
     await expect(rag.ask(question, request)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('publishes a human event for every RAG search, question and chat message', async () => {
+    const published: Array<{ type: string; details: Record<string, unknown> }> = [];
+    const events = { publish: async (type: string, details: Record<string, unknown>) => { published.push({ type, details }); } } as unknown as HumanEventPublisher;
+    const { rag } = await setup(() => 'Nică fura cireșe [1].', events);
+    const scope = { opusPaths: ['creanga/amintiri'] };
+
+    await rag.search('Nică cireșe', { topK: 2, scope });
+    await rag.ask('Ce fura Nică?', { scope, topK: 1 });
+    const chat = await rag.chat('Ce fura Nică?', { scope, topK: 1 });
+    await rag.streamAsk('Ce fura Nică?', { scope, topK: 1 });
+
+    expect(published.map((e) => e.type)).toEqual(['rag-search', 'ask', 'chat', 'ask']);
+    expect(published[0].details).toEqual({ query: 'Nică cireșe', scope, results: 2 });
+    expect(published[1].details).toMatchObject({ message: 'Ce fura Nică?', scope, answerChars: 'Nică fura cireșe [1].'.length, passages: 1, model: 'scripted' });
+    expect(published[2].details).toMatchObject({ message: 'Ce fura Nică?', conversationId: chat.conversationId, scope, passages: 1 });
+    expect(published[3].details).toMatchObject({ message: 'Ce fura Nică?', streamed: true });
   });
 
   it('rejects a conversation id it could not have issued', async () => {

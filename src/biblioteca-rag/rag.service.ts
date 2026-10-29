@@ -29,7 +29,7 @@ import {
     bibliotecaFilter,
 } from "./biblioteca.source";
 import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from "./ragtime.providers";
-import { NotificationPublisher } from "../services/notifications/notification-publisher.service";
+import { HumanEventPublisher } from "../services/events/human-events.publisher";
 
 export interface RagPassage {
     /** 1-based: the [n] the answer cites. */
@@ -126,7 +126,7 @@ export class RagService {
         @Inject(PROVIDER_EMBEDDER) embedder: Embedder,
         @Inject(PROVIDER_VECTOR_COLLECTION) private readonly vectors: BibliotecaVectorCollection,
         @Inject(PROVIDER_CHAT_MODEL) private readonly chatModel: ChatModel,
-        @Optional() private readonly notifications?: NotificationPublisher,
+        @Optional() private readonly events?: HumanEventPublisher,
     ) {
         const resolver = new BibliotecaContentResolver(tbc);
         this.searcher = new GenericSearcher(embedder, vectors.store, resolver, { accept: acceptPassage });
@@ -146,7 +146,9 @@ export class RagService {
         const { results } = await this.searcher.search(q, this.vectors.name, {
             topK: validTopK(request.topK ?? 10, RAG_LIMITS.maxSearchTopK), filter, scoreThreshold: validDistance(request.maxDistance),
         });
-        return { query: q, scope: scopeOf(filter), passages: passages(results) };
+        const response = { query: q, scope: scopeOf(filter), passages: passages(results) };
+        await this.events?.publish('rag-search', { query: q, scope: response.scope, results: response.passages.length });
+        return response;
     }
 
     async ask(question: string, request: RagRequestBase & { history?: ChatTurn[] } = {}): Promise<RagAnswerResponse> {
@@ -156,13 +158,15 @@ export class RagService {
             topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), filter, scoreThreshold: validDistance(request.maxDistance),
             history: validHistory(request.history),
         });
-        return {
+        const result = {
             question: q,
             scope: scopeOf(filter),
             answer: response.answer,
             model: response.citations.length > 0 ? this.chatModel.modelName : null,
             passages: passages(response.citations),
         };
+        await this.events?.publish('ask', { message: q, scope: result.scope, answerChars: result.answer.length, passages: result.passages.length, model: result.model });
+        return result;
     }
 
     /** The passages, then the answer as it is generated. */
@@ -173,7 +177,9 @@ export class RagService {
             topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), filter, scoreThreshold: validDistance(request.maxDistance),
             history: validHistory(request.history), signal,
         });
-        return { question: q, scope: scopeOf(filter), passages: passages(stream.citations), answer: stream.answer };
+        const result = { question: q, scope: scopeOf(filter), passages: passages(stream.citations), answer: stream.answer };
+        await this.events?.publish('ask', { message: q, scope: result.scope, passages: result.passages.length, model: this.chatModel.modelName, streamed: true });
+        return result;
     }
 
     async chat(message: string, request: RagRequestBase & { conversationId?: string } = {}): Promise<RagChatResponse> {
@@ -194,7 +200,10 @@ export class RagService {
             model: reply.citations.length > 0 ? this.chatModel.modelName : null,
             passages: passages(reply.citations),
         };
-        await this.notifications?.chatUsed(result.message, result.scope, result.conversationId);
+        await this.events?.publish('chat', {
+            message: result.message, conversationId: result.conversationId, scope: result.scope,
+            answerChars: result.answer.length, passages: result.passages.length, model: result.model,
+        });
         return result;
     }
 }
