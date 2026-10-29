@@ -31,6 +31,12 @@ export interface OllamaChatModelOptions {
   /** A finder shared with other clients; one is made from url/defaultModel otherwise. */
   finder?: OllamaGenerativeModelFinder;
   options?: Record<string, unknown>;
+  /**
+   * Ollama keep_alive: how long the model stays loaded after each request
+   * ('6h', 3600, -1 for good). Omitted: Ollama's default (5 minutes), after
+   * which the next request waits for the model to load again.
+   */
+  keepAlive?: number | string;
   timeoutMs?: number;
   /** How long a picked model is reused before asking Ollama again. Default 60 s. */
   modelPickTtlMs?: number;
@@ -78,6 +84,7 @@ export class OllamaChatModel implements ChatModel {
         model,
         stream,
         think: false,
+        ...(this.options.keepAlive !== undefined ? { keep_alive: this.options.keepAlive } : {}),
         options: { ...(this.options.options ?? GENERATION_OPTIONS), ...(options.deterministic ? { temperature: 0 } : {}) },
         ...(options.json ? { format: 'json' } : {}),
         messages,

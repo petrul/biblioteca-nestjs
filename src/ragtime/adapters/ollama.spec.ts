@@ -86,6 +86,14 @@ describe('OllamaChatModel', () => {
 });
 
 describe('OllamaGenerativeModelFinder', () => {
+  it('sends keep_alive when set, and leaves it to Ollama when not', async () => {
+    const calls = mockFetch(() => ({ body: { message: { content: 'ok' } } }));
+    await new OllamaChatModel({ url: 'http://o', defaultModel: 'qwen3.5:9b', modelChoice: 'fixed', keepAlive: '6h' }).complete([{ role: 'user', content: 'q' }]);
+    await new OllamaChatModel({ url: 'http://o', defaultModel: 'qwen3.5:9b', modelChoice: 'fixed' }).complete([{ role: 'user', content: 'q' }]);
+    expect(calls[0].body.keep_alive).toBe('6h');
+    expect(calls[1].body).not.toHaveProperty('keep_alive');
+  });
+
   it('defaults to qwen3.5:9b', () => {
     expect(DEFAULT_GENERATION_MODEL).toBe('qwen3.5:9b');
     expect(new OllamaGenerativeModelFinder({ url: 'http://o' }).current).toBe('qwen3.5:9b');

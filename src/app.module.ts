@@ -12,12 +12,10 @@ import { ConfigModule } from '@nestjs/config';
 import { BibliotecaClient } from './services/biblioteca_client.service';
 import configuration, { AppConfService, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, SharedTextbaseConfig, TB_GETPARAS_PAGE_SIZE, VectorizerConfiguration } from './configuration';
 import { QdrantVectorStore } from './ragtime/adapters/qdrant.vector-store';
-import { OllamaChatModel } from './ragtime/adapters/ollama.chat-model';
-import { DEFAULT_GENERATION_MODEL } from './ragtime/adapters/ollama.model-finder';
 import { OllamaEmbedder } from './ragtime/adapters/ollama.embedder';
 import { Embedder } from './ragtime/core';
 import { BIBLIOTECA_QDRANT_TUNING, bibliotecaCollectionSpec, BibliotecaPayload } from './biblioteca-rag/biblioteca.source';
-import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from './biblioteca-rag/ragtime.providers';
+import { BibliotecaVectorCollection, bibliotecaChatModel, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from './biblioteca-rag/ragtime.providers';
 import { RagService } from './biblioteca-rag/rag.service';
 import { RagController } from './biblioteca-rag/rag.controller';
 import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
@@ -171,7 +169,7 @@ import { NotificationPublisher } from './services/notifications/notification-pub
       // already loaded next to the pinned bge-m3 (found lazily, on the first
       // question), else qwen3.5:9b.
       provide: PROVIDER_CHAT_MODEL,
-      useFactory: (conf: VectorizerConfiguration) => new OllamaChatModel({ url: conf.ollamaUrl, defaultModel: DEFAULT_GENERATION_MODEL }),
+      useFactory: (conf: VectorizerConfiguration) => bibliotecaChatModel(conf.ollamaUrl),
       inject: [PROVIDER_CONF]
     },
     {
