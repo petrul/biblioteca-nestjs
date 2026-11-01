@@ -21,7 +21,6 @@ import { RagController } from './biblioteca-rag/rag.controller';
 import { AllMiniLmL6V2_StsService, AllMpnetBaseV2_StsService, SentenceTransformersService } from './services/sts/sts.service';
 import { RetryingEmbedder } from './services/retrying_embedder';
 import { PROVIDER_LOGGER, retryUntilAvailable } from './util';
-import { log } from 'console';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health/health.controller';
 import { UpstreamHealthIndicator } from './health/upstream-health.indicator';
@@ -176,7 +175,6 @@ import { HumanEventPublisher } from './services/events/human-events.publisher';
       provide: VectorizerService,
       useFactory: (tbc: BibliotecaClient, embedder: Embedder, vectors: BibliotecaVectorCollection,
         conf: VectorizerConfiguration, shared: SharedTextbaseConfig ) => {
-        log(conf);
         return new VectorizerService(tbc, embedder, vectors, shared, TB_GETPARAS_PAGE_SIZE);
       },
       inject: [BibliotecaClient, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION, PROVIDER_CONF, PROVIDER_SHARED_CONFIG, PROVIDER_LOGGER]
