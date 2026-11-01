@@ -4,11 +4,22 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { timingSafeEqual } from 'node:crypto';
+import { INITIATOR_HEADER, prefixProcessOutput, propagateInitiator, requestInitiator, runAs } from './initiator';
+
+// Every line this process writes starts with its initiator - see initiator.ts.
+prefixProcessOutput();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['verbose', 'debug', 'log', 'warn', 'error' ]
   });
+
+  // Each request runs - and logs - as the reader its caller names, or as the
+  // guest of its address; its calls to biblioteca-server and biblioteca-covers
+  // carry that label on ("system" for this service's own background work).
+  app.use((req: any, _res: any, next: () => void) => runAs(
+    requestInitiator(req.get(INITIATOR_HEADER), `${req.ip}|${req.get('user-agent') ?? ''}`), next));
+  propagateInitiator([process.env.BIBLIOTECA_EXTERNAL_URL ?? '', process.env.COVERS_API_URL || 'http://localhost:3335']);
 
   app.use((req: any, res: any, next: () => void) => {
     const path = req.path as string;
