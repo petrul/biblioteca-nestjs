@@ -117,6 +117,19 @@ describe('RagService', () => {
     expect(published[3].details).toMatchObject({ message: 'Ce fura Nică?', streamed: true });
   });
 
+  it('records a question or chat message that fails, with its error', async () => {
+    const published: Array<{ type: string; details: Record<string, unknown> }> = [];
+    const events = { publish: async (type: string, details: Record<string, unknown>) => { published.push({ type, details }); } } as unknown as HumanEventPublisher;
+    const { rag } = await setup(() => { throw new Error('Ollama is down'); }, events);
+
+    await expect(rag.chat('Ce fura Nică?', { topK: 1 })).rejects.toThrow('Ollama is down');
+    await expect(rag.ask('Ce fura Nică?', { topK: 1 })).rejects.toThrow('Ollama is down');
+
+    expect(published.map((e) => e.type)).toEqual(['chat', 'ask']);
+    expect(published[0].details).toMatchObject({ message: 'Ce fura Nică?', failed: 'Ollama is down' });
+    expect(published[1].details).toMatchObject({ message: 'Ce fura Nică?', failed: 'Ollama is down' });
+  });
+
   it('rejects a conversation id it could not have issued', async () => {
     const { rag } = await setup();
     await expect(rag.chat('Nică', { conversationId: 'x; drop' })).rejects.toBeInstanceOf(BadRequestException);

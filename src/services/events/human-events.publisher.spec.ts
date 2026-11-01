@@ -1,3 +1,4 @@
+import { runAs } from '../../initiator';
 import { HumanEventPublisher } from './human-events.publisher';
 
 // biblioteca-nestjs's human events - a chat message, a RAG search, a question -
@@ -18,6 +19,16 @@ describe('HumanEventPublisher', () => {
     expect(Object.keys(event)).toEqual(['type', 'at', 'service', 'message', 'conversationId', 'scope']);
     expect(event).toMatchObject({ type: 'chat', service: 'biblioteca-nestjs', message: 'Cine este Angelica?' });
     expect(Number.isNaN(Date.parse(event.at))).toBe(false);
+  });
+
+  it('records who asked: the signed-in user the request runs as', async () => {
+    const sendJson = jest.fn().mockResolvedValue(undefined);
+    await runAs('petru@scriptorium.ro', () =>
+      new HumanEventPublisher({ sendJson } as any, shared('biblioteca_events')).publish('chat', { message: 'Cine este Angelica?' }));
+    expect(sendJson.mock.calls[0][1]).toMatchObject({ type: 'chat', user: 'petru@scriptorium.ro' });
+    await runAs('guest_formidable_dictator', () =>
+      new HumanEventPublisher({ sendJson } as any, shared('biblioteca_events')).publish('chat', { message: 'q' }));
+    expect(sendJson.mock.calls[1][1].user).toBeUndefined();
   });
 
   it('needs no environment: mail, ntfy or token settings play no part', async () => {

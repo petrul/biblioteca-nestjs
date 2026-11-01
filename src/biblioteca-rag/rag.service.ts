@@ -154,10 +154,10 @@ export class RagService {
     async ask(question: string, request: RagRequestBase & { history?: ChatTurn[] } = {}): Promise<RagAnswerResponse> {
         const q = validQuery(question);
         const filter = validFilter(request.scope);
-        const response = await this.rag.ask(q, this.vectors.name, {
+        const response = await this.recordingFailure('ask', { message: q, scope: scopeOf(filter) }, () => this.rag.ask(q, this.vectors.name, {
             topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), filter, scoreThreshold: validDistance(request.maxDistance),
             history: validHistory(request.history),
-        });
+        }));
         const result = {
             question: q,
             scope: scopeOf(filter),
@@ -173,10 +173,10 @@ export class RagService {
     async streamAsk(question: string, request: RagRequestBase & { history?: ChatTurn[] } = {}, signal?: AbortSignal) {
         const q = validQuery(question);
         const filter = validFilter(request.scope);
-        const stream = await this.rag.streamAsk(q, this.vectors.name, {
+        const stream = await this.recordingFailure('ask', { message: q, scope: scopeOf(filter), streamed: true }, () => this.rag.streamAsk(q, this.vectors.name, {
             topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), filter, scoreThreshold: validDistance(request.maxDistance),
             history: validHistory(request.history), signal,
-        });
+        }));
         const result = { question: q, scope: scopeOf(filter), passages: passages(stream.citations), answer: stream.answer };
         await this.events?.publish('ask', { message: q, scope: result.scope, passages: result.passages.length, model: this.chatModel.modelName, streamed: true });
         return result;
@@ -187,10 +187,11 @@ export class RagService {
         const filter = validFilter(request.scope);
         if (request.conversationId !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(String(request.conversationId)))
             throw new BadRequestException('conversationId must be the id a previous chat reply returned');
-        const reply = await this.chatbot.chat(this.vectors.name, {
-            conversationId: request.conversationId, message: m, filter,
-            topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), scoreThreshold: validDistance(request.maxDistance),
-        });
+        const reply = await this.recordingFailure('chat', { message: m, conversationId: request.conversationId, scope: scopeOf(filter) },
+            () => this.chatbot.chat(this.vectors.name, {
+                conversationId: request.conversationId, message: m, filter,
+                topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), scoreThreshold: validDistance(request.maxDistance),
+            }));
         const result = {
             conversationId: reply.conversationId,
             message: reply.message,
@@ -205,6 +206,16 @@ export class RagService {
             answerChars: result.answer.length, passages: result.passages.length, model: result.model,
         });
         return result;
+    }
+
+    /** Runs a question or chat message; one that fails is recorded too, with its error, before the error goes on. */
+    private async recordingFailure<T>(type: 'ask' | 'chat', details: Record<string, unknown>, run: () => Promise<T>): Promise<T> {
+        try {
+            return await run();
+        } catch (error) {
+            await this.events?.publish(type, { ...details, failed: error instanceof Error ? error.message : String(error) });
+            throw error;
+        }
     }
 }
 

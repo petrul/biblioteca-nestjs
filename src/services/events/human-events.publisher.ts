@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PROVIDER_SHARED_CONFIG, SharedTextbaseConfig } from '../../configuration';
+import { currentInitiator, isUserLabel } from '../../initiator';
 import { ProducerService } from '../kafka/producer.service';
 
 export const SERVICE = 'biblioteca-nestjs';
@@ -14,7 +15,10 @@ export type HumanEventType = 'chat' | 'rag-search' | 'ask';
  * own: on a server too old to name the topic, events are skipped (logged once).
  * Publishing never fails the chat or search it records.
  *
- * Shape (asyncapi.yml's HumanEvent): {type, at, service, ...details}.
+ * Shape (asyncapi.yml's HumanEvent): {type, at, service, user, ...details},
+ * where user is who asked - the signed-in user the reader's chat gate let
+ * through, which the request runs as (see src/initiator.ts); absent when the
+ * request was not a signed-in user's.
  */
 @Injectable()
 export class HumanEventPublisher {
@@ -33,7 +37,9 @@ export class HumanEventPublisher {
       this.warnedMissingTopic = true;
       return;
     }
+    const initiator = currentInitiator();
     const event: Record<string, unknown> = { type, at: new Date().toISOString(), service: SERVICE };
+    if (isUserLabel(initiator)) event.user = initiator;
     for (const [key, value] of Object.entries(details)) if (value !== undefined && value !== null) event[key] = value;
     try {
       await this.producer.sendJson(topic, event);
