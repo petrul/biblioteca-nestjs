@@ -14,11 +14,10 @@ async function bootstrap() {
     logger: ['verbose', 'debug', 'log', 'warn', 'error' ]
   });
 
-  // Each request runs - and logs - as the reader its caller names, or as the
-  // guest of its address; its calls to biblioteca-server and biblioteca-covers
+  // Each request runs - and logs - as the reader its caller names, else as
+  // anonymous; its calls to biblioteca-server and biblioteca-covers
   // carry that label on ("system" for this service's own background work).
-  app.use((req: any, _res: any, next: () => void) => runAs(
-    requestInitiator(req.get(INITIATOR_HEADER), `${req.ip}|${req.get('user-agent') ?? ''}`), next));
+  app.use((req: any, _res: any, next: () => void) => runAs(requestInitiator(req.get(INITIATOR_HEADER)), next));
   propagateInitiator([process.env.BIBLIOTECA_EXTERNAL_URL ?? '', process.env.COVERS_API_URL || 'http://localhost:3335']);
 
   app.use((req: any, res: any, next: () => void) => {
