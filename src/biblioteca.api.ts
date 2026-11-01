@@ -35,54 +35,18 @@ export interface RepresentationModelObject {
   _links?: Links;
 }
 
-export interface EntityModelTeiDiv {
+export interface EntityModelEmbeddingBatchStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
   /** @format int64 */
-  id?: number;
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
+  totalChars?: number;
   /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
-  summarySourceUrl?: string;
-  coverUrl?: string;
-  leaf?: boolean;
-  completePath?: string;
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
   _links?: Links;
 }
 
@@ -97,19 +61,12 @@ export interface PageMetadata {
   number?: number;
 }
 
-export interface PagedModelEntityModelTeiDiv {
+export interface PagedModelEntityModelEmbeddingBatchStat {
   _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
+    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
   };
   _links?: Links;
   page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
 }
 
 export interface Author {
@@ -166,137 +123,6 @@ export interface Author {
   country?: string;
   visualName?: string;
   anonymous?: boolean;
-}
-
-export interface TeiFile {
-  /** @format int64 */
-  id?: number;
-  filename?: string;
-  /**
-   * @minLength 0
-   * @maxLength 1000
-   */
-  title?: string;
-  authors?: Author[];
-  language?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  repoName?: string;
-  /** @format date-time */
-  timestamp?: string;
-  author?: Author;
-}
-
-export interface EntityModelTeiOpus {
-  description?: string;
-  significantQuote?: string;
-  coverUrl?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiOpus {
-  _embedded?: {
-    teiOpuses?: EntityModelTeiOpus[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelObject {
-  _embedded?: {
-    objects?: any[];
-  };
-  _links?: Links;
-}
-
-export interface EntityModelTeiElem {
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  leaf?: boolean;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiElem {
-  _embedded?: {
-    teiElems?: EntityModelTeiElem[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface EntityModelOpusVectorizingStat {
-  /** @format date-time */
-  recordedAt?: string;
-  /** @format int64 */
-  opusId?: number;
-  /** @format int32 */
-  totalParas?: number;
-  /** @format int32 */
-  totalBatches?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelOpusVectorizingStat {
-  _embedded?: {
-    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
 }
 
 export interface EntityModelAuthor {
@@ -371,24 +197,202 @@ export interface CollectionModelEntityModelAuthor {
   _links?: Links;
 }
 
-export interface EntityModelEmbeddingBatchStat {
+export interface EntityModelTeiOpus {
+  description?: string;
+  significantQuote?: string;
+  summary?: string;
+  summarySourceUrl?: string;
+  /** @format date-time */
+  workEnrichedAt?: string;
+  coverUrl?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiOpus {
+  _embedded?: {
+    teiOpuses?: EntityModelTeiOpus[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelTeiDiv {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
+  summarySourceUrl?: string;
+  coverUrl?: string;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface CollectionModelObject {
+  _embedded?: {
+    objects?: any[];
+  };
+  _links?: Links;
+}
+
+export interface EntityModelTeiElem {
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiElem {
+  _embedded?: {
+    teiElems?: EntityModelTeiElem[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface PagedModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+}
+
+export interface TeiFile {
+  /** @format int64 */
+  id?: number;
+  filename?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1000
+   */
+  title?: string;
+  authors?: Author[];
+  language?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  repoName?: string;
+  /** @format date-time */
+  timestamp?: string;
+  author?: Author;
+}
+
+export interface EntityModelOpusVectorizingStat {
   /** @format date-time */
   recordedAt?: string;
-  /** @format int32 */
-  batchSize?: number;
   /** @format int64 */
-  totalChars?: number;
+  opusId?: number;
   /** @format int32 */
-  vectorDimension?: number;
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
   embedderModel?: string;
   /** @format int64 */
   durationMs?: number;
   _links?: Links;
 }
 
-export interface PagedModelEntityModelEmbeddingBatchStat {
+export interface PagedModelEntityModelOpusVectorizingStat {
   _embedded?: {
-    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
   };
   _links?: Links;
   page?: PageMetadata;
@@ -581,6 +585,10 @@ export interface TeiOpusRequestBody {
   teiDiv?: string;
   description?: string;
   significantQuote?: string;
+  summary?: string;
+  summarySourceUrl?: string;
+  /** @format date-time */
+  workEnrichedAt?: string;
   coverUrl?: string;
 }
 
@@ -616,6 +624,41 @@ export interface AttentionRequest {
   secondsDelta?: number;
 }
 
+export interface ReorderRequest {
+  itemIds?: string[];
+}
+
+export interface DivCollectionDto {
+  /** @format uuid */
+  id?: string;
+  name?: string;
+  kind?: "FAVORITES" | "USER" | "SEARCH";
+  searchQuery?: string;
+  searchParams?: string;
+  /** @format date-time */
+  createdAt?: string;
+  items?: DivCollectionItemDto[];
+  favorites?: boolean;
+}
+
+export interface DivCollectionItemDto {
+  /** @format uuid */
+  id?: string;
+  kind?: string;
+  divPath?: string;
+  divHead?: string;
+  fragmentStart?: string;
+  fragmentEnd?: string;
+  fragmentText?: string[];
+  snippet?: string;
+  /** @format float */
+  score?: number;
+  /** @format int32 */
+  sortOrder?: number;
+  /** @format date-time */
+  addedAt?: string;
+}
+
 export interface RuntimeConfigUpdate {
   value?: string;
 }
@@ -641,6 +684,9 @@ export interface EnrichmentUpdateDto {
   bio?: string;
   bioSourceUrl?: string;
   summary?: string;
+  summarySourceUrl?: string;
+  workEnriched?: boolean;
+  overwrite?: boolean;
   significantQuote?: string;
   birthDate?: string;
   deathDate?: string;
@@ -656,34 +702,29 @@ export interface CreateCollectionRequest {
   name?: string;
 }
 
-export interface DivCollectionDto {
-  /** @format int64 */
-  id?: number;
-  name?: string;
-  /** @format date-time */
-  createdAt?: string;
-  items?: DivCollectionItemDto[];
-  favorites?: boolean;
-}
-
-export interface DivCollectionItemDto {
-  /** @format int64 */
-  id?: number;
-  kind?: string;
-  divPath?: string;
-  divHead?: string;
-  fragmentStart?: string;
-  fragmentEnd?: string;
-  fragmentText?: string[];
-  /** @format date-time */
-  addedAt?: string;
-}
-
 export interface AddItemRequest {
   type?: string;
   path?: string;
   start?: string;
   end?: string;
+}
+
+export interface SaveSearchRequest {
+  name?: string;
+  query?: string;
+  params?: string;
+  hits?: SearchHitToSave[];
+}
+
+export interface SearchHitToSave {
+  path?: string;
+  snippet?: string;
+  /** @format float */
+  score?: number;
+}
+
+export interface RenameRequest {
+  name?: string;
 }
 
 export interface AuthorDto {
@@ -740,6 +781,8 @@ export interface OpusDto {
   summarySourceUrl?: string;
   coverUrl?: string;
   description?: string;
+  summary?: string;
+  workEnrichedAt?: string;
   significantQuote?: string;
   author?: any;
   leaf?: boolean;
@@ -770,6 +813,8 @@ export interface TeiDivDto {
   summarySourceUrl?: string;
   coverUrl?: string;
   description?: string;
+  summary?: string;
+  workEnrichedAt?: string;
   significantQuote?: string;
   children?: TeiDivDto[];
   author?: AuthorDto;
@@ -926,6 +971,7 @@ export interface Kafka {
   opusReimportedTopic?: string;
   opusRemovedTopic?: string;
   enrichWorkTopic?: string;
+  humanEventsTopic?: string;
 }
 
 export interface Milvus {
@@ -2623,11 +2669,11 @@ export class Api<
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet17
-     * @request GET:/api/drest/teiDivs/search/getBottomDivIds
+     * @request GET:/api/drest/teiDivs/search/getBottomDivIdsWithFilename
      */
     executeSearchTeidivGet17: (params: RequestParams = {}) =>
       this.request<CollectionModelEntityModelTeiDiv, void>({
-        path: `/api/drest/teiDivs/search/getBottomDivIds`,
+        path: `/api/drest/teiDivs/search/getBottomDivIdsWithFilename`,
         method: "GET",
         format: "json",
         ...params,
@@ -3278,6 +3324,23 @@ export class Api<
     /**
      * No description
      *
+     * @tags div-collection-rest-controller
+     * @name Reorder
+     * @request PUT:/api/collections/mine/{id}/order
+     */
+    reorder: (id: string, data: ReorderRequest, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine/${id}/order`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags runtime-config-rest-controller
      * @name Get1
      * @request GET:/api/admin/runtime-config/{key}
@@ -3418,11 +3481,28 @@ export class Api<
      *
      * @tags div-collection-rest-controller
      * @name AddItem
-     * @request POST:/api/collections/mine/{name}/items
+     * @request POST:/api/collections/mine/{id}/items
      */
-    addItem: (name: string, data: AddItemRequest, params: RequestParams = {}) =>
+    addItem: (id: string, data: AddItemRequest, params: RequestParams = {}) =>
       this.request<DivCollectionItemDto, any>({
-        path: `/api/collections/mine/${name}/items`,
+        path: `/api/collections/mine/${id}/items`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name SaveSearch
+     * @request POST:/api/collections/mine/searches
+     */
+    saveSearch: (data: SaveSearchRequest, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine/searches`,
         method: "POST",
         body: data,
         type: ContentType.Json,
@@ -3444,6 +3524,52 @@ export class Api<
       this.request<Record<string, any>, any>({
         path: `/api/auth/google/profile`,
         method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Get2
+     * @request GET:/api/collections/mine/{id}
+     */
+    get2: (id: string, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Delete
+     * @request DELETE:/api/collections/mine/{id}
+     */
+    delete: (id: string, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/api/collections/mine/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Rename
+     * @request PATCH:/api/collections/mine/{id}
+     */
+    rename: (id: string, data: RenameRequest, params: RequestParams = {}) =>
+      this.request<DivCollectionDto, any>({
+        path: `/api/collections/mine/${id}`,
+        method: "PATCH",
         body: data,
         type: ContentType.Json,
         format: "json",
@@ -3956,35 +4082,6 @@ export class Api<
     /**
      * No description
      *
-     * @tags div-collection-rest-controller
-     * @name Get2
-     * @request GET:/api/collections/mine/{name}
-     */
-    get2: (name: string, params: RequestParams = {}) =>
-      this.request<DivCollectionDto, any>({
-        path: `/api/collections/mine/${name}`,
-        method: "GET",
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags div-collection-rest-controller
-     * @name Delete
-     * @request DELETE:/api/collections/mine/{name}
-     */
-    delete: (name: string, params: RequestParams = {}) =>
-      this.request<void, any>({
-        path: `/api/collections/mine/${name}`,
-        method: "DELETE",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
      * @tags author-rest-controller
      * @name GetAuthor
      * @request GET:/api/authors/{strId}
@@ -4115,11 +4212,11 @@ export class Api<
      *
      * @tags div-collection-rest-controller
      * @name RemoveItem
-     * @request DELETE:/api/collections/mine/{name}/items/{itemId}
+     * @request DELETE:/api/collections/mine/{id}/items/{itemId}
      */
-    removeItem: (name: string, itemId: number, params: RequestParams = {}) =>
+    removeItem: (id: string, itemId: string, params: RequestParams = {}) =>
       this.request<void, any>({
-        path: `/api/collections/mine/${name}/items/${itemId}`,
+        path: `/api/collections/mine/${id}/items/${itemId}`,
         method: "DELETE",
         ...params,
       }),

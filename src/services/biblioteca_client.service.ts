@@ -105,6 +105,7 @@ export class BibliotecaClient {
           opusReimportedTopic: cfg.kafka.opusReimportedTopic,
           opusRemovedTopic: cfg.kafka.opusRemovedTopic,
           enrichWorkTopic: cfg.kafka.enrichWorkTopic,
+          humanEventsTopic: cfg.kafka.humanEventsTopic,
         },
         milvus: {
           collection: cfg.milvus.collection,
