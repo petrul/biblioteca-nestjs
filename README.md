@@ -1,700 +1,132 @@
-# Biblioteca NestJS Vectorizer
+# Biblioteca NestJS
 
-A NestJS worker that turns [biblioteca-server](../biblioteca-server)'s
-text content into vector embeddings and stores them in Milvus — so the
-main server's semantic ("vector"/"deep") search has something to search
-against.
+The background worker of [Biblioteca](https://biblioteca.scriptorium.ro). It
+does the slow, GPU-bound work, so that the server that serves readers never
+waits on it:
 
-## What it does
+- **Vectorizes** every paragraph of every work into Qdrant (bge-m3 via
+  Ollama), for biblioteca-server's semantic search.
+- **Enriches** the catalogue: author bios and facts, work summaries, and
+  covers rendered by biblioteca-covers and stored in MinIO.
+- **Answers questions** about the library, a book or a collection: hybrid
+  search, retrieval-augmented answers and chat (`/api/rag/*`), built on
+  its own framework, *ragtime*.
 
-- Listens to a Kafka topic textbase-server publishes to whenever an opus
-  (a work) is imported or reimported.
-- On each such event, fetches every paragraph of that opus from
-  textbase-server, embeds the ones that haven't already been embedded
-  (tracked by content hash, not just URL — see [Algorithm](#algorithm)),
-  and writes the resulting vectors into the matching Milvus collection.
-- Runs entirely independently of textbase-server: deployed, scaled, and
-  restarted on its own schedule, communicating only over Kafka and HTTP.
-
-## Why it's useful
-
-Vectorizing a large text corpus is slow and has its own failure modes
-(a model server being briefly unreachable, a paragraph's text changing
-after a re-edit, duplicate content across works). Keeping that entirely
-separate from the server that actually serves reader traffic means a
-vectorization backlog, a model swap, or a Milvus hiccup never risks taking
-the reading experience down with it.
-
-## Quickstart
-
-Prerequisites: Node 18+, a reachable Kafka broker, Milvus instance, and an
-Ollama (or sentence-transformers) server, plus a reachable textbase-server
-to pull content from and to read shared config off of.
-
-```bash
-git clone <this repo>
-cd biblioteca-nestjs
-cp .env.example .env.dev   # then fill in your Kafka/Milvus/Ollama/textbase-server values
-rake npminstall
-rake run[dev]     # loads .env.dev, then `npm run start`
+```
+biblioteca-server ──Kafka: work imported──▶ biblioteca-nestjs ──▶ Qdrant (vectors)
+        ▲                                      │  │        └──▶ Ollama (embeddings, chat)
+        └──── REST: paragraphs, config, ───────┘  └──▶ biblioteca-covers ──▶ MinIO
+              enrichment results
+biblioteca-reader ──/vz/api (chat, status)──▶ biblioteca-nestjs
 ```
 
-For iterating with auto-restart on file changes, load the env yourself and
-use Nest's watch mode instead: `set -a && source .env.dev && set +a && npm run start:dev`.
+## Quick start
 
-There's nothing to open in a browser — this is a background worker. Watch
-its logs for `Kafka consumer connected` and vectorization activity as
-opera get imported on the textbase-server side.
-
-## Running tests
+Every Biblioteca project has the same Rake interface. The tasks load the
+`biblioteca/<profile>` pass-store profile, by default the machine's
+hostname:
 
 ```bash
-rake test[dev]     # or: npx jest
+rake run              # npm run start, on http://localhost:3334 (PORT overrides)
+rake "run[zmeu]"      # with an explicit profile
+rake test             # jest; most specs use fakes, a few talk to live Ollama/Qdrant
+rake ci               # clean, install, test with the ci profile, build, publish the Docker image
+rake gen-client       # regenerate src/biblioteca.api.ts from a running biblioteca-server
 ```
 
-Most specs run against fakes (no live services needed) — see
-[Notable specs](#notable-specs) for the handful that talk to a real Ollama
-server and take longer as a result.
+Needs Node, plus reachable Kafka, Qdrant, Ollama and biblioteca-server (it
+reads its shared configuration from the server at startup, and waits until
+the server is up). Look for `listening on Kafka topics` in the log. The
+Swagger UI is at `/api/ui`.
 
-## Docker
+## Configuration
 
-```bash
-rake docker:build     # build editii/biblioteca-nestjs:<version> locally
-rake docker:publish    # also push to mini.local:5000
-```
+[`.env.example`](.env.example) lists the variables, using the pass-store
+names the whole family shares:
 
----
-
-## Configuration: what's actually load-bearing
-
-`.env.example` lists the complete set of environment variables
-`src/configuration.ts` requires at startup: `KAFKA_BROKERS`,
-`STS_SERVER`, `OLLAMA_SERVER`, `VECTORSTORE_URL`, `BIBLIOTECA_EXTERNAL_URL` —
-the shared pass-store names the whole Biblioteca family uses, so the worker
-boots directly off a sourced `biblioteca/<stage>` environment with no
-renaming in between. There used to be more of these — a per-collection env
-var for each Milvus collection, a `KAFKA_TOPIC`, a `TB_GETPARAS_PAGE_SIZE`,
-and a `KAFKA_GROUP_ID` — but
-the Milvus/topic/page-size ones are now decided by textbase-server (see
-[Shared config](#shared-config-the-important-part)), and the consumer
-group id is the worker's own identity, the same in every environment, so
-it's the hardcoded `biblioteca_nestjs` constant in
-`src/configuration.ts` instead of an env var — in all cases the variables
-were removed rather than left around unused.
-
-### Shared config (the important part)
-
-At bootstrap, this service fetches `GET /api/admin/config` from
-textbase-server (`app.module.ts`'s `PROVIDER_SHARED_CONFIG`, wrapped in
-`retryUntilAvailable` since textbase-server may not be up yet) and uses
-*that* — not its own env vars — to decide:
-
-- which Kafka topic to consume (`shared.kafka.newOpusImportedTopic`)
-- which Milvus collection to write to, and its vector dimension
-  (`shared.milvus.collection`, `shared.embedder.dimension`)
-- which embedding model to actually call (`shared.embedder.ollamaModel`)
-- the paragraph size window to filter/truncate by
-  (`shared.paragraph.minChars`/`maxChars` — see
-  [Vector-related configuration](#vector-related-configuration-the-whole-picture))
-
-This means textbase-server is the single source of truth for that naming
-convention — this service structurally cannot disagree with it about
-which collection or topic to use, because it never makes its own decision
-about either. `SharedTextbaseConfig` (`src/configuration.ts`) documents
-the exact shape fetched.
-
-## Vector-related configuration (the whole picture)
-
-Everything that shapes what ends up in Milvus, and how it can be searched,
-lives in exactly four places. In reading order of "who decides what":
-
-1. **The collection's identity and the paragraph size window** live in
-   biblioteca-server's `application.properties` and flow to this worker
-   through the shared config (see above):
-   - `milvus.collection` (default `biblioteca_paragraphs_bge_m3`) — which
-     collection to write into. Per-stage override stays possible through
-     that property; the default is what prod uses.
-   - `vectorizer.para.minChars` / `vectorizer.para.maxChars` (default
-     20 / 3000) — the paragraph window. Paragraphs at or below minChars
-     are skipped entirely (measured corpus noise: BOMs, reference ids,
-     bare numerals, speaker labels); paragraphs above maxChars are
-     **truncated to maxChars, not dropped**, so long expository
-     paragraphs and `<table>` blocks stay searchable. The sha256 stored
-     as the row's identity is always the *full* source paragraph's hash
-     — it drives the reimport dedup, not what got embedded. Against a
-     server older than the `paragraph` shared-config section, the worker
-     falls back to these same values hardcoded in
-     `biblioteca_client.service.ts`.
-
-2. **The embedder's context clamp** lives here, per model
-   (`Embedder.maxInputChars`): bge-m3 16384 (its 8192-token
-   context at a conservative ~2 chars/token for the corpus's
-   Latin/Cyrillic text), qwen3-embedding 32768, nomic-embed-text 8192,
-   the STS models 512/1024. The effective per-paragraph cap is
-   `min(shared.paragraph.maxChars, embedder.maxContextChars)` — raising
-   maxChars on the server can never produce inputs the active model
-   would silently truncate or reject on its own, and switching embedders
-   auto-tightens the clamp to the new model's real limit.
-
-3. **The index** is created only together with a collection (see
-   `MilvusCollection.idx_ivfsq8_l2_8192`): IVF_SQ8, L2, `nlist=8192`
-   (the 4·√N rule of thumb for the target ~6.5M-paragraph corpus).
-   IVF_SQ8 was chosen over full-precision HNSW on purpose: the index
-   costs ~1.1KB/row (~7G resident once the whole corpus is indexed)
-   where HNSW would need ~27G of RAM loaded — more than the deployment
-   host has in total. Since an index is created with its collection,
-   nlist changes take effect at the next truncate/recreate, never
-   in place. The query side must stay in relation to it:
-   biblioteca-server's `MilvusCollection.DEFAULT_NPROBE` (64 — roughly
-   √nlist buckets scanned per query) is that counterpart; change the
-   two together.
-
-4. **The Milvus instance's own reclamation behavior** is not Milvus
-   defaults anymore: the standalone instance's config is versioned at
-   `scripts/docker/milvus/milvus.yaml` (in the `editii/scripts` repo)
-   and mounted straight into the container by the compose file there.
-   Its `dataCoord.gc` is tightened (sweep every 10m, drop/missing
-   tolerances 10m/1h, orphan-file scan every 24h instead of weekly) —
-   stock defaults let append-only binlog garbage accumulate for days
-   (observed: 40G of binlogs behind a 217K-row collection).
-
-Related, same theme: the incremental vectorizing run (`POST /api/vectorizing/start`)
-**never truncates, drops, or deletes the collection**. It walks every opus
-and embeds only paragraphs whose content hash is not already stored. Collection
-resets and opus removal are deliberate, manual-only operations exposed by the
-vector store, never a routine consequence of starting a run.
-
-### How IVF_SQ8 works (and what nlist/nprobe trade off)
-
-The name is two orthogonal ideas stacked:
-
-- **IVF — inverted file.** At index-build time, k-means clusters the
-  collection's vectors into `nlist` buckets (centroids); every vector is
-  stored on the bucket list of its nearest centroid. At query time: embed
-  the query, find its `nprobe` nearest centroids, and scan only the
-  vectors in those buckets — instead of all N. The cost of one search is
-  roughly `nprobe × (rows / nlist)` distance computations.
-- **SQ8 — scalar quantization to 8 bits.** Every 32-bit float component
-  of a vector is compressed to one byte (4x smaller; bge-m3's components
-  are in [-1, 1] so a linear scale fits comfortably). Distances are
-  computed on the quantized bytes: a 1024-dim vector costs ~1KB instead
-  of 4KB, at the price of a small distance error that perturbs ranking
-  near-ties.
-
-The parameters, and their failure modes:
-
-- `nlist` (build-time, once per collection): bucket count. Too few →
-  giant buckets, slow scans; too many → centroid-distance overhead and
-  sparse buckets. Rule of thumb 4·√N, hence 8192 for the ~6.5M-row target
-  (~800 rows per bucket).
-- `nprobe` (per-query): buckets scanned. Recall rises with nprobe,
-  latency with it; √nlist (64, biblioteca-server's DEFAULT_NPROBE) is
-  the balanced default. Raise it for recall-critical evaluation runs,
-  not permanently.
-- **L2** as the metric loses nothing here: bge-m3 emits L2-normalized
-  vectors, for which L2 ordering is identical to cosine ordering.
-
-Expected quality at this scale: roughly 85–95% recall@10 — SQ8's
-quantization noise plus vectors that landed just outside the probed
-buckets. Full-precision HNSW would reach ~97%+ but needs ~27G resident
-(see above). If recall ever becomes the binding constraint, the upgrade
-path is DiskANN or a Qdrant-style quantized-HNSW with reranking — not
-raising nprobe forever.
-
-## Vectors are precious: reuse by sha256, never auto-drop
-
-Embedding the full corpus takes **days**, not an index rebuild — vectors
-are a multi-day asset, and the pipeline treats them accordingly
-(`VectorizerService.vectorize`, `VectorizerKafkaListenerService`,
-`vector_reuse.spec.ts`):
-
-- **Reuse before embedding.** For every page fetched from
-  biblioteca-server, the store is asked which paragraph sha256s already
-  have vectors (`VectorStore.alreadyStored`). Only the missing ones cost
-  an embedder call — a reimport of a book with two corrected paragraphs
-  embeds exactly those two.
-- **Renames repoint, they never re-embed.** A book's url embeds the
-  author/work-title, so renaming a book moves every paragraph's url while
-  no text — and so no sha256 — changes. Those vectors are *reused*:
-  `VectorStore.repointUrls` updates the stored `url` and derived
-  `opus_path` payloads (Qdrant `set`-style point update, the embedding
-  bytes untouched). A rename is therefore cheap regardless of the book's
-  size.
-- **Nothing drops vectors automatically.** Import/reimport events no
-  longer purge the opus's old vectors first; `opusRemoved` events are
-  logged and *retained*, not deleted. The vectorizing job never
-  truncates. The only drops are the explicit, manual admin endpoints:
-
-| Endpoint | What it does |
+| Variable | Purpose |
 | --- | --- |
-| `POST /api/vector-store/remove-opus` | Manually removes one opus's vectors (body: `{"path": "author/work"}`) |
-| `POST /api/vector-store/reset` | Manually drops and recreates the whole collection — the nuclear option |
+| `KAFKA_BROKERS` | Kafka brokers |
+| `OLLAMA_URL` | Ollama, for embeddings and chat |
+| `VECTORSTORE_URL` | Qdrant URL with port (`VECTOR_STORE=qdrant` is the default) |
+| `BIBLIOTECA_EXTERNAL_URL` | biblioteca-server, read for content and shared config |
+| `COVERS_API_URL` | biblioteca-covers (default `http://localhost:3335`) |
+| `MINIO_URL`, `MINIO_CREDS` | Cover storage: endpoint plus bucket, and `access-key:secret-key` |
+| `BIBLIOTECA_INTERNAL_API_TOKEN` | Required by the state-changing admin endpoints (`Authorization: Bearer ...`) |
 
-- **Stale data is reported, not silently dropped.** A removed book's (or
-  a changed edition's vanished paragraphs') vectors stay in the store.
-  A scheduled stale-data reporter will identify them and publish their
-  ids to a Kafka topic (e.g. `biblioteca-events`), so removal happens
-  only as a manual, explicitly approved operation. Until then, stale rows
-  are harmless to the user: biblioteca-server filters search hits whose
-  urls no longer resolve (see its Search docs).
+**Topic, collection, model and paragraph window are not configured here**:
+they come from biblioteca-server's `GET /api/admin/config`, so the two cannot
+disagree. See [docs/vectors.md](docs/vectors.md).
 
-## Kafka contract (AsyncAPI)
+## How it works
 
-`VectorizerKafkaListenerService` (`src/services/kafka/vectorizer-listener.service.ts`) is this
-service's one Kafka consumer — the message schema it consumes, and
-textbase-server's other topics this service *doesn't* touch, are
-documented in full in biblioteca-server's `src/main/resources/static/asyncapi.yml` rather than
-duplicated here (textbase-server is the sole producer of everything on
-Kafka in this whole system, so that's the natural source of truth).
-
-## Embedding backends
-
-Every embedder implements ragtime's `Embedder` (`src/ragtime/core/model.ts`:
-`embed`/`embedBatch`, `dimension`, `supportedLanguages`, `maxInputChars`,
-optional `maxBatchSize`) - `VectorizerService`, the RAG service and
-everything downstream depend only on that interface (`PROVIDER_EMBEDDER`).
-
-The active one is `OllamaEmbedder` (`src/ragtime/adapters/ollama.embedder.ts`)
-for whichever model textbase-server's shared config reports (BGE-M3, 1024
-dims), wrapped in `RetryingEmbedder` (`src/services/retrying_embedder.ts`).
-bge-m3 is requested with `keep_alive: -1`: every client of the shared
-Ollama keeps it loaded next to one generating model, and a call without it
-would reset that and unload the model a few minutes later.
-
-The retired sentence-transformers embedders (`services/sts`, all-mpnet-base-v2
-768 dims, all-MiniLM-L6-v2 384 dims) implement the same interface and stay
-registered for explicit use.
-
-### Startup availability checks
-
-Two dependencies are checked for reachability at startup and *waited out*
-(5s poll interval, no cap — `retryUntilAvailable` in `src/util.ts`)
-rather than crashing the process:
-
-- **The embedder** — wrapped in `RetryingEmbedder`;
-  `VectorizerService.onModuleInit()` makes an explicit throwaway call
-  through it before the Kafka listener starts consuming, so an
-  unreachable embedder is caught at boot, not on the first real message.
-- **Milvus** — the `MilvusCollection` provider factory runs the same way
-  during Nest's own bootstrap, so an unreachable Milvus blocks startup
-  (retrying) rather than crashing it outright.
-
-This only covers reachability *at startup*. A failure partway through a
-`vectorize()` call (Milvus going down mid-opus, or anything else) is a
-Kafka concern instead: the per-message handler re-throws after logging,
-so kafkajs doesn't commit that message's offset and redelivers/retries it
-rather than silently dropping it.
-
-## Algorithm
-
-On a new-opus-imported event: fetch every paragraph of that opus, diff
-against the sha256 hashes already stored in Milvus for it, and only embed
-+ upload the paragraphs whose content hash is new — paragraphs that
-haven't changed since the last run are skipped entirely.
-
-### Known limitations
-
-These are real, currently-unhandled edge cases in that diffing algorithm,
-not aspirational features:
-
-- If a paragraph's URL changes but its content (and hash) doesn't — e.g.
-  moving it into a subchapter — the stored record still points at the old
-  URL, which goes stale.
-- Duplicate content across different URLs is currently stored as separate
-  vectors rather than deduplicated by hash.
-- A paragraph that's removed from the source (reorganized away, stanzas
-  merged) isn't removed from Milvus — it lingers as an orphaned vector.
-
-The likely fix shape: upsert on `(sha256, url)` as a compound key — where
-both match, skip; where only the hash matches, update the URL in place;
-otherwise insert as new.
-
-## Package map (orientation for developers & coding agents)
+- **Vectorizing.** On each "work imported" event the worker reads the work's
+  paragraphs from biblioteca-server and embeds only those whose sha256 has no
+  stored vector. A renamed book is repointed, not re-embedded. **Nothing ever
+  drops vectors automatically**, because rebuilding them takes days. See
+  [docs/vectors.md](docs/vectors.md).
+- **Enrichment.** Kafka listeners plus a daily 03:00 sweep fill missing author
+  bios, work summaries, covers and vectors. Every step is fill-only unless a
+  manual run asks for `overwrite`. See [docs/enrichment.md](docs/enrichment.md).
+- **Search, ask, chat.** Questions are searched with the question and a
+  drafted answer (HyDE), by vectors and keywords, then reranked by the chat
+  model before answering with `[n]` citations. See
+  [docs/ragtime.md](docs/ragtime.md).
+- **Events.** Every chat, question and RAG search is published on
+  `biblioteca_events` with its user. The topic names and message schemas are
+  in biblioteca-server's `asyncapi.yml`.
+- **Initiator.** Every log line names who caused it, taken from the
+  initiator header the reader and server send (`src/initiator.ts`).
 
 | Path | What's there |
 | --- | --- |
-| `src/app.module.ts` | Dependency wiring — the fastest place to see how every provider above actually connects |
-| `src/configuration.ts` | Env var loading (`VectorizerConfiguration`) and the `SharedTextbaseConfig` shape fetched from textbase-server |
-| `src/services/kafka/` | `KafkaService`, `ProducerService`, `VectorizerKafkaListenerService` (the consumer that triggers vectorization) |
-| `src/ragtime/core/` | Ragtime, the generic search/RAG/chat framework - see [Ragtime](#ragtime-the-implementation). Imports nothing outside itself |
-| `src/ragtime/adapters/` | Ragtime implementations: Qdrant, Ollama (embedder, chat model), Cassandra, website crawler |
-| `src/biblioteca-rag/` | Biblioteca on ragtime: paragraph source, payload layout, resolver, context expander, scopes, the RAG service and `/api/rag` |
-| `src/services/sts/` | The retired sentence-transformers embedders (see [Embedding backends](#embedding-backends)) |
-| `src/services/vectorizer.service.ts` | Vectorizing a work: ragtime's `GenericIndexer` over its paragraphs |
-| `src/services/biblioteca_client.service.ts` | `BibliotecaClient` — this worker's HTTP client into biblioteca-server (paragraphs, shared config) |
-| `src/services/retrying_embedder.ts`, `src/util.ts` | The `retryUntilAvailable`/retry-wrapper machinery used throughout |
-| `test/fake-biblioteca-client.ts`, `test/res/paras.json` | Fixture data and fake client used by tests instead of a live textbase-server |
+| `src/app.module.ts` | The wiring: start here to see how everything connects |
+| `src/configuration.ts` | Environment variables and the shared-config shape |
+| `src/services/kafka/` | Kafka consumers (vectorizing, author and work enrichment) and the producer |
+| `src/services/vectorizer.service.ts` | Vectorizing a work |
+| `src/services/*enrichment*` | Enrichment, covers, the manual admin runs |
+| `src/services/events/` | Publishing human events on `biblioteca_events` |
+| `src/ragtime/core/` | The generic framework; imports nothing outside itself (`extractable.spec.ts` enforces it) |
+| `src/ragtime/adapters/` | Qdrant, Ollama, Cassandra, website crawler |
+| `src/biblioteca-rag/` | Biblioteca on ragtime, and the `/api/rag` controller |
+| `src/biblioteca.api.ts` | Generated biblioteca-server client (`rake gen-client`) |
+| `test/` | Fakes and fixtures used in place of a live server |
 
-For a concrete task, `app.module.ts` is the fastest way to see how
-everything is actually wired together before diving into any one service.
+## API
 
-## Notable specs
-
-- `ragtime/core/*.spec.ts` — the framework on in-memory doubles
-  (`MemoryVectorStore`, `KeywordEmbedder`, `ScriptedChatModel`); and
-  `extractable.spec.ts`, which fails the build if a core file imports
-  anything but the core and `node:` built-ins.
-- `ragtime/adapters/*.integration.spec.ts` — the Qdrant store and bge-m3
-  against the live shared instances (own `test_*` collections only).
-- `biblioteca-rag/rag.service.spec.ts` — search, ask, chat and streaming end
-  to end over a fake library (`test/fake-paragraph-reader.ts`).
-- `retrying_embedder.spec.ts` / `util.spec.ts` — the
-  retry-on-failure wrapper and its underlying helper, with a mocked inner
-  embedder (fast, no real network): succeeds-first-try, recovers after
-  several failures, logs one short warning per attempt rather than a
-  stack trace, and proves there's no small hardcoded retry cap.
-- `biblioteca_client.service.spec.ts` / `vectorizer.service.spec.ts` — run
-  against `test/fake-biblioteca-client.ts`'s `FakeBibliotecaClient` rather
-  than a live textbase-server, since one with real content isn't reliably
-  reachable from a dev box. Serves fixture data from `test/res/paras.json`
-  (recomputing each paragraph's `text_sha256` at load time, since some
-  stored values are stale), plus 1200 synthesized entries for pagination
-  tests.
-- `services/sts/sts.service.spec.ts` — the original STS embedder.
-
-## This service's own API
-
-A small admin/control surface (`src/app.controller.ts`), not the vectorization
-pipeline itself (that's driven entirely by Kafka - see
-[Shared config](#shared-config-the-important-part) and
-[Kafka contract](#kafka-contract-asyncapi) above/below):
+The admin endpoints that change state (POSTs to vectorizing, enrichment,
+covers, vector-store) need `Authorization: Bearer $BIBLIOTECA_INTERNAL_API_TOKEN`.
 
 | Endpoint | What it does |
 | --- | --- |
-| `GET /api/info` | Name + version from `package.json` |
-| `GET /api/status` | General status surface - today reports the vectorizing job under `vectorizing`, plus future flags/configs/information |
-| `GET /api/vectorizing` | Status of the bulk vectorizing job: `state` (`idle`/`running`/`pausing`/`paused`/`finished`), progress (`totalOpera`, `completedOpera`, `currentOpus`, `processedParas`), `pauseRequested`, `canResume` |
-| `POST /api/vectorizing/start?shuffle=` | Walks every opus via `BibliotecaClient` and re-vectorizes each one, optionally in random order; the response arrives when the run completes. **Does not truncate** (see [Vectors are precious](#vectors-are-precious-reuse-by-sha256-never-auto-drop)): already-stored sha256s are reused, only genuinely new paragraphs get embedded |
-| `POST /api/vectorizing/pause` | Halts the running job after its current batch |
-| `POST /api/vectorizing/resume` | Continues a paused run from where it halted, skipping opera already completed (in memory only - after an app restart, `start` a fresh run instead; does not truncate, so the partial collection keeps its already-vectorized rows) |
-| `POST /optimize` | A no-op kept for old callers: Qdrant compacts on its own (Milvus is retired) |
-| `POST /api/vector-store/remove-opus` | **Manual-only** drop: removes one opus's vectors (body: `{"path": "author/work"}`) |
-| `POST /api/vector-store/reset` | **Manual-only** drop: drops and recreates the whole collection |
-| `GET /api/enrichment/modules` | The enrichment module catalog: author / work / cover / vectorize, what each fills, whether overwrite applies to it |
-| `POST /api/enrichment/run` | Starts a manual enrichment job (202 + job id, poll `jobs/:id`). Body: `steps` (any of the module ids), optional `targets` (`authorStrIds`, `opusPaths`; omitted = whole corpus), optional `overwrite`. **Fill-only by default**: already-enriched entities are skipped without a call; `overwrite: true` re-enriches them and asks biblioteca-server to replace the data (rejected for `vectorize`). The vectorize step needs explicit `targets.opusPaths` and reuses stored sha256s - it never drops vectors |
-| `POST /api/enrichment/run/dry-run` | The same body, but read-only: lists the candidates the run would process, no external call at all |
-| `GET /api/enrichment/jobs` | Recent enrichment jobs (in memory only), newest first |
-| `GET /api/enrichment/jobs/:id` | One job: state (`running`/`finished`/`cancelled`/`failed`), per-step counters (`candidates`/`processed`/`skippedExisting`/`failed`), first errors |
-| `POST /api/enrichment/jobs/:id/cancel` | Cooperative stop of a running job, honored between entities |
-| `GET /api/enrichment/author/:strId` | Which enrichment fields one author already has |
-| `GET /api/enrichment/work?path=` | Which enrichment fields one work already has |
-| `POST /api/rag/search` | The paragraphs nearest in meaning to `query`, within `scope.opusPaths` (one work, a collection, or none = the whole library) |
-| `POST /api/rag/ask` | An answer generated from the nearest passages, citing them as `[n]`; optional caller-kept `history` |
-| `POST /api/rag/ask/stream` | The same as newline-delimited JSON: the passages first, then `{"delta"}` chunks, then `{"done": true}` |
-| `POST /api/rag/chat` | The next turn of a conversation (`conversationId` from the previous reply; kept in memory). Follow-ups are rewritten into standalone queries before searching |
+| `GET /api/info`, `GET /api/status` | Version; status, including the vectorizing job |
+| `GET /api/vectorizing` | The bulk vectorizing job: state and progress |
+| `POST /api/vectorizing/{start,pause,resume}` | Run, pause or resume the bulk job (`start?shuffle=`); never truncates |
+| `POST /api/vector-store/remove-opus`, `.../reset` | **Manual-only** drops of one work's vectors, or of the whole collection |
+| `GET /api/enrichment/modules` | The enrichment steps: author, work, cover, vectorize |
+| `POST /api/enrichment/run`, `.../run/dry-run` | A manual enrichment job (202 + job id), or the list of what it would do |
+| `GET /api/enrichment/jobs[/:id]`, `POST .../:id/cancel` | Follow or cancel enrichment jobs |
+| `GET /api/enrichment/author/:strId`, `.../work?path=` | What one author or work already has |
+| `POST /api/covers/work`, `/api/covers/run...` | Render one work's cover now, or run cover jobs |
+| `POST /api/rag/search` | The passages nearest in meaning to `query`, within `scope.opusPaths` (a book, a collection, or everything) |
+| `POST /api/rag/ask`, `.../ask/stream` | An answer citing passages as `[n]`; the stream sends passages, `{"delta"}` chunks, `{"done": true}` |
+| `POST /api/rag/chat` | The next turn of a conversation (`conversationId`; held in memory) |
 
-`@nestjs/swagger` (`src/main.ts`) serves a live OpenAPI document for this
-at `/api/ui` - same mechanism, one instance per this app rather than a
-checked-in export like textbase-server's, since this surface is small and
-purely operational (no external client generates against it the way the
-reader generates against textbase-server's).
+`/api/rag/*` has no rate limit of its own. It is reached only through
+biblioteca-reader, whose chat gate admits signed-in users one message at a
+time. biblioteca-reader generates `src/generated/vectorizer-api.d.ts` from this
+service's OpenAPI document (`/api/ui-json`), so when this API changes, run
+`rake gen-vectorizer-client` there against a running instance.
 
-## Regenerating the typed API clients
+## Tests
 
-`rake gen-client` regenerates every typed client from the live OpenAPI spec
-of the running servers. It is an umbrella only — the work lives in the
-specialized tasks it calls, and each can be run on its own:
-
-```bash
-rake gen-client                 # both clients, dev profile (localhost:8080)
-rake gen-client[yoga]          # any pass-store profile; PROFILE env works too
-rake gen-biblioteca-client     # src/biblioteca.api.ts, from biblioteca-server
-rake gen-sts-client            # src/sts.api.ts, from the sentence-transformers server
-```
-
-Like every other rake task they load the profile's environment from the
-pass store (`biblioteca/<profile>`), so `BIBLIOTECA_EXTERNAL_URL` decides
-which biblioteca-server is asked; `STS_SERVER` decides the STS server when
-the profile defines one (falling back to the mini.local instance
-`./gen-biblioteca-api.sh` always used — `sentenceTransformersServer` is
-retired/optional, the sts.service classes are never selected today, but
-`sts.api.ts` is still imported and compiled). Each task downloads the
-spec, runs `swagger-typescript-api` through `npx -y` (the generator is
-not a project dependency — the `-y` keeps npx from stopping to ask before
-caching it), writes the client, and removes the downloaded spec json:
-only the generated clients are checked in.
-
-Run this after biblioteca-server's API surface changes, with the target
-server actually running — the regen picks up whatever that server currently
-serves, so the diff against the checked-in client is real upstream API
-change, not editor noise. `./gen-biblioteca-api.sh` is the older hand-rolled
-equivalent; prefer the rake task.
-
-This service's own document (`/api/ui-json`, served by SwaggerModule at
-`/api/ui`) is itself consumed downstream: **biblioteca-reader** generates
-`src/generated/vectorizer-api.d.ts` from it (`rake gen-vectorizer-client`
-in that repo, raw spec used directly — the vectorizer's admin surface has
-no allowlist layer of its own). So a change to this service's own API
-surface means regenerating there too, with this server running at the
-same commit — see biblioteca-reader's README, "Refresh the API clients".
-### Asynchronous work-cover enrichment
-
-After a successful opus-import event, the NestJS worker schedules cover
-generation in the background. It calls `biblioteca-covers`, writes the PNG to
-the configured MinIO bucket under `covers/`, and persists only the public URL
-on the opus. Jobs are deduplicated by the canonical `authorId/opusId` path and
-never run in the reader request path. A missing or failed cover is harmless:
-the reader uses its bundled default cover.
-
-The worker uses the existing import Kafka topic with its own consumer group,
-so vectorization and enrichment never steal one another's events. Configure
-`COVERS_API_URL`, `MINIO_URL`, and `MINIO_CREDS`. Credentials are server-side only.
-
-The cover-cache variables mean:
-
-```dotenv
-# MinIO S3/API endpoint, with the bucket as the URL path.
-MINIO_URL=http://srv2.local:20124/biblioteca
-# access-key:secret-key (example only; never commit a real credential).
-MINIO_CREDS=example-cover-cache-access-key:example-cover-cache-secret-key
-```
-
-`MINIO_URL` is used as both the S3/API endpoint and the base URL for public
-objects. `MINIO_CREDS` is split at the first colon. Both values stay server-side.
-
-### Manual enrichment admin (`/api/enrichment/*`)
-
-The four enrichment steps - author bio/facts, work summary, cover art,
-vectorization - run automatically off the Kafka import topics and the daily
-03:00 sweep. The `/api/enrichment/*` surface is the explicit manual way to
-retrigger them integrally or partially, designed to be driven entirely from
-the Swagger UI at `/api/ui` (`GET modules` lists what exists; the run
-endpoints carry ready-made named examples in their request body).
-
-The invariant the surface is built around: **every step is fill-only by
-default** - it only enriches what is not enriched yet, and existing data is
-never touched. For covers, "enriched" means verified, not merely present:
-a stored `coverUrl` whose MinIO object is missing - or holds a non-image
-body - counts as unenriched and the cover is re-rendered (one ranged read
-per stored URL, asked by `CoverEnrichmentService.hasUsableCover` from the
-Kafka work-enrichment listener and the manual run alike). That is enforced in three independent layers, so a bug in one
-cannot destroy anything: candidate selection (an enriched entity never even
-becomes a candidate), the guards inside the enrichment/cover services
-themselves, and biblioteca-server's persistence endpoint, which fills blank
-fields unless the single update's payload carries `overwrite: true`.
-
-`overwrite: true` is the one explicit switch - per request, never sticky,
-rejected for the vectorize step (vectorization is fill-only by construction:
-stored sha256s are reused, nothing is dropped). Manual runs and the daily
-sweep share one single-flight lock, so they never walk the corpus at the same
-time. Jobs are async (the run answers 202 with a job id), cancel is
-cooperative, and `POST /api/enrichment/run/dry-run` lists the candidates
-without making a single external call.
-
-
-# Modelling of the RAG domain in Bibliteoca NestJS project
-
-Retrieval-augmented generation, just as much as semantic search always need/query pretty much the same components which we will model in the ragmodel.ts
-
-There are also the rudiments of thi smodel in the siblinbg model.ts file. After finishing this work, that model should be adapted from the new one. 
-
-We need interfaces that specify the contracts of the services. As such, using generic interfaces described below, we can write generic indexing algorithms in a few lines of
-code, iterating on a TextSource, for ex, retrieving batches of TextItems, embedding them, storing them, then quering them back, resolving TextItems associated with stored vectors,
-feeding those TextItems into an Ollama chat generators with a question so we complete our 
-RAG. 
-
-Below, the mermaid scheme of the /src/model/ragtime-model.ts file,
-
-These components/ services are:
-
-- a TextItem is the basic unit of text that is worth indexing, and retrieving, identifying with a URL
-  it is an interface implemented by MemTextItem for example which uses RAM memory for storage. The interface should be well designed so the TextItem be lazily accessible using input streams, and retrievable in batches.
-    - a MemTextItem which actually stores the content in memory. it is a materialized implementation of the TextItem interface.  We expect to have lots of TextItems, millions of them in a TextSource, but also we can have very finite collections of TextItems of human dimensions
-    finite size loadable in memory
-- a TextIterable is an iterable of TextItem. a website should be queryable through a TextIterable (for example an implementation can use the likes of 'wget -m' to download it, convert each page into markdown, then serve each page into )
-- a TextSource is source of data, like a website, an api/, a database or what not
-- a vector store like QDrant
-- a data store like Cassandra
-- an embedder like Ollama qwen-embedder model
-- a generator like Ollama qwen3.5:4b, llama3.1:8b etc , or equiv OpenAI, Gemini, Claude apis.
-- we will call a data store, vector store, LLM  a COQ subsystem (cassadra/ollama/qdrant)
-
-On top of that there is a content resolver abstraction that, given an id of a
-retrieved vector, from the index store, for example, can produce a TextItem implementation which can retrieve the actual corresponding text for displaying to user searches for ex. or for references. The content resolver can resolve 
-using the original source (typically slower but retrieves original URL or against the cache stored in database, typically in cassandra)
-
-There are two main subsystem that use these abstractions,
-- an indexer, which, through said abstractions crawl TextSources and
-store/index them
-- a searcher which can do similarity search
-- a RAG system which answers questions, and can be integrated in a chat box attached to a site, a page etc.
-
-I want you to design the mermaid class diagrams of these abstractions,  generate the ragtime.ts typescript corresponding classes.  Also generate in a 
-file name ragtime.model.ts the abstractions usable for a generic website or
-for Biblioteca.scriptorium.ro, which is a digital library that offers a REST api  in which you can iterate over books, chapters. -- make it generic. Keep
-generic abstractions in ragtime.model.ts and particulars of implementations (for example crawling a site using a particular library, storing TextItems in a cassandra store, etc) -- in well named .ts files organized around.
-
-
-```mermaid
-classDiagram
-    %% Core Entities & Items
-    class TextItem {
-        <<interface>>
-        +String id
-        +String sourceId
-        +String url
-        +Map~string,any~ metadata
-        +getContentStream() ReadableStream
-        +getText() Promise~string~
-    }
-
-    class MemTextItem {
-        -string content
-        +getContentStream() ReadableStream
-        +getText() Promise~string~
-    }
-
-    TextItem <|.. MemTextItem
-
-    %% Sources & Iterables
-    class TextIterable~T extends TextItem~ {
-        <<interface>>
-        +AsyncIterable~T~
-        +getBatches(batchSize: number) AsyncIterable~T[]~
-    }
-
-    class TextSource~T extends TextItem~ {
-        <<interface>>
-        +String id
-        +String name
-        +TextIterable~T~ getItems()
-        +TextItem getItemById(id: string) Promise~T~
-    }
-
-    TextSource --> TextIterable : produces
-
-    %% COQ Subsystems Contracts
-    class VectorStore {
-        <<interface>>
-        +upsert(collection: string, vectors: VectorRecord[]) Promise~void~
-        +query(collection: string, vector: number[], topK: number) Promise~VectorQueryResult[]~
-    }
-
-    class DataStore~T extends TextItem~ {
-        <<interface>>
-        +save(item: T) Promise~void~
-        +saveBatch(items: T[]) Promise~void~
-        +findById(id: string) Promise~T | null~
-    }
-
-    class Embedder {
-        <<interface>>
-        +String modelName
-        +number dimension
-        +embed(text: string) Promise~number[]~
-        +embedBatch(texts: string[]) Promise~number[][]~
-    }
-
-    class Generator {
-        <<interface>>
-        +String modelName
-        +generate(prompt: string, context: TextItem[]) Promise~string~
-        +streamGenerate(prompt: string, context: TextItem[]) AsyncIterable~string~
-    }
-
-    %% Content Resolution
-    class ContentResolver~T extends TextItem~ {
-        <<interface>>
-        +resolve(vectorId: string) Promise~T~
-        +resolveBatch(vectorIds: string[]) Promise~T[]~
-    }
-
-    %% High Level Services
-    class Indexer {
-        <<interface>>
-        +indexSource(source: TextSource, collection: string) Promise~IndexingStats~
-    }
-
-    class Searcher~T extends TextItem~ {
-        <<interface>>
-        +search(query: string, collection: string, topK: number) Promise~SearchResult~T~~
-    }
-
-    class RagSystem~T extends TextItem~ {
-        <<interface>>
-        +ask(question: string, collection: string) Promise~RagResponse~T~~
-    }
-
-    Indexer --> TextSource
-    Indexer --> Embedder
-    Indexer --> VectorStore
-    Indexer --> DataStore
-
-    Searcher --> Embedder
-    Searcher --> VectorStore
-    Searcher --> ContentResolver
-
-    RagSystem --> Searcher
-    RagSystem --> Generator
-```
-
-## Ragtime: the implementation
-
-The design above is implemented in three layers:
-
-- **`src/ragtime/core/`** - the reusable framework. `model.ts` holds every
-  contract: `TextItem`/`TextSource`/`TextIterable`, `TextSplitter`,
-  `VectorStore` and `VectorCollectionManager` (with a store-neutral
-  `CollectionSpec`), `DataStore`, `Embedder` (query/passage purposes,
-  `maxBatchSize`), `ChatModel` + `PromptBuilder` (together a `Generator`),
-  `ContentResolver`, `Reranker`, `ContextExpander`, `Retriever`,
-  `QueryExpander`, `KeywordIndex`, `Indexer`, `Searcher`,
-  `RagSystem` (`ask`, `streamAsk`), `QueryRewriter`, `ConversationStore`,
-  `Chatbot`. The generic implementations: `GenericIndexer` (dedup, language
-  filter, truncation, vector reuse by id with payload repointing, sub-batching,
-  hooks), `GenericSearcher` (score threshold read by score kind, `accept`,
-  reranking), `HybridSearcher` (question and expansions, vector and keyword
-  retrievers, pooled round-robin, reranked), `VectorRetriever`,
-  `MemoryKeywordIndex` (BM25), `HypotheticalAnswerExpander` (HyDE),
-  `LlmReranker`, `PromptedGenerator`/`DefaultPromptBuilder`, `RagtimeSystem`,
-  `RagChatbot` with `LlmQueryRewriter`, `MemoryConversationStore`,
-  `ParagraphSplitter`, `MemoryVectorStore`, `DataStoreContentResolver`, and
-  test doubles. The core imports only itself and `node:` built-ins
-  (`extractable.spec.ts` enforces it), so it can be lifted into a package
-  as it is.
-- **`src/ragtime/adapters/`** - `QdrantVectorStore` (REST; deterministic UUID
-  point ids, the item id in the payload, rescoring on quantized collections),
-  `OllamaEmbedder`, `OllamaChatModel` (editii-translator's generation
-  options) with `OllamaGenerativeModelFinder` (lazily, on first use: the
-  generating model already loaded on the shared GPU, else qwen3.5:9b),
-  `CassandraDataStore`, `WebsiteTextSource`.
-- **`src/biblioteca-rag/`** - Biblioteca on ragtime: `BibliotecaDivSource`
-  (a work's paragraphs, id = sha256), the `{sha256, url, opus_path}` payload
-  and point ids biblioteca-server's own vector search shares,
-  `BibliotecaContentResolver` (hits back to paragraph text through their div,
-  titled "Author, Work - Chapter"), `BibliotecaContextExpander` (each hit with
-  its neighbouring paragraphs), `BibliotecaKeywordRetriever` (BM25 over the
-  works of a small scope, read once and cached), scopes (`opusPaths`: a book,
-  a collection, or the whole library) and `RagService` behind `/api/rag/*`.
-
-Why questions search harder than `/api/rag/search`: measured on "A Christmas
-Carol" (743 paragraphs), the paragraph answering a plot question ranks far
-down by the question's vector alone - "whose Christmas ball...?" ~320th,
-"what does Scrooge send...?" ~280th. Ask and chat therefore search with the
-question and a drafted answer (HyDE), by vectors and, within a scope, by
-keywords, then let the chat model rerank the pooled 60 candidates.
-`novel-chat.integration.spec.ts` chats with the book (who/what questions,
-follow-ups) against the live models, with tolerant assertions. A turn takes
-~5-30 s on the shared GPU (rewrite, draft, rerank, answer).
-
-Known limits:
-
-- Conversations live in memory (`MemoryConversationStore`): lost on restart,
-  per instance. A persistent `ConversationStore` is the next step for a real
-  chat UI.
-- User collections are per user on biblioteca-server; the caller (reader or
-  server) turns a collection into its `opusPaths`.
-- `/api/rag/*` costs GPU time on the shared Ollama (one request at a time)
-  and has no authentication or rate limit: keep it internal, behind the
-  reader or the server.
-- Resolving a hit reads its div's paragraphs (cached); a server endpoint
-  returning paragraphs by URL (following relocations) would be cheaper.
-  `GET /api/divs?path=` cannot do it: for a paragraph path it answers 500
-  (it merges an unpersisted paragraph inside a read-only transaction).
-- Answer quality is the generating model's: retrieval finds the right
-  passages, qwen3.5:9b still slips on facts. A reranker and evaluation
-  questions per work are the next levers.
-
+- `src/ragtime/core/*.spec.ts` - the framework on in-memory doubles.
+- `src/biblioteca-rag/rag.service.spec.ts` - search, ask, chat and streaming
+  over a fake library.
+- `src/services/vector_reuse.spec.ts` - reuse by sha256 and url repointing.
+- `*.integration.spec.ts` - live Qdrant (own `test_*` collections) and Ollama.
+  `novel-chat.integration.spec.ts` chats with *A Christmas Carol*; these take
+  longer, and the live model can occasionally fail them.
 
 ## License
 
