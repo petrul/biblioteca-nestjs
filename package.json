@@ -12,7 +12,7 @@
   ],
   "author": "Petru Dimulescu",
   "private": true,
-  "license": "Code is not open source, ask Editii Scriptorium srl for licensing terms.",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "nest build",
     "clean": "rm -rf dist/",

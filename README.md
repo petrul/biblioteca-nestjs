@@ -695,3 +695,7 @@ Known limits:
   passages, qwen3.5:9b still slips on facts. A reranker and evaluation
   questions per work are the next levers.
 
+
+## License
+
+Copyright 2026 Editii Scriptorium srl. Licensed under the [Apache License, Version 2.0](LICENSE); see also [NOTICE](NOTICE).
