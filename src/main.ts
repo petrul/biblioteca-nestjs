@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { timingSafeEqual } from 'node:crypto';
 import { INITIATOR_HEADER, prefixProcessOutput, propagateInitiator, requestInitiator, runAs } from './initiator';
+import { requiresInternalApiToken } from './security-boundary';
 
 // Every line this process writes starts with its initiator - see initiator.ts.
 prefixProcessOutput();
@@ -22,16 +23,7 @@ async function bootstrap() {
 
   app.use((req: any, res: any, next: () => void) => {
     const path = req.path as string;
-    const protectedMutation = req.method === 'POST' && (
-      /^\/api\/vectorizing\/(start|pause|resume)$/.test(path)
-      || /^\/api\/enrichment\/(run|run\/dry-run)$/.test(path)
-      || /^\/api\/enrichment\/jobs\/[^/]+\/cancel$/.test(path)
-      || /^\/api\/covers\/(run|run\/dry-run|work)$/.test(path)
-      || /^\/api\/covers\/jobs\/[^/]+\/cancel$/.test(path)
-      || path === '/api/vector-store/remove-opus'
-      || path === '/api/vector-store/reset'
-      || path === '/optimize'
-    );
+    const protectedMutation = requiresInternalApiToken(req.method, path);
     if (!protectedMutation) return next();
 
     const token = process.env.BIBLIOTECA_INTERNAL_API_TOKEN;
