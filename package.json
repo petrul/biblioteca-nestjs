@@ -1,6 +1,6 @@
 {
   "name": "biblioteca-nestjs",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "releaseName": "Ethereal Exedra",
   "description": "",
   "main": "dist/main.js",
