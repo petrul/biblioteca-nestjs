@@ -37,6 +37,13 @@ export const COVER_IMPRINT = {
 } as const;
 
 /** Slow, best-effort work-cover generation. Never runs on a reader request. */
+/** biblioteca-covers refused to render (HTTP 4xx/5xx), with its reason when it gave one. */
+export class CoverRenderRefused extends Error {
+  constructor(readonly status: number, readonly reason: string) {
+    super(reason ? `cover renderer HTTP ${status}: ${reason}` : `cover renderer HTTP ${status}`);
+  }
+}
+
 @Injectable()
 export class CoverEnrichmentService {
   private readonly log = new Logger("cover-enrichment");
@@ -347,7 +354,7 @@ export class CoverEnrichmentService {
     if (this.pending.has(candidate.path)) throw new Error(`a cover for ${candidate.path} is already being rendered`);
     this.pending.add(candidate.path);
     try {
-      const result = await this.generate(candidate, true, request);
+      const result = await this.generate(candidate, true, request, true);
       if (!result) throw new Error(`cover generation failed for ${candidate.path} (see the nestjs log)`);
       return result;
     } finally {
@@ -387,7 +394,7 @@ export class CoverEnrichmentService {
     return pngKey.replace(/\.png$/, '') + '.json';
   }
 
-  private async generate(candidate: CoverCandidate, replace = false, requestOverride?: Record<string, unknown>): Promise<GeneratedCover | null> {
+  private async generate(candidate: CoverCandidate, replace = false, requestOverride?: Record<string, unknown>, rethrow = false): Promise<GeneratedCover | null> {
     const started = Date.now();
     this.log.log(`cover candidate ${candidate.path}`);
     try {
@@ -407,7 +414,13 @@ export class CoverEnrichmentService {
         body: JSON.stringify(request),
         signal: AbortSignal.timeout(120_000),
       });
-      if (!response.ok) throw new Error(`cover renderer HTTP ${response.status}`);
+      if (!response.ok) {
+        // biblioteca-covers says why in a JSON { error } - e.g. "The cover
+        // art could not be loaded: <host> answered 403" - keep it.
+        let reason = '';
+        try { const body = await response.json(); reason = typeof body?.error === 'string' ? body.error : ''; } catch { /* not JSON */ }
+        throw new CoverRenderRefused(response.status, reason);
+      }
       const body = Buffer.from(await response.arrayBuffer());
       // A 200 with a non-image body (an error document, a JSON stub) must
       // never reach the cover cache: hasUsableCover would keep re-rendering
@@ -453,6 +466,8 @@ export class CoverEnrichmentService {
       return { coverUrl: url, request };
     } catch (error: any) {
       this.log.warn(`cover generation failed for ${candidate.path} after ${this.elapsed(started)}: ${error?.message || error}`);
+      // The admin waiting on generateNow is told why; the background queue logs and moves on.
+      if (rethrow) throw error;
       return null;
     }
   }

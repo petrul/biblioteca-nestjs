@@ -1,5 +1,6 @@
 /// <reference types="jest" />
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { CoverRenderRefused } from './services/cover-enrichment.service';
 import { CoverWorkController } from './cover-work.controller';
 
 describe('CoverWorkController (the reader admin section\'s backend)', () => {
@@ -22,6 +23,21 @@ describe('CoverWorkController (the reader admin section\'s backend)', () => {
     const { controller, covers } = make();
     await expect(controller.generate({ path: 'eminescu/poezii' })).resolves.toEqual({ coverUrl: 'http://minio.test/covers/new.png', request: { title: 'Poezii' } });
     expect(covers.generateNow).toHaveBeenCalledWith(expect.objectContaining({ id: 3, path: 'eminescu/poezii', title: 'Poezii', author: 'Mihai Eminescu' }), undefined);
+  });
+
+  it('when the renderer refuses the request, the admin is told why: 422 with the renderer\'s reason in `error`', async () => {
+    const reason = 'The cover art could not be loaded: ziarullumina.ro answered with a web page, not the image';
+    const { controller } = make({ generateNow: jest.fn(async () => { throw new CoverRenderRefused(422, reason); }) });
+    const refused = await controller.generate({ path: 'comnena/alexiada', request: { title: 'Alexiada' } } as any).catch(e => e);
+    expect(refused).toBeInstanceOf(UnprocessableEntityException);
+    expect(refused.getStatus()).toBe(422);
+    expect(refused.getResponse()).toEqual({ statusCode: 422, error: reason });
+  });
+
+  it('a renderer failure on its side (5xx) is not passed off as the admin\'s fault', async () => {
+    const { controller } = make({ generateNow: jest.fn(async () => { throw new CoverRenderRefused(500, 'browser crashed'); }) });
+    const failed = await controller.generate({ path: 'comnena/alexiada' } as any).catch(e => e);
+    expect(failed).toBeInstanceOf(CoverRenderRefused);
   });
 
   it('renders from an admin-supplied request JSON when one is posted', async () => {

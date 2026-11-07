@@ -1,7 +1,7 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode, NotFoundException, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, HttpCode, NotFoundException, Post, Query, UnprocessableEntityException } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { BibliotecaClient } from './services/biblioteca_client.service';
-import { CoverEnrichmentService } from './services/cover-enrichment.service';
+import { CoverEnrichmentService, CoverRenderRefused } from './services/cover-enrichment.service';
 import { coverCandidateFor } from './services/kafka/author-arts';
 
 export class CoverWorkRequestDto {
@@ -51,6 +51,11 @@ export class CoverWorkController {
       return await this.covers.generateNow(candidate, dto.request ?? undefined);
     } catch (error: any) {
       if (/already being rendered/.test(error?.message)) throw new ConflictException(error.message);
+      // The renderer refused this request (e.g. cover art it could not load):
+      // the admin's editor shows `error`, so it carries the renderer's reason.
+      if (error instanceof CoverRenderRefused && error.status >= 400 && error.status < 500) {
+        throw new UnprocessableEntityException({ statusCode: 422, error: error.reason || error.message });
+      }
       throw error;
     }
   }

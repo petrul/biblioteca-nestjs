@@ -1,5 +1,5 @@
 /// <reference types="jest" />
-import { CoverEnrichmentService } from './cover-enrichment.service';
+import { CoverEnrichmentService, CoverRenderRefused } from './cover-enrichment.service';
 
 /**
  * Only the enqueue admission rule matters here - the fill-only invariant
@@ -322,6 +322,20 @@ describe('CoverEnrichmentService on-demand cover and its stored request', () => 
     expect(result.request).toMatchObject({ title: 'Poezii', publisher: 'Ediții Scriptorium', date: '2026', pubPlace: 'București', series: 'Scriptorium Classique' });
     expect(persisted).toEqual([{ opusId: 5, coverUrl: result.coverUrl, replaceCover: true }]);
     expect(await svc.storedRequest(result.coverUrl)).toEqual(result.request);
+  });
+
+  it('generateNow, refused by the renderer (e.g. cover art it could not load), rejects with the renderer\'s reason and stores nothing', async () => {
+    const svc = makeService();
+    const originalFetch = (global as any).fetch;
+    (global as any).fetch = (async () => ({ ok: false, status: 422, json: async () => ({ error: 'The cover art could not be loaded: ziarullumina.ro answered 403' }) })) as any;
+    try {
+      const refused = await svc.generateNow({ id: 9, path: 'comnena/alexiada', title: 'Alexiada', author: 'Ana Comnena' }, { title: 'Alexiada' }).catch(e => e);
+      expect(refused).toBeInstanceOf(CoverRenderRefused);
+      expect(refused.status).toBe(422);
+      expect(refused.reason).toBe('The cover art could not be loaded: ziarullumina.ro answered 403');
+      expect(stored.size).toBe(0);
+      expect(persisted).toEqual([]);
+    } finally { (global as any).fetch = originalFetch; }
   });
 
   it('generateNow renders an admin-supplied request verbatim, skipping the random theme', async () => {
