@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -11,9 +12,13 @@ import { requiresInternalApiToken } from './security-boundary';
 prefixProcessOutput();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['verbose', 'debug', 'log', 'warn', 'error' ]
   });
+  // An admin's cover request JSON may carry an uploaded image as a data URL
+  // (several MB): the 100 KB default would refuse it. Internal service only,
+  // its mutations behind the internal API token.
+  app.useBodyParser('json', { limit: '12mb' });
 
   // Each request runs - and logs - as the reader its caller names, else as
   // anonymous; its calls to biblioteca-server and biblioteca-covers
