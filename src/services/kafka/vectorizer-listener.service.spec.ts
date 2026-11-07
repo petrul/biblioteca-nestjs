@@ -31,6 +31,7 @@ describe('VectorizerKafkaListenerService', () => {
     let delaySpy: jest.SpyInstance;
     let eachMessage: (payload: any) => Promise<void>;
     let consumer: any;
+    let ks: any;
     let getElemByPath: jest.Mock;
     let removeOpus: jest.Mock;
     let vectorize: jest.Mock;
@@ -43,7 +44,7 @@ describe('VectorizerKafkaListenerService', () => {
             run: jest.fn().mockImplementation(({ eachMessage: h }) => { eachMessage = h; }),
             disconnect: jest.fn().mockResolvedValue(undefined),
         };
-        const ks = { kafka: { consumer: jest.fn(() => consumer) }, ensureTopics: jest.fn().mockResolvedValue(undefined) } as unknown as KafkaService;
+        ks = { kafka: { consumer: jest.fn(() => consumer) }, ensureTopics: jest.fn().mockResolvedValue(undefined) };
         getElemByPath = jest.fn();
         const tbc = { getElemByPath } as unknown as BibliotecaClient;
         removeOpus = jest.fn().mockResolvedValue(undefined);
@@ -104,6 +105,16 @@ describe('VectorizerKafkaListenerService', () => {
             fromBeginning: true,
         });
         expect(typeof eachMessage).toBe('function');
+    });
+
+    it('commits after every message and fetches small batches, so an eviction never sends a whole batch back', () => {
+        // Production, 2026-11-07: 1 MB batches took ~25 min to vectorize, the
+        // consumer was evicted mid-batch, the end-of-batch commit was refused,
+        // and the same ~485 opera were vectorized again all day.
+        expect(consumer.run).toHaveBeenCalledWith(expect.objectContaining({ autoCommitThreshold: 1 }));
+        const consumerOptions = (ks.kafka.consumer as jest.Mock).mock.calls[0][0];
+        expect(consumerOptions.groupId).toBe('test-group');
+        expect(consumerOptions.maxBytesPerPartition).toBeLessThanOrEqual(64 * 1024);
     });
 
     it.each([404, 400])('skips the event when the server answers %s - offset commits, no retry, no vectorizing', async (status) => {

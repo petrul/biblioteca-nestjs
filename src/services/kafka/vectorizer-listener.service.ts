@@ -12,6 +12,8 @@ export class VectorizerKafkaListenerService implements OnApplicationShutdown, On
 
   consumer: Consumer;
 
+  static readonly MAX_BYTES_PER_PARTITION = 64 * 1024;
+
   private readonly log = new Logger(VectorizerKafkaListenerService.name);
 
   constructor(protected ks: KafkaService,
@@ -52,6 +54,16 @@ export class VectorizerKafkaListenerService implements OnApplicationShutdown, On
       // slow.
       sessionTimeout: 30 * 1000,
       heartbeatInterval: 10 * 1000,
+      // Small batches. KafkaJS fetches up to 1 MB per partition by default -
+      // ~300 of these events (each carries the opus with its author's bio),
+      // ~25 minutes of vectorizing - and it can only rejoin the group between
+      // batches: any rebalance during one (a coordinator move, a metadata
+      // change) evicted the consumer before the batch ended, its commit was
+      // refused, and the whole batch came back. In production (2026-11-07)
+      // that looped over the same ~485 opera all day, the group's offset on
+      // one partition stuck 1,202 events behind, an eviction every ~25 min.
+      // 64 KB is a few dozen events: back to the group within a minute or two.
+      maxBytesPerPartition: VectorizerKafkaListenerService.MAX_BYTES_PER_PARTITION,
     })
     await this.consumer.connect();
     await this.consumer.subscribe({
@@ -63,6 +75,9 @@ export class VectorizerKafkaListenerService implements OnApplicationShutdown, On
     });
     this.log.log(`listening on Kafka topics ${this.sharedConfig.kafka.newOpusImportedTopic} and ${this.sharedConfig.kafka.opusRemovedTopic}`);
     await this.consumer.run({
+      // Commit after every message, not at the end of the batch: an
+      // eviction then costs at most the event in hand, never the batch.
+      autoCommitThreshold: 1,
       eachMessage: (async ({ topic, message, heartbeat }) => {
         // Do not let one transient Textbase/Ollama/Milvus outage terminate the
         // Kafka consumer. Remaining inside eachMessage also prevents KafkaJS
