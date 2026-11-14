@@ -132,6 +132,19 @@ describe('EnrichmentService', () => {
     expect(fetchMock.calls).toHaveLength(0);
   });
 
+  it('the daily sweep ends with the TOC cache check, even when the enrichment walk fails', async () => {
+    const tbc = new FakeTbc();
+    tbc.getAuthors = async () => { throw new Error('server down'); };
+    const tocCache = { calls: 0, async warmMissing() { this.calls++; return {}; } };
+    (global as any).fetch = new FakeFetch().stub;
+    const svc = new EnrichmentService(tbc as any, { bibliotecaUrl: 'http://biblioteca.test' } as any, undefined, tocCache as any);
+
+    await svc.dailySweep();
+
+    expect(tocCache.calls).toBe(1);
+    expect(svc.isRunning()).toBe(false);
+  });
+
   it('enriches an author with the Wikipedia extract, Wikidata facts and lead image', async () => {
     const tbc = new FakeTbc();
     tbc.authors = [{ strId: 'alecsandri', displayName: 'Vasile Alecsandri' }];

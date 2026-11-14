@@ -30,6 +30,7 @@ import { EnrichmentAdminController } from './enrichment-admin.controller';
 import { CoverAdminController } from './cover-admin.controller';
 import { CoverWorkController } from './cover-work.controller';
 import { CoverEnrichmentService } from './services/cover-enrichment.service';
+import { TocCacheService } from './services/toc-cache.service';
 import { HumanEventPublisher } from './services/events/human-events.publisher';
 
 @Module({
@@ -71,6 +72,7 @@ import { HumanEventPublisher } from './services/events/human-events.publisher';
     EnrichmentService,
     EnrichmentAdminService,
     CoverEnrichmentService,
+    TocCacheService,
     BibliotecaClient,
     VectorizingJobService,
     RagService,

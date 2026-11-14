@@ -4,6 +4,7 @@ import { BibliotecaClient } from './biblioteca_client.service';
 import { CoverEnrichmentService } from './cover-enrichment.service';
 import { EnrichmentService } from './enrichment.service';
 import { ENRICHMENT_STEP_IDS, EnrichmentStep } from './enrichment-modules';
+import { TocCacheService } from './toc-cache.service';
 import { VectorizerService } from './vectorizer.service';
 import { VectorizingJobService } from './vectorizing_job.service';
 
@@ -90,6 +91,7 @@ export class EnrichmentAdminService {
     protected covers: CoverEnrichmentService,
     protected vectorizer: VectorizerService,
     protected vectorizingJob: VectorizingJobService,
+    protected tocCache: TocCacheService,
   ) {}
 
   current(): Job | null {
@@ -178,6 +180,7 @@ export class EnrichmentAdminService {
         }
       }
     }
+    if (wants('cache')) result.totals.cache = (await this.tocCache.missing()).missing.length;
     return result;
   }
 
@@ -225,6 +228,12 @@ export class EnrichmentAdminService {
     if (unknown.length) {
       throw new BadRequestException(`unknown enrichment step(s): ${unknown.join(', ')} - see GET /api/enrichment/modules`);
     }
+    if (request.overwrite === true && request.steps.includes('cache')) {
+      throw new BadRequestException('overwrite does not apply to cache: it only builds the tables of contents that are missing');
+    }
+    if (request.targets && request.steps.includes('cache')) {
+      throw new BadRequestException('the cache step covers the whole corpus; it takes no targets');
+    }
     if (request.overwrite === true && request.steps.includes('vectorize')) {
       throw new BadRequestException('overwrite does not apply to vectorize: vectors are never dropped or replaced, vectorize() only adds the missing ones ("vectors are precious")');
     }
@@ -248,6 +257,7 @@ export class EnrichmentAdminService {
       if (job.request.steps.includes('author')) await this.runAuthors(job, force, artByAuthor);
       if (job.request.steps.includes('work') || job.request.steps.includes('cover')) await this.runOpera(job, force, artByAuthor);
       if (job.request.steps.includes('vectorize')) await this.runVectorize(job);
+      if (job.request.steps.includes('cache')) await this.runCache(job);
       job.state = job.cancelRequested ? 'cancelled' : 'finished';
     } catch (e: any) {
       job.state = 'failed';
@@ -435,6 +445,18 @@ export class EnrichmentAdminService {
         this.recordError(job, `vectorize ${path}: ${e?.message ?? e}`);
       }
     }
+  }
+
+  /** Builds every missing table of contents; cancel is honored between works. */
+  private async runCache(job: Job): Promise<void> {
+    const counters = job.steps.cache!;
+    const result = await this.tocCache.warmMissing({ shouldStop: () => job.cancelRequested });
+    counters.candidates = result.built + result.failed;
+    counters.processed = result.built;
+    counters.failed = result.failed;
+    counters.skippedExisting = result.works - result.missing;
+    for (const error of result.errors) this.recordError(job, error);
+    job.updatedAt = Date.now();
   }
 
   private authorTargeted(author: any, request: EnrichmentRunRequest): boolean {

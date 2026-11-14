@@ -14,7 +14,7 @@
  * whose overwrite flag is true here.
  */
 export interface EnrichmentModule {
-  id: 'author' | 'work' | 'cover' | 'vectorize';
+  id: 'author' | 'work' | 'cover' | 'vectorize' | 'cache';
   title: string;
   /** One-liner of what the module actually does, served to Swagger UI. */
   description: string;
@@ -55,6 +55,13 @@ export const ENRICHMENT_MODULES: EnrichmentModule[] = [
     title: 'Text vectorization',
     description: 'Embeds one opus\'s paragraphs. Fill-only BY CONSTRUCTION: already-stored sha256s are reused and nothing is ever dropped ("vectors are precious"), so overwrite does not apply. Explicit opusPaths targets only - a full-corpus run belongs to POST /api/vectorizing/start.',
     fills: ['vectors'],
+    overwrite: false,
+  },
+  {
+    id: 'cache',
+    title: 'Table-of-contents cache',
+    description: "Builds the cached table of contents of every work that has none, one work at a time with a pause, so no reader waits for one (a large work's took seconds). The server builds it at import already; this is the backstop. Fill-only by construction: nothing is dropped or rebuilt, so overwrite does not apply. Whole corpus only.",
+    fills: ['toc'],
     overwrite: false,
   },
 ];

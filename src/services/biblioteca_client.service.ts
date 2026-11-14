@@ -270,6 +270,21 @@ export class BibliotecaClient {
       }
     }
 
+    /**
+     * The works whose table of contents is not in the server's disk cache
+     * (at most `limit` ids), plus the total number of works.
+     */
+    async missingTocs(limit = 100): Promise<{ missing: number[]; works: number }> {
+      const resp = await this.tb.api.getMissingTocs({ limit });
+      return { missing: resp.data.missing ?? [], works: resp.data.works ?? 0 };
+    }
+
+    /** Builds and caches one work's table of contents on the server. */
+    async buildToc(opusId: number): Promise<{ divisions: number; millis: number }> {
+      const resp = await this.tb.api.buildToc(opusId);
+      return { divisions: resp.data.divisions ?? 0, millis: resp.data.millis ?? 0 };
+    }
+
     async persistEnrichment(update: { opusId: number; coverUrl?: string; replaceCover?: boolean }): Promise<void> {
       const response = await fetch(`${this.conf.bibliotecaUrl}/api/internal/enrichment`, {
         method: 'POST',

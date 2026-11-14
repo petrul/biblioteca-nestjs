@@ -81,10 +81,23 @@ class FakeVectorizer {
   async vectorize(id: number) { this.vectorized.push(id); }
 }
 
+/** The TOC cache module: a fixed result, and whether the run asked it to stop. */
+class FakeTocCache {
+  calls = 0;
+  stopSeen?: boolean;
+  missingIds = [7, 8, 9];
+  async missing() { return { missing: this.missingIds, works: 10 }; }
+  async warmMissing(opts: { shouldStop?: () => boolean } = {}) {
+    this.calls++;
+    this.stopSeen = opts.shouldStop?.();
+    return { missing: 3, built: 2, failed: 1, works: 10, errors: ['TOC of work 9: HTTP 500'] };
+  }
+}
+
 function makeSvc(tbc: FakeTbc, enrichment: FakeEnrichment, covers: FakeCovers, vectorizer: FakeVectorizer,
-  vectorizingRunning = false) {
+  vectorizingRunning = false, tocCache = new FakeTocCache()) {
   const vectorizingJob: any = { status: () => ({ running: vectorizingRunning }) };
-  return new EnrichmentAdminService(tbc as any, enrichment as any, covers as any, vectorizer as any, vectorizingJob);
+  return new EnrichmentAdminService(tbc as any, enrichment as any, covers as any, vectorizer as any, vectorizingJob, tocCache as any);
 }
 
 /** Runs the async job to completion (or the terminal state it reaches). */
@@ -102,6 +115,36 @@ describe('EnrichmentAdminService', () => {
   it('the module catalog is the steps list the run endpoint validates against', () => {
     expect(ENRICHMENT_STEP_IDS).toEqual(ENRICHMENT_MODULES.map(m => m.id));
     expect(ENRICHMENT_MODULES.find(m => m.id === 'vectorize')!.overwrite).toBe(false);
+  });
+
+  it('the cache step builds the missing TOCs and reports them in the step counters', async () => {
+    const tocCache = new FakeTocCache();
+    const enrichment = new FakeEnrichment();
+    const svc = makeSvc(new FakeTbc(), enrichment, new FakeCovers(), new FakeVectorizer(), false, tocCache);
+
+    const done = await waitJob(svc, (await svc.start({ steps: ['cache'] })).id);
+
+    expect(tocCache.calls).toBe(1);
+    expect(tocCache.stopSeen).toBe(false);
+    expect(done.steps.cache).toEqual({ candidates: 3, processed: 2, skippedExisting: 7, failed: 1 });
+    expect(done.errors).toEqual(['TOC of work 9: HTTP 500']);
+    expect(done.state).toBe('finished');
+    expect(enrichment.running).toBe(false);
+  });
+
+  it('the cache step is fill-only and whole-corpus: overwrite and targets are refused', async () => {
+    const svc = makeSvc(new FakeTbc(), new FakeEnrichment(), new FakeCovers(), new FakeVectorizer());
+    await expect(svc.start({ steps: ['cache'], overwrite: true })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.start({ steps: ['cache'], targets: { opusPaths: ['p1'] } })).rejects.toBeInstanceOf(BadRequestException);
+    expect(ENRICHMENT_MODULES.find(m => m.id === 'cache')!.overwrite).toBe(false);
+  });
+
+  it('a cache dry run counts the works without a TOC and builds nothing', async () => {
+    const tocCache = new FakeTocCache();
+    const svc = makeSvc(new FakeTbc(), new FakeEnrichment(), new FakeCovers(), new FakeVectorizer(), false, tocCache);
+    const dry = await svc.dryRun({ steps: ['cache'] });
+    expect(dry.totals).toEqual({ cache: 3 });
+    expect(tocCache.calls).toBe(0);
   });
 
   it('fill-only by default: enriched entities are skipped untouched, only the missing are enriched', async () => {

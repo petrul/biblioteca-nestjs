@@ -35,18 +35,29 @@ export interface RepresentationModelObject {
   _links?: Links;
 }
 
-export interface EntityModelEmbeddingBatchStat {
+export interface AppUser {
+  /** @format int64 */
+  id?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  username?: string;
+  googleSub?: string;
+  avatarUrl?: string;
+  role?: "USER" | "ADMIN";
   /** @format date-time */
-  recordedAt?: string;
-  /** @format int32 */
-  batchSize?: number;
+  createdAt?: string;
+}
+
+export interface EntityModelReaderWorkspaceState {
+  owner?: AppUser;
   /** @format int64 */
-  totalChars?: number;
-  /** @format int32 */
-  vectorDimension?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
+  revision?: number;
+  lastSearch?: string;
+  workspace?: string;
+  /** @format date-time */
+  updatedAt?: string;
   _links?: Links;
 }
 
@@ -61,12 +72,78 @@ export interface PageMetadata {
   number?: number;
 }
 
-export interface PagedModelEntityModelEmbeddingBatchStat {
+export interface PagedModelEntityModelReaderWorkspaceState {
   _embedded?: {
-    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+    readerWorkspaceStates?: EntityModelReaderWorkspaceState[];
   };
   _links?: Links;
   page?: PageMetadata;
+}
+
+export interface EntityModelTeiDiv {
+  /** @format int64 */
+  id?: number;
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  /**
+   * @minLength 0
+   * @maxLength 3000
+   */
+  head?: string;
+  summarySourceUrl?: string;
+  coverUrl?: string;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelEntityModelTeiDiv {
+  _embedded?: {
+    teiDivs?: EntityModelTeiDiv[];
+  };
+  _links?: Links;
 }
 
 export interface Author {
@@ -123,6 +200,164 @@ export interface Author {
   country?: string;
   visualName?: string;
   anonymous?: boolean;
+}
+
+export interface TeiFile {
+  /** @format int64 */
+  id?: number;
+  filename?: string;
+  /**
+   * @minLength 0
+   * @maxLength 1000
+   */
+  title?: string;
+  authors?: Author[];
+  language?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  repoName?: string;
+  /** @format date-time */
+  timestamp?: string;
+  author?: Author;
+}
+
+export interface EntityModelOpusVectorizingStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int64 */
+  opusId?: number;
+  /** @format int32 */
+  totalParas?: number;
+  /** @format int32 */
+  totalBatches?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelOpusVectorizingStat {
+  _embedded?: {
+    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelTeiElem {
+  xpath?: string;
+  domPath?: string;
+  lang?:
+    | "BG"
+    | "BR"
+    | "CA"
+    | "DA"
+    | "DE"
+    | "EN"
+    | "ES"
+    | "FI"
+    | "FR"
+    | "GR"
+    | "HU"
+    | "IT"
+    | "LA"
+    | "NL"
+    | "NO"
+    | "PT"
+    | "RO"
+    | "RU"
+    | "ZH";
+  name?: string;
+  /** @format int32 */
+  nth?: number;
+  /**
+   * @minLength 0
+   * @maxLength 100
+   */
+  urlFragment?: string;
+  /** @format byte */
+  txtSha256?: Blob;
+  /** @format int32 */
+  size?: number;
+  /** @format int32 */
+  wordSize?: number;
+  leaf?: boolean;
+  completePath?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiElem {
+  _embedded?: {
+    teiElems?: EntityModelTeiElem[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface EntityModelTeiOpus {
+  description?: string;
+  significantQuote?: string;
+  summary?: string;
+  summarySourceUrl?: string;
+  /** @format date-time */
+  workEnrichedAt?: string;
+  coverUrl?: string;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelTeiOpus {
+  _embedded?: {
+    teiOpuses?: EntityModelTeiOpus[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
+}
+
+export interface CollectionModelObject {
+  _embedded?: {
+    objects?: any[];
+  };
+  _links?: Links;
+}
+
+export interface EntityModelEmbeddingBatchStat {
+  /** @format date-time */
+  recordedAt?: string;
+  /** @format int32 */
+  batchSize?: number;
+  /** @format int64 */
+  totalChars?: number;
+  /** @format int32 */
+  vectorDimension?: number;
+  embedderModel?: string;
+  /** @format int64 */
+  durationMs?: number;
+  _links?: Links;
+}
+
+export interface PagedModelEntityModelEmbeddingBatchStat {
+  _embedded?: {
+    embeddingBatchStats?: EntityModelEmbeddingBatchStat[];
+  };
+  _links?: Links;
+  page?: PageMetadata;
 }
 
 export interface EntityModelAuthor {
@@ -195,207 +430,6 @@ export interface CollectionModelEntityModelAuthor {
     authors?: EntityModelAuthor[];
   };
   _links?: Links;
-}
-
-export interface EntityModelTeiOpus {
-  description?: string;
-  significantQuote?: string;
-  summary?: string;
-  summarySourceUrl?: string;
-  /** @format date-time */
-  workEnrichedAt?: string;
-  coverUrl?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiOpus {
-  _embedded?: {
-    teiOpuses?: EntityModelTeiOpus[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface EntityModelTeiDiv {
-  /** @format int64 */
-  id?: number;
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  /**
-   * @minLength 0
-   * @maxLength 3000
-   */
-  head?: string;
-  summarySourceUrl?: string;
-  coverUrl?: string;
-  leaf?: boolean;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface CollectionModelObject {
-  _embedded?: {
-    objects?: any[];
-  };
-  _links?: Links;
-}
-
-export interface EntityModelTeiElem {
-  xpath?: string;
-  domPath?: string;
-  lang?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  name?: string;
-  /** @format int32 */
-  nth?: number;
-  /**
-   * @minLength 0
-   * @maxLength 100
-   */
-  urlFragment?: string;
-  /** @format byte */
-  txtSha256?: Blob;
-  /** @format int32 */
-  size?: number;
-  /** @format int32 */
-  wordSize?: number;
-  leaf?: boolean;
-  completePath?: string;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelTeiElem {
-  _embedded?: {
-    teiElems?: EntityModelTeiElem[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface PagedModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
-}
-
-export interface CollectionModelEntityModelTeiDiv {
-  _embedded?: {
-    teiDivs?: EntityModelTeiDiv[];
-  };
-  _links?: Links;
-}
-
-export interface TeiFile {
-  /** @format int64 */
-  id?: number;
-  filename?: string;
-  /**
-   * @minLength 0
-   * @maxLength 1000
-   */
-  title?: string;
-  authors?: Author[];
-  language?:
-    | "BG"
-    | "BR"
-    | "CA"
-    | "DA"
-    | "DE"
-    | "EN"
-    | "ES"
-    | "FI"
-    | "FR"
-    | "GR"
-    | "HU"
-    | "IT"
-    | "LA"
-    | "NL"
-    | "NO"
-    | "PT"
-    | "RO"
-    | "RU"
-    | "ZH";
-  repoName?: string;
-  /** @format date-time */
-  timestamp?: string;
-  author?: Author;
-}
-
-export interface EntityModelOpusVectorizingStat {
-  /** @format date-time */
-  recordedAt?: string;
-  /** @format int64 */
-  opusId?: number;
-  /** @format int32 */
-  totalParas?: number;
-  /** @format int32 */
-  totalBatches?: number;
-  embedderModel?: string;
-  /** @format int64 */
-  durationMs?: number;
-  _links?: Links;
-}
-
-export interface PagedModelEntityModelOpusVectorizingStat {
-  _embedded?: {
-    opusVectorizingStats?: EntityModelOpusVectorizingStat[];
-  };
-  _links?: Links;
-  page?: PageMetadata;
 }
 
 export interface AuthorRequestBody {
@@ -484,6 +518,18 @@ export interface OpusVectorizingStatRequestBody {
   embedderModel?: string;
   /** @format int64 */
   durationMs?: number;
+}
+
+export interface ReaderWorkspaceStateRequestBody {
+  /** @format int64 */
+  id?: number;
+  owner?: AppUser;
+  /** @format int64 */
+  revision?: number;
+  lastSearch?: string;
+  workspace?: string;
+  /** @format date-time */
+  updatedAt?: string;
 }
 
 export interface TeiDivRequestBody {
@@ -698,6 +744,49 @@ export interface EnrichmentUpdateDto {
   replaceCover?: boolean;
 }
 
+export interface TocBuiltView {
+  /** @format int64 */
+  opusId?: number;
+  /** @format int32 */
+  divisions?: number;
+  /** @format int64 */
+  millis?: number;
+}
+
+export interface GuestName {
+  name?: string;
+}
+
+export interface Selection {
+  path?: string;
+  selector?: string;
+  start?: string;
+  end?: string;
+  rev?: string;
+}
+
+export interface Fragment {
+  kind?: string;
+  sourcePath?: string;
+  selector?: string;
+  sourceVersion?: string;
+  canonicalPath?: string;
+  contextPath?: string;
+  workId?: string;
+  workTitle?: string;
+  chapterId?: string;
+  chapterTitle?: string;
+  authorName?: string;
+  language?: string;
+  text?: string;
+  html?: string;
+  /** @format int32 */
+  startOffset?: number;
+  /** @format int32 */
+  endOffset?: number;
+  readingPages?: string[];
+}
+
 export interface CreateCollectionRequest {
   name?: string;
 }
@@ -870,6 +959,14 @@ export interface PagingDto {
   number?: number;
 }
 
+export interface RelocationDto {
+  oldPath?: string;
+  newPath?: string;
+  reason?: string;
+  /** @format date-time */
+  createdAt?: string;
+}
+
 export interface RebuildStatus {
   indexExists?: boolean;
   running?: boolean;
@@ -881,6 +978,12 @@ export interface RebuildStatus {
   processedOpera?: number;
   /** @format int64 */
   indexedDocs?: number;
+}
+
+export interface MissingTocsView {
+  missing?: number[];
+  /** @format int32 */
+  works?: number;
 }
 
 /** Book metadata available to cover themes - matches schemas/book-metadata.schema.json exactly. title/author/publisher/date always come back (possibly ""); every other field is omitted entirely when this work's TEI source has nothing for it - which is most works, most fields, in this corpus. */
@@ -2106,9 +2209,24 @@ export class Api<
      *
      * @tags profile-controller
      * @name Descriptor3
-     * @request GET:/api/drest/profile/teiDivs
+     * @request GET:/api/drest/profile/readerWorkspaceStates
      */
     descriptor3: (params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/api/drest/profile/readerWorkspaceStates`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags profile-controller
+     * @name Descriptor4
+     * @request GET:/api/drest/profile/teiDivs
+     */
+    descriptor4: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiDivs`,
         method: "GET",
@@ -2120,10 +2238,10 @@ export class Api<
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor4
+     * @name Descriptor5
      * @request GET:/api/drest/profile/teiElems
      */
-    descriptor4: (params: RequestParams = {}) =>
+    descriptor5: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiElems`,
         method: "GET",
@@ -2135,13 +2253,165 @@ export class Api<
      * No description
      *
      * @tags profile-controller
-     * @name Descriptor5
+     * @name Descriptor6
      * @request GET:/api/drest/profile/teiOpuses
      */
-    descriptor5: (params: RequestParams = {}) =>
+    descriptor6: (params: RequestParams = {}) =>
       this.request<string, any>({
         path: `/api/drest/profile/teiOpuses`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name GetCollectionResourceReaderworkspacestateGet
+     * @request GET:/api/drest/readerWorkspaceStates
+     */
+    getCollectionResourceReaderworkspacestateGet: (
+      query?: {
+        /**
+         * Zero-based page index (0..N)
+         * @min 0
+         * @default 0
+         */
+        page?: number;
+        /**
+         * The size of the page to be returned
+         * @min 1
+         * @default 20
+         */
+        size?: number;
+        /** Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+        sort?: string[];
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<PagedModelEntityModelReaderWorkspaceState, any>({
+        path: `/api/drest/readerWorkspaceStates`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description create-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name PostCollectionResourceReaderworkspacestatePost
+     * @request POST:/api/drest/readerWorkspaceStates
+     */
+    postCollectionResourceReaderworkspacestatePost: (
+      data: ReaderWorkspaceStateRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelReaderWorkspaceState, any>({
+        path: `/api/drest/readerWorkspaceStates`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags reader-workspace-state-search-controller
+     * @name ExecuteSearchReaderworkspacestateGet
+     * @request GET:/api/drest/readerWorkspaceStates/search/findByOwnerUsername
+     */
+    executeSearchReaderworkspacestateGet: (
+      query?: {
+        username?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelReaderWorkspaceState, void>({
+        path: `/api/drest/readerWorkspaceStates/search/findByOwnerUsername`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description get-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name GetItemResourceReaderworkspacestateGet
+     * @request GET:/api/drest/readerWorkspaceStates/{id}
+     */
+    getItemResourceReaderworkspacestateGet: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelReaderWorkspaceState, void>({
+        path: `/api/drest/readerWorkspaceStates/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description update-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name PutItemResourceReaderworkspacestatePut
+     * @request PUT:/api/drest/readerWorkspaceStates/{id}
+     */
+    putItemResourceReaderworkspacestatePut: (
+      id: string,
+      data: ReaderWorkspaceStateRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelReaderWorkspaceState, any>({
+        path: `/api/drest/readerWorkspaceStates/${id}`,
+        method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description delete-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name DeleteItemResourceReaderworkspacestateDelete
+     * @request DELETE:/api/drest/readerWorkspaceStates/{id}
+     */
+    deleteItemResourceReaderworkspacestateDelete: (
+      id: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, void>({
+        path: `/api/drest/readerWorkspaceStates/${id}`,
+        method: "DELETE",
+        ...params,
+      }),
+
+    /**
+     * @description patch-readerworkspacestate
+     *
+     * @tags reader-workspace-state-entity-controller
+     * @name PatchItemResourceReaderworkspacestatePatch
+     * @request PATCH:/api/drest/readerWorkspaceStates/{id}
+     */
+    patchItemResourceReaderworkspacestatePatch: (
+      id: string,
+      data: ReaderWorkspaceStateRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<EntityModelReaderWorkspaceState, any>({
+        path: `/api/drest/readerWorkspaceStates/${id}`,
+        method: "PATCH",
+        body: data,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -2728,9 +2998,24 @@ export class Api<
      *
      * @tags tei-div-search-controller
      * @name ExecuteSearchTeidivGet20
+     * @request GET:/api/drest/teiDivs/search/getOperaIdsWithFilename
+     */
+    executeSearchTeidivGet20: (params: RequestParams = {}) =>
+      this.request<CollectionModelEntityModelTeiDiv, void>({
+        path: `/api/drest/teiDivs/search/getOperaIdsWithFilename`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags tei-div-search-controller
+     * @name ExecuteSearchTeidivGet21
      * @request GET:/api/drest/teiDivs/search/getOperaPathsForTeiFileId
      */
-    executeSearchTeidivGet20: (
+    executeSearchTeidivGet21: (
       query?: {
         /** @format int64 */
         teiFileId?: number;
@@ -3447,6 +3732,55 @@ export class Api<
     /**
      * No description
      *
+     * @tags internal-caches
+     * @name BuildToc
+     * @summary Builds (or reads) a work's table of contents into the cache
+     * @request POST:/api/internal/caches/toc/{opusId}
+     */
+    buildToc: (opusId: number, params: RequestParams = {}) =>
+      this.request<TocBuiltView, any>({
+        path: `/api/internal/caches/toc/${opusId}`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description The reader's browser asks for one on its first visit and keeps it, so a guest's browsing reads under one name in every Biblioteca service's log.
+     *
+     * @tags guest-rest-controller
+     * @name NewGuestName
+     * @summary A fresh guest name, like guest_formidable_dictator
+     * @request POST:/api/guests
+     */
+    newGuestName: (params: RequestParams = {}) =>
+      this.request<GuestName, any>({
+        path: `/api/guests`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags fragment-rest-controller
+     * @name Selection
+     * @request POST:/api/fragments/resolve
+     */
+    selection: (data: Selection, params: RequestParams = {}) =>
+      this.request<Fragment, Record<string, string>>({
+        path: `/api/fragments/resolve`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags div-collection-rest-controller
      * @name Mine1
      * @request GET:/api/collections/mine
@@ -3642,6 +3976,7 @@ export class Api<
          * @default 10
          */
         limit?: number;
+        scope?: string[];
       },
       params: RequestParams = {},
     ) =>
@@ -3672,6 +4007,7 @@ export class Api<
          * @default 10
          */
         limit?: number;
+        scope?: string[];
       },
       params: RequestParams = {},
     ) =>
@@ -3702,6 +4038,7 @@ export class Api<
          * @default 10
          */
         limit?: number;
+        scope?: string[];
       },
       params: RequestParams = {},
     ) =>
@@ -3732,6 +4069,7 @@ export class Api<
          * @default 10
          */
         limit?: number;
+        scope?: string[];
       },
       params: RequestParams = {},
     ) =>
@@ -3797,6 +4135,27 @@ export class Api<
       }),
 
     /**
+     * @description the current path of a division path that a TEI reimport changed (relocation chains followed), e.g. /shakespeare/the_tragedy/act_iv/another_room_in_the_castle; 404 when it was not relocated
+     *
+     * @tags relocation-rest-controller
+     * @name GetRelocation
+     * @request GET:/api/relocations
+     */
+    getRelocation: (
+      query: {
+        path: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<RelocationDto, any>({
+        path: `/api/relocations`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * No description
      *
      * @tags reading-progress-rest-controller
@@ -3835,6 +4194,32 @@ export class Api<
     /**
      * No description
      *
+     * @tags internal-caches
+     * @name GetMissingTocs
+     * @summary Works whose table of contents is not in the disk cache (at most limit), and how many works there are
+     * @request GET:/api/internal/caches/toc
+     */
+    getMissingTocs: (
+      query?: {
+        /**
+         * @format int32
+         * @default 100
+         */
+        limit?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<MissingTocsView, any>({
+        path: `/api/internal/caches/toc`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags info-rest-controller
      * @name Info
      * @request GET:/api/info
@@ -3843,6 +4228,29 @@ export class Api<
       this.request<Record<string, string>, any>({
         path: `/api/info`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags fragment-rest-controller
+     * @name Resolve
+     * @request GET:/api/fragments
+     */
+    resolve: (
+      query: {
+        path: string;
+        selector?: string;
+        rev?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Fragment, Record<string, string>>({
+        path: `/api/fragments`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -4030,6 +4438,31 @@ export class Api<
       this.request<TeiDivDto[], any>({
         path: `/api/collections/system/featured`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags div-collection-rest-controller
+     * @name Discover
+     * @request GET:/api/collections/system/discover
+     */
+    discover: (
+      query?: {
+        /**
+         * @format int32
+         * @default 20
+         */
+        size?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<TeiDivDto[], any>({
+        path: `/api/collections/system/discover`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),

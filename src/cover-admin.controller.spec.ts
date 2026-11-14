@@ -91,7 +91,7 @@ describe('CoverAdminController (independent /api/covers surface)', () => {
       },
     };
     const covers: any = { enqueued: [] as any[], hasUsableCover: async (url?: string) => !!url, enqueue(candidate: any, opts: any = {}) { this.enqueued.push({ ...candidate, force: opts.force }); } };
-    const svc = new EnrichmentAdminService(tbc, { tryBeginRun: () => true, endRun: () => {}, storedAuthorArt: async () => undefined } as any, covers, {} as any, { status: () => ({ running: false }) } as any);
+    const svc = new EnrichmentAdminService(tbc, { tryBeginRun: () => true, endRun: () => {}, storedAuthorArt: async () => undefined } as any, covers, {} as any, { status: () => ({ running: false }) } as any, {} as any);
     const controller = new CoverAdminController(svc);
 
     const job: any = await controller.run({} as any);

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } f
 import { BibliotecaClient } from './biblioteca_client.service';
 import { AppConfService, PROVIDER_CONF } from '../configuration';
 import { CoverEnrichmentService } from './cover-enrichment.service';
+import { TocCacheService } from './toc-cache.service';
 
 type WikiSummary = {
     extract?: string;
@@ -80,6 +81,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
     private readonly client: BibliotecaClient,
     @Inject(PROVIDER_CONF) private readonly conf: AppConfService,
     @Optional() private readonly covers?: CoverEnrichmentService,
+    @Optional() private readonly tocCache?: TocCacheService,
   ) {}
 
   onModuleInit() {
@@ -198,6 +200,12 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
         }
       }
     } catch (e: any) { this.log.warn(`daily enrichment sweep failed: ${e?.message ?? e}`); }
+    // The cache module: every work's table of contents cached, so no
+    // reader waits for one. Its own try - a failed enrichment walk does
+    // not skip it, and it never fails the sweep.
+    try {
+      await this.tocCache?.warmMissing();
+    } catch (e: any) { this.log.warn(`daily TOC cache check failed: ${e?.message ?? e}`); }
     finally { this.endRun(); }
   }
 
