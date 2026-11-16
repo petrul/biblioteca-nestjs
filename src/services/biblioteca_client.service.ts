@@ -39,7 +39,8 @@ export class BibliotecaClient {
 
     /**
      * One author with everything the server associates with it - imageUrls
-     * (author_media) and image_href (the bundled portrait). Cast to any:
+     * (author_media). Legacy image_href values are filtered before cover use.
+     * Cast to any:
      * the generated AuthorDto predates imageUrls.
      */
     async getAuthor(strId: string): Promise<any> {

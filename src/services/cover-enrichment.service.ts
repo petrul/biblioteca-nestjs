@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { Client as MinioClient } from 'minio';
 import { BibliotecaClient } from './biblioteca_client.service';
 import { AppConfService, PROVIDER_CONF } from '../configuration';
+import { withoutLegacyCoverArtUrl } from './cover-art-url';
 
 type CoverCandidate = {
   id: number;
@@ -68,11 +69,8 @@ export class CoverEnrichmentService {
   // selectable layout everywhere else, just never auto-picked for a
   // batch-generated cover.
   private static readonly EXCLUDED_RANDOM_LAYOUTS = ['storybook_whimsy'];
-  // The one layout drawn without any picture: a work with no art of its
-  // own and an author with no portrait is only ever given this one.
-  static readonly NO_ART_LAYOUT = 'pure_typographic';
   private coverMeta?: { layouts: string[]; palettes: string[] };
-  private async randomTheme(hasArt = true): Promise<{ layout: string; paletteId: string }> {
+  private async randomTheme(_hasArt = true, stableKey?: string): Promise<{ layout: string; paletteId: string }> {
     if (!this.coverMeta) {
       try {
         const resp = await fetch(`${this.conf.coversApiUrl.replace(/\/$/, '')}/api/cover/meta`);
@@ -80,10 +78,14 @@ export class CoverEnrichmentService {
           const meta = await resp.json();
           const ids = (arr: unknown) =>
             (Array.isArray(arr) ? arr : []).map((e: any) => e?.id ?? e).filter((id: any) => typeof id === 'string');
-          const layouts = ids(meta.layouts).filter(
+          const discoveredLayouts = (Array.isArray(meta.layouts) ? meta.layouts : [])
+            .filter((entry: any) => entry?.default === true)
+            .map((entry: any) => entry?.id)
+            .filter((id: any) => typeof id === 'string');
+          const layouts = (discoveredLayouts.length ? discoveredLayouts : ids(meta.layouts)).filter(
             (id: string) => !CoverEnrichmentService.EXCLUDED_RANDOM_LAYOUTS.includes(id),
           );
-          this.coverMeta = { layouts, palettes: ids(meta.palettes) };
+          this.coverMeta = { layouts: layouts.sort(), palettes: ids(meta.palettes).sort() };
         }
       } catch (error: any) {
         this.log.error(`Covers service unavailable at ${this.conf.coversApiUrl}: ${error?.message || error}`);
@@ -91,10 +93,14 @@ export class CoverEnrichmentService {
         // but the dependency failure must remain visible in the log.
       }
     }
-    const pick = (ids: string[] | undefined, fallback: string) =>
-      ids && ids.length ? ids[Math.floor(Math.random() * ids.length)] : fallback;
-    const layout = hasArt ? pick(this.coverMeta?.layouts, 'archival_monograph') : CoverEnrichmentService.NO_ART_LAYOUT;
-    return { layout, paletteId: pick(this.coverMeta?.palettes, 'archival_alabaster') };
+    const pick = (ids: string[] | undefined, fallback: string, salt: string) => {
+      if (!ids?.length) return fallback;
+      if (!stableKey) return ids[Math.floor(Math.random() * ids.length)];
+      const digest = createHash('sha256').update(`${stableKey}\0${salt}`).digest();
+      return ids[digest.readUInt32BE(0) % ids.length];
+    };
+    const layout = pick(this.coverMeta?.layouts, 'folio_bauhaus', 'layout');
+    return { layout, paletteId: pick(this.coverMeta?.palettes, 'archival_alabaster', 'palette') };
   }
 
   constructor(
@@ -382,7 +388,10 @@ export class CoverEnrichmentService {
       const stream = await this.minio.getObject(this.bucket, CoverEnrichmentService.requestKey(key));
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-      return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      return request && typeof request === 'object' && !Array.isArray(request)
+        ? withoutLegacyCoverArtUrl(request as Record<string, unknown>)
+        : null;
     } catch (error: any) {
       if (error?.code === 'NoSuchKey' || error?.code === 'NotFound') return null;
       throw error;
@@ -402,9 +411,9 @@ export class CoverEnrichmentService {
       // of the whole cover feature is a varied shelf, not one house
       // design repeated two thousand times. An admin-supplied request
       // (the reader's editable JSON) overrides the theme entirely.
-      // Without any art (neither the work's nor its author's) only the
-      // typographic layout - the others are built around a picture.
-      const theme = requestOverride ? null : await this.randomTheme(!!candidate.artUrl);
+      // The Folio Studio designs are self-contained and remain useful even
+      // when no work/author artwork was retrieved; art is an optional layer.
+      const theme = requestOverride ? null : await this.randomTheme(!!candidate.artUrl, candidate.path);
       const request = requestOverride ?? this.coverRequest(candidate, theme!);
       // The exact JSON sent to biblioteca-covers, one line per cover.
       this.log.log(`cover request ${candidate.path}: ${requestOverride ? '(admin-supplied) ' : ''}${JSON.stringify(request)}`);

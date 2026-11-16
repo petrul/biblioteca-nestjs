@@ -261,25 +261,53 @@ describe('CoverEnrichmentService randomTheme layout exclusion', () => {
     expect(picks.has('archival_monograph') || picks.has('constructivist')).toBe(true);
   });
 
-  it('without any art (no work image, no author portrait) only ever picks the typographic layout', async () => {
+  it('without any art (no work image, no author portrait) still uses a Folio Studio default', async () => {
     (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
       ? { ok: true, status: 200, json: async () => ({
-          layouts: [{ id: 'archival_monograph' }, { id: 'constructivist' }, { id: 'pure_typographic' }],
+          layouts: [{ id: 'archival_monograph' }, { id: 'folio_bauhaus', default: true }, { id: 'folio_botanical', default: true }],
           palettes: [{ id: 'archival_alabaster' }, { id: 'midnight' }],
         }) }
       : { ok: false, status: 500, json: async () => ({}) }) as any;
 
     const svc = makeService();
-    for (let i = 0; i < 30; i++) {
-      expect((await (svc as any).randomTheme(false)).layout).toBe('pure_typographic');
-    }
-    // the random JSON for an art-less work, and with art the pool is the usual one
-    expect((await svc.randomRequest({ id: 1, path: 'a/b', title: 'T', author: 'A' })).layout).toBe('pure_typographic');
-    const withArt = new Set<string>();
-    for (let i = 0; i < 40; i++) {
-      withArt.add((await svc.randomRequest({ id: 1, path: 'a/b', title: 'T', author: 'A', artUrl: 'https://upload.wikimedia.org/a.jpg' })).layout as string);
-    }
-    expect(withArt.size).toBeGreaterThan(1);
+    const withoutArt = new Set<string>();
+    for (let i = 0; i < 40; i++) withoutArt.add((await (svc as any).randomTheme(false)).layout);
+    expect([...withoutArt].every(id => id.startsWith('folio_'))).toBe(true);
+    expect(withoutArt.size).toBeGreaterThan(1);
+  });
+
+  it('uses a stable pseudo-random theme for automatic generation of the same work', async () => {
+    (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
+      ? { ok: true, status: 200, json: async () => ({
+          layouts: [{ id: 'constructivist' }, { id: 'archival_monograph' }],
+          palettes: [{ id: 'midnight' }, { id: 'archival_alabaster' }],
+        }) }
+      : { ok: false, status: 500, json: async () => ({}) }) as any;
+
+    const firstService = makeService();
+    const secondService = makeService();
+    const first = await (firstService as any).randomTheme(true, 'shakespeare/hamlet');
+    const second = await (secondService as any).randomTheme(true, 'shakespeare/hamlet');
+    expect(second).toEqual(first);
+  });
+
+  it('uses only the renderer-marked Folio Studio defaults for automatic art covers', async () => {
+    (global as any).fetch = (async (url: any) => String(url).endsWith('/api/cover/meta')
+      ? { ok: true, status: 200, json: async () => ({
+          layouts: [
+            { id: 'archival_monograph' },
+            { id: 'folio_bauhaus', default: true },
+            { id: 'folio_nocturne', default: true },
+          ],
+          palettes: [{ id: 'midnight_obsidian' }],
+        }) }
+      : { ok: false, status: 500, json: async () => ({}) }) as any;
+
+    const svc = makeService();
+    const picked = new Set<string>();
+    for (let i = 0; i < 40; i++) picked.add((await (svc as any).randomTheme(true)).layout);
+    expect([...picked].every(id => id.startsWith('folio_'))).toBe(true);
+    expect(picked.size).toBeGreaterThan(1);
   });
 });
 

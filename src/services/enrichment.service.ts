@@ -3,6 +3,7 @@ import { BibliotecaClient } from './biblioteca_client.service';
 import { AppConfService, PROVIDER_CONF } from '../configuration';
 import { CoverEnrichmentService } from './cover-enrichment.service';
 import { TocCacheService } from './toc-cache.service';
+import { isEligibleCoverArtUrl } from './cover-art-url';
 
 type WikiSummary = {
     extract?: string;
@@ -141,7 +142,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
       const nameByAuthor = new Map<string, string>();
       for (const author of (authors as any[])) {
         const stored = (author as any).imageHref || (author as any).image_href;
-        if (author.strId && stored) artByAuthor.set(author.strId, stored);
+        if (author.strId && isEligibleCoverArtUrl(stored)) artByAuthor.set(author.strId, stored);
         const name = (author as any).visualName || (author as any).displayName;
         if (author.strId && name) nameByAuthor.set(author.strId, name);
       }
@@ -179,7 +180,9 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
           }
         }
         // the work's art stored by an earlier pass
-        artUrl = artUrl || (Array.isArray(state.imageUrls) ? state.imageUrls[0] : undefined);
+        artUrl = artUrl || (Array.isArray(state.imageUrls)
+          ? state.imageUrls.find(isEligibleCoverArtUrl)
+          : undefined);
         if (this.covers && (opus as any).id && (opus as any).completePath && (opus as any).head) {
           // The walk's SDR projection never embeds the opus's author, so
           // the strId is the completePath's leading segment - the
@@ -242,8 +245,8 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * The author's already-stored portrait (the authors API's image_href,
-   * a biblioteca-server /img/... URL) - the art a cover order falls
+   * The author's already-stored external media (the authors API's imageUrls;
+   * legacy `/img/authors/...` values are rejected) - the art a cover order falls
    * back to when no fresh art was retrieved: fill-only enrichment skips
    * an enriched author entirely, and a fresh run can also come up empty
    * when the author's name form has no Wikipedia hit. Short-lived cache:
@@ -263,7 +266,7 @@ export class EnrichmentService implements OnModuleInit, OnModuleDestroy {
         const stored = [
           ...(Array.isArray(author.imageUrls) ? author.imageUrls : []),
           ...(author.imageHref || author.image_href ? [author.imageHref || author.image_href] : []),
-        ].filter((url, i, all) => typeof url === 'string' && url.length > 0 && all.indexOf(url) === i);
+        ].filter((url, i, all) => isEligibleCoverArtUrl(url) && all.indexOf(url) === i);
         if (author.strId && stored.length) byStrId.set(author.strId, stored);
       }
       this.authorsArtCache = { at: now, byStrId };

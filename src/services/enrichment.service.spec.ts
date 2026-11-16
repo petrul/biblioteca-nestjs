@@ -366,14 +366,15 @@ describe('EnrichmentService', () => {
 
     // no Wikipedia work enrichment (summary already there), no
     // author enrichment (bio already there) - yet the cover still
-    // carries the resolved name and the stored portrait.
+    // carries the resolved name, but never resurrects a deleted bundled
+    // portrait as cover art.
     expect(fetchMock.calls).toHaveLength(0);
     expect(enqueued).toEqual([
       expect.objectContaining({
         id: 9,
         path: 'dostoyevskii/bratya_karamazovy',
         author: 'Федор Михайлович Достоевский',
-        artUrl: '/img/authors/dostoyevskii.jpg',
+        artUrl: undefined,
       }),
     ]);
   });

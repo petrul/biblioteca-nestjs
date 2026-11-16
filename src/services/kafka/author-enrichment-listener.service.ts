@@ -116,8 +116,8 @@ export class AuthorEnrichmentKafkaListenerService implements OnApplicationShutdo
               }
             }
             // Re-ask the server for the author with all its media - the
-            // images enrichment persisted (just now or on earlier runs) plus
-            // the bundled portrait - and pick one at random, so a corpus
+            // external images enrichment persisted (just now or on earlier
+            // runs) - and pick one at random, so a corpus
             // does not get one repeated portrait. The freshly retrieved art
             // only stands in when the server has nothing associated yet.
             if (author?.strId) {
