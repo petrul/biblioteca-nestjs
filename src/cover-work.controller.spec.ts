@@ -61,6 +61,20 @@ describe('CoverWorkController (the reader admin section\'s backend)', () => {
     expect(covers.generateNow).not.toHaveBeenCalled();
   });
 
+  it('never returns a localhost author image in random request JSON', async () => {
+    const { controller } = make({
+      randomRequest: jest.fn(async () => ({
+        title: 'Poezii',
+        layout: 'folio_bauhaus',
+        coverArtUrl: 'http://localhost:8080/img/authors/eminescu.jpg',
+      })),
+    });
+    await expect(controller.randomRequest('eminescu/poezii')).resolves.toEqual({
+      coverUrl: opus.coverUrl,
+      request: { title: 'Poezii', layout: 'folio_bauhaus' },
+    });
+  });
+
   it('returns the current cover\'s stored request', async () => {
     const { controller, covers } = make();
     await expect(controller.request('eminescu/poezii')).resolves.toEqual({ coverUrl: opus.coverUrl, request: { title: 'Poezii', series: 'Scriptorium Classique' } });

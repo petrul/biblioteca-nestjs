@@ -73,7 +73,8 @@ export class CoverWorkController {
   async randomRequest(@Query('path') path: string): Promise<CoverWorkDto> {
     const opus = await this.work(path);
     const candidate = await coverCandidateFor(this.tbc, opus);
-    return { coverUrl: opus.coverUrl, request: await this.covers.randomRequest(candidate) };
+    const request = await this.covers.randomRequest(candidate);
+    return { coverUrl: opus.coverUrl, request: withoutLegacyCoverArtUrl(request) };
   }
 
   @ApiOperation({ summary: 'The request JSON one work\'s current cover was rendered from' })
