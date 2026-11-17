@@ -318,9 +318,9 @@ export class CoverEnrichmentService {
       title: candidate.title,
       author: candidate.author,
       ...COVER_IMPRINT,
-      // The renderer's coverArtUrl: same-origin path, data URL or
-      // remote https URL (auto-proxied, see biblioteca-covers'
-      // coverRequest.ts) - Wikipedia/Wikimedia URLs qualify as-is.
+      // The renderer's coverArtUrl: an explicitly uploaded data URL or a
+      // remotely enriched HTTP(S) URL. Legacy local author paths are filtered
+      // by coverCandidateFor/isEligibleCoverArtUrl before reaching the render.
       ...(candidate.artUrl ? { coverArtUrl: candidate.artUrl } : {}),
       layout: theme.layout,
       foilEffect: 'none',

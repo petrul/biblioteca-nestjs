@@ -10,6 +10,8 @@ describe('cover art source policy', () => {
   it('keeps explicit external and data art eligible', () => {
     expect(isEligibleCoverArtUrl('https://upload.wikimedia.org/wikipedia/commons/a/a.jpg')).toBe(true);
     expect(isEligibleCoverArtUrl('data:image/png;base64,AAAA')).toBe(true);
+    expect(isEligibleCoverArtUrl('http://localhost:8080/covers/local.jpg')).toBe(false);
+    expect(isEligibleCoverArtUrl('/covers/local.jpg')).toBe(false);
   });
 
   it('removes a deleted local author portrait from stored cover JSON', () => {

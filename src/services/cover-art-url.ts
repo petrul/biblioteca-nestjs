@@ -6,8 +6,16 @@
 export function isEligibleCoverArtUrl(value: unknown): value is string {
   if (typeof value !== 'string' || !value.trim()) return false;
   const raw = value.trim();
-  let path = raw;
-  try { path = new URL(raw, 'http://biblioteca.invalid').pathname; } catch { /* relative data is handled below */ }
+  // Explicit admin uploads are data URLs; all enriched artwork must be an
+  // absolute HTTP(S) URL. Relative paths and localhost URLs are old bundled
+  // assets, not remotely enriched media, and the renderer correctly refuses
+  // them as private/non-public addresses.
+  if (/^data:/i.test(raw)) return true;
+  let parsed: URL;
+  try { parsed = new URL(raw); } catch { return false; }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+  if (/^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[?::1\]?)$/i.test(parsed.hostname)) return false;
+  const path = parsed.pathname;
   return !/(^|\/)img\/authors(?:\/|$)/i.test(path)
     && !/(^|\/)authors(?:\/|$)/i.test(path);
 }

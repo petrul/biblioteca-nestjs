@@ -3,6 +3,7 @@ import { ApiBody, ApiOperation, ApiProperty, ApiQuery, ApiTags } from '@nestjs/s
 import { BibliotecaClient } from './services/biblioteca_client.service';
 import { CoverEnrichmentService, CoverRenderRefused } from './services/cover-enrichment.service';
 import { coverCandidateFor } from './services/kafka/author-arts';
+import { withoutLegacyCoverArtUrl } from './services/cover-art-url';
 
 export class CoverWorkRequestDto {
   @ApiProperty({ example: 'eminescu/poezii', description: 'The work\'s stable id, authorStrId/opusStrId.' })
@@ -47,8 +48,11 @@ export class CoverWorkController {
   async generate(@Body() dto: CoverWorkRequestDto): Promise<CoverWorkDto> {
     const opus = await this.work(dto?.path);
     const candidate = await coverCandidateFor(this.tbc, opus);
+    const request = dto?.request && typeof dto.request === 'object' && !Array.isArray(dto.request)
+      ? withoutLegacyCoverArtUrl(dto.request)
+      : dto?.request;
     try {
-      return await this.covers.generateNow(candidate, dto.request ?? undefined);
+      return await this.covers.generateNow(candidate, request ?? undefined);
     } catch (error: any) {
       if (/already being rendered/.test(error?.message)) throw new ConflictException(error.message);
       // The renderer refused this request (e.g. cover art it could not load):

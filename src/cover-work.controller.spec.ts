@@ -47,6 +47,13 @@ describe('CoverWorkController (the reader admin section\'s backend)', () => {
     expect(covers.generateNow).toHaveBeenCalledWith(expect.objectContaining({ path: 'eminescu/poezii' }), request);
   });
 
+  it('strips a legacy localhost author image before rendering an edited request', async () => {
+    const { controller, covers } = make();
+    const request = { title: 'Poezii', coverArtUrl: 'http://localhost:8080/img/authors/eminescu.jpg' };
+    await controller.generate({ path: 'eminescu/poezii', request });
+    expect(covers.generateNow).toHaveBeenCalledWith(expect.objectContaining({ path: 'eminescu/poezii' }), { title: 'Poezii' });
+  });
+
   it('hands out a fresh random request without rendering anything', async () => {
     const { controller, covers } = make();
     await expect(controller.randomRequest('eminescu/poezii')).resolves.toEqual({ coverUrl: opus.coverUrl, request: { title: 'Poezii', layout: 'continental_classic' } });
