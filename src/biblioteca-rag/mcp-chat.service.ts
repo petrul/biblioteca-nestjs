@@ -197,6 +197,10 @@ export class McpChatService {
     if (!answer && lastAnswerCandidate) answer = lastAnswerCandidate;
     if (!answer) throw new Error(`Ollama did not finish a grounded answer after ${MAX_ROUNDS} rounds`);
     const finalPassages = passages(observed);
+    // Qwen can cite a passage number from an intermediate search set that is
+    // not present in the compact response returned to the reader. Never
+    // expose a dangling citation that the UI cannot make openable.
+    answer = sanitizeCitationMarkers(answer, finalPassages.length);
     const finalRefs = [...new Set(finalPassages.map(p => p.url))].slice(0, 8);
     this.log.log(`[chat:${trace}] complete answer_chars=${answer.length} tools=${[...calledTools].join(',') || 'none'} passages=${finalPassages.length} refs=${finalRefs.join(' | ') || 'none'} answer_preview=${oneLine(answer, 500)}`);
     await this.conversations.append(conversationId, [
@@ -298,6 +302,13 @@ function oneLine(value: unknown, max = 500): string {
 
 function safeJson(value: unknown, max = 1000): string {
   try { return oneLine(JSON.stringify(value), max); } catch { return '"[unserializable]"'; }
+}
+
+export function sanitizeCitationMarkers(answer: string, passageCount: number): string {
+  return answer.replace(/\[(\d+)\]/g, (marker, number) => {
+    const index = Number(number);
+    return index >= 1 && index <= passageCount ? marker : '';
+  }).replace(/[ \t]{2,}/g, ' ').trim();
 }
 
 function summarizeToolResult(value: unknown): string {
