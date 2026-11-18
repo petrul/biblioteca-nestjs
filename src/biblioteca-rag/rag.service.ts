@@ -30,6 +30,7 @@ import {
 } from "./biblioteca.source";
 import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from "./ragtime.providers";
 import { HumanEventPublisher } from "../services/events/human-events.publisher";
+import { McpChatService, PROVIDER_MCP_CHAT } from './mcp-chat.service';
 
 export interface RagPassage {
     /** 1-based: the [n] the answer cites. */
@@ -127,6 +128,7 @@ export class RagService {
         @Inject(PROVIDER_VECTOR_COLLECTION) private readonly vectors: BibliotecaVectorCollection,
         @Inject(PROVIDER_CHAT_MODEL) private readonly chatModel: ChatModel,
         @Optional() private readonly events?: HumanEventPublisher,
+        @Optional() @Inject(PROVIDER_MCP_CHAT) private readonly mcpChat?: McpChatService,
     ) {
         const resolver = new BibliotecaContentResolver(tbc);
         this.searcher = new GenericSearcher(embedder, vectors.store, resolver, { accept: acceptPassage });
@@ -187,7 +189,29 @@ export class RagService {
         const filter = validFilter(request.scope);
         if (request.conversationId !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(String(request.conversationId)))
             throw new BadRequestException('conversationId must be the id a previous chat reply returned');
-        const reply = await this.recordingFailure('chat', { message: m, conversationId: request.conversationId, scope: scopeOf(filter) },
+        if (this.mcpChat) {
+            const reply = await this.recordingFailure('chat', { message: m, conversationId: request.conversationId, scope: scopeOf(filter), adaptor: 'mcp' },
+                () => this.mcpChat!.chat(m, { conversationId: request.conversationId, scope: scopeOf(filter) }));
+            await this.events?.publish('chat', {
+                message: reply.message, conversationId: reply.conversationId, scope: reply.scope,
+                answerChars: reply.answer.length, passages: reply.passages.length, model: reply.model, adaptor: 'mcp',
+            });
+            return reply;
+        }
+        return this.legacyChatValidated(m, filter, request);
+    }
+
+    /** Keep the pre-MCP ragtime implementation available to /api/rag/chat. */
+    async legacyChat(message: string, request: RagRequestBase & { conversationId?: string } = {}): Promise<RagChatResponse> {
+        const m = validQuery(message);
+        const filter = validFilter(request.scope);
+        if (request.conversationId !== undefined && !/^[A-Za-z0-9-]{8,64}$/.test(String(request.conversationId)))
+            throw new BadRequestException('conversationId must be the id a previous chat reply returned');
+        return this.legacyChatValidated(m, filter, request);
+    }
+
+    private async legacyChatValidated(m: string, filter: VectorFilter | undefined, request: RagRequestBase & { conversationId?: string }): Promise<RagChatResponse> {
+        const reply = await this.recordingFailure('chat', { message: m, conversationId: request.conversationId, scope: scopeOf(filter), adaptor: 'ragtime' },
             () => this.chatbot.chat(this.vectors.name, {
                 conversationId: request.conversationId, message: m, filter,
                 topK: validTopK(request.topK ?? 6, RAG_LIMITS.maxAskTopK), scoreThreshold: validDistance(request.maxDistance),

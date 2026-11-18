@@ -146,7 +146,8 @@ The design above is implemented in three layers:
   titled "Author, Work - Chapter"), `BibliotecaContextExpander` (each hit with
   its neighbouring paragraphs), `BibliotecaKeywordRetriever` (BM25 over the
   works of a small scope, read once and cached), scopes (`opusPaths`: a book,
-  a collection, or the whole library) and `RagService` behind `/api/rag/*`.
+  a collection, or the whole library) and `RagService` behind the legacy
+  `/api/rag/search` and `/api/rag/ask` routes.
 
 Why questions search harder than `/api/rag/search`: measured on "A Christmas
 Carol" (743 paragraphs), the paragraph answering a plot question ranks far
@@ -165,7 +166,8 @@ Known limits:
   chat UI.
 - User collections are per user on biblioteca-server; the caller (reader or
   server) turns a collection into its `opusPaths`.
-- `/api/rag/*` costs GPU time on the shared Ollama (one request at a time)
+- `/api/rag/search`, `/api/rag/ask`, `/api/rag/chat` and `/api/mcp/chat` cost GPU time on the shared
+  Ollama (one request at a time)
   and has no authentication or rate limit of its own: it stays internal.
   biblioteca-reader's chat gate admits only signed-in users, one message at a
   time, 60 an hour and 400 a day (`chatLimit.ts` there), and every chat is

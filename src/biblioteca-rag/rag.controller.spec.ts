@@ -7,6 +7,7 @@ import { bibliotecaCollectionSpec } from './biblioteca.source';
 import { RagController } from './rag.controller';
 import { BIBLIOTECA_SYSTEM_PROMPT, RagService } from './rag.service';
 import { BibliotecaVectorCollection, PROVIDER_CHAT_MODEL, PROVIDER_EMBEDDER, PROVIDER_VECTOR_COLLECTION } from './ragtime.providers';
+import { ChatController } from '../chat.controller';
 
 /** RagController and RagService resolve through Nest's container with the providers app.module gives them. */
 describe('RagController wiring', () => {
@@ -25,5 +26,27 @@ describe('RagController wiring', () => {
     const controller = moduleRef.get(RagController);
     expect(await controller.ask({ question: 'Ce fura Nică?' })).toMatchObject({ answer: '', model: null, passages: [] });
     expect(model.calls.filter((call) => call.messages[0].content === BIBLIOTECA_SYSTEM_PROMPT)).toHaveLength(0);
+  });
+
+  it('keeps the old rag chat route on the legacy implementation', async () => {
+    const legacyChat = jest.fn().mockResolvedValue({ answer: 'legacy' });
+    const controller = new RagController({ legacyChat } as unknown as RagService);
+
+    await controller.chat({ message: 'old question' });
+
+    expect(legacyChat).toHaveBeenCalledWith('old question', {
+      scope: undefined, topK: undefined, maxDistance: undefined, conversationId: undefined,
+    });
+  });
+
+  it('routes the new mcp chat surface through the MCP-enabled service method', async () => {
+    const chat = jest.fn().mockResolvedValue({ answer: 'grounded' });
+    const controller = new ChatController({ chat } as unknown as RagService);
+
+    await controller.chat({ message: 'new question' });
+
+    expect(chat).toHaveBeenCalledWith('new question', {
+      scope: undefined, topK: undefined, maxDistance: undefined, conversationId: undefined,
+    });
   });
 });

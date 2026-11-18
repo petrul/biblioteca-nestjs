@@ -107,10 +107,12 @@ export class RagController {
     }
   }
 
+  /** Legacy ragtime chat endpoint; kept unchanged for existing callers. */
   @Post('/chat')
   @HttpCode(200)
-  @ApiOperation({ summary: 'The next turn of a conversation over the scope: follow-ups are rewritten from the conversation before searching' })
+  @ApiOperation({ summary: 'Legacy ragtime conversation over retrieved passages' })
   chat(@Body() body: RagChatDto): Promise<RagChatResponse> {
-    return this.rag.chat(body?.message, { scope: body?.scope, topK: body?.topK, maxDistance: body?.maxDistance, conversationId: body?.conversationId });
+    return this.rag.legacyChat(body?.message, { scope: body?.scope, topK: body?.topK, maxDistance: body?.maxDistance, conversationId: body?.conversationId });
   }
+
 }

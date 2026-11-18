@@ -2,6 +2,7 @@
 export function requiresInternalApiToken(method: string, path: string): boolean {
   if (method.toUpperCase() !== 'POST') return false;
   return /^\/api\/rag\/(search|ask|ask\/stream|chat)$/.test(path)
+    || path === '/api/mcp/chat'
     || /^\/api\/vectorizing\/(start|pause|resume)$/.test(path)
     || /^\/api\/enrichment\/(run|run\/dry-run)$/.test(path)
     || /^\/api\/enrichment\/jobs\/[^/]+\/cancel$/.test(path)

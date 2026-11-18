@@ -8,16 +8,19 @@ waits on it:
   Ollama), for biblioteca-server's semantic search.
 - **Enriches** the catalogue: author bios and facts, work summaries, and
   covers rendered by biblioteca-covers and stored in MinIO.
-- **Answers questions** about the library, a book or a collection: hybrid
-  search, retrieval-augmented answers and chat (`/api/rag/*`), built on
-  its own framework, *ragtime*.
+- **Answers questions** through a thin MCP-to-Ollama chat adaptor
+  (`/api/mcp/chat`). The adaptor discovers Biblioteca's read-only MCP tools,
+  gives their schemas to `qwen3.5:9b`, executes the model's tool calls, and
+  feeds the results back. Retrieval logic stays in biblioteca-server's MCP
+  tools; the older `/api/rag/search`, `/api/rag/ask` and `/api/rag/chat`
+  endpoints remain on the ragtime implementation for compatibility.
 
 ```
 biblioteca-server ──Kafka: work imported──▶ biblioteca-nestjs ──▶ Qdrant (vectors)
         ▲                                      │  │        └──▶ Ollama (embeddings, chat)
         └──── REST: paragraphs, config, ───────┘  └──▶ biblioteca-covers ──▶ MinIO
               enrichment results
-biblioteca-reader ──/vz/api (chat, status)──▶ biblioteca-nestjs
+biblioteca-reader ──/vz/api (chat, status)──▶ biblioteca-nestjs ──MCP──▶ biblioteca-server
 ```
 
 ## Quick start
@@ -52,13 +55,34 @@ names the whole family shares:
 | `BIBLIOTECA_EXTERNAL_URL` | biblioteca-server, read for content and shared config |
 | `COVERS_API_URL` | biblioteca-covers (default `http://localhost:3335`) |
 | `MINIO_URL`, `MINIO_CREDS` | Cover storage: endpoint plus bucket, and `access-key:secret-key` |
-| `BIBLIOTECA_INTERNAL_API_TOKEN` | Required by the state-changing admin endpoints (`Authorization: Bearer ...`) |
+| `BIBLIOTECA_INTERNAL_API_TOKEN` | Required for internal NestJS routes and authenticated MCP calls (`Authorization: Bearer ...`) |
 
 **Topic, collection, model and paragraph window are not configured here**:
 they come from biblioteca-server's `GET /api/admin/config`, so the two cannot
 disagree. See [docs/vectors.md](docs/vectors.md).
 
 ## How it works
+
+### Chat adaptor
+
+The reader calls the stable same-origin `POST /api/mcp/chat` contract.
+NestJS no longer performs a second retrieval-and-prompt pipeline for that
+route. For each conversation turn it:
+
+1. opens a streamable-HTTP MCP session against `BIBLIOTECA_EXTERNAL_URL`;
+2. retrieves the advertised tool names, descriptions and JSON schemas;
+3. supplies the selected corpus tools to Ollama's `/api/chat` call;
+4. executes Qwen's tool calls through MCP, preserving the active work scope;
+5. sends the tool results back to Ollama until it returns a grounded answer.
+
+The conversation id remains an in-memory, bounded conversation store, so the
+reader's existing per-work context and reset behavior are unchanged. Literal
+`search_grep` is accepted only for an active work; broad questions can use the
+server-owned semantic and Lucene tools first. The adaptor enriches the raw MCP
+schemas with model-facing descriptions that explain this progression: vector
+and Lucene discovery, path/chapter inspection, then exact one-work grep or
+quote verification. No MCP-specific environment variable is added: the
+adaptor uses the existing Biblioteca URL, internal token and Ollama URL.
 
 - **Vectorizing.** On each "work imported" event the worker reads the work's
   paragraphs from biblioteca-server and embeds only those whose sha256 has no
@@ -68,10 +92,10 @@ disagree. See [docs/vectors.md](docs/vectors.md).
 - **Enrichment.** Kafka listeners plus a daily 03:00 sweep fill missing author
   bios, work summaries, covers and vectors. Every step is fill-only unless a
   manual run asks for `overwrite`. See [docs/enrichment.md](docs/enrichment.md).
-- **Search, ask, chat.** Questions are searched with the question and a
-  drafted answer (HyDE), by vectors and keywords, then reranked by the chat
-  model before answering with `[n]` citations. See
-  [docs/ragtime.md](docs/ragtime.md).
+- **Search and ask.** The legacy `/api/rag/search` and `/api/rag/ask` routes
+  still use ragtime for compatibility. The reader chat route uses the MCP
+  adaptor described above, so search orchestration remains owned by
+  biblioteca-server.
 - **Events.** Every chat, question and RAG search is published on
   `biblioteca_events` with its user. The topic names and message schemas are
   in biblioteca-server's `asyncapi.yml`.
@@ -110,12 +134,16 @@ covers, vector-store) need `Authorization: Bearer $BIBLIOTECA_INTERNAL_API_TOKEN
 | `POST /api/covers/work`, `/api/covers/run...` | Render one work's cover now, or run cover jobs |
 | `POST /api/rag/search` | The passages nearest in meaning to `query`, within `scope.opusPaths` (a book, a collection, or everything) |
 | `POST /api/rag/ask`, `.../ask/stream` | An answer citing passages as `[n]`; the stream sends passages, `{"delta"}` chunks, `{"done": true}` |
-| `POST /api/rag/chat` | The next turn of a conversation (`conversationId`; held in memory) |
+| `POST /api/mcp/chat` | The next grounded turn of a conversation (`conversationId`; held in memory) |
 
-`/api/rag/*` has no rate limit of its own. It is reached only through
-biblioteca-reader, whose chat gate admits signed-in users one message at a
-time. biblioteca-reader generates `src/generated/vectorizer-api.d.ts` from this
-service's OpenAPI document (`/api/ui-json`), so when this API changes, run
+`POST /api/rag/chat` is the compatibility endpoint for the pre-MCP ragtime
+conversation implementation. New clients should use `/api/mcp/chat`.
+
+The retrieval routes and `/api/mcp/chat` have no rate limit of their own. They are
+reached only through biblioteca-reader, whose chat gate admits signed-in users
+one message at a time. biblioteca-reader generates
+`src/generated/biblioteca-nestjs-api.d.ts` from this service's OpenAPI document
+(`/api/ui-json`), so when this API changes, run
 `rake gen-vectorizer-client` there against a running instance.
 
 ## Tests

@@ -32,6 +32,8 @@ import { CoverWorkController } from './cover-work.controller';
 import { CoverEnrichmentService } from './services/cover-enrichment.service';
 import { TocCacheService } from './services/toc-cache.service';
 import { HumanEventPublisher } from './services/events/human-events.publisher';
+import { McpChatService, PROVIDER_MCP_CHAT } from './biblioteca-rag/mcp-chat.service';
+import { ChatController } from './chat.controller';
 
 @Module({
   imports: [
@@ -50,6 +52,7 @@ import { HumanEventPublisher } from './services/events/human-events.publisher';
     EnrichmentAdminController,
     CoverAdminController, CoverWorkController,
     RagController,
+    ChatController,
     HealthController
   ],
 
@@ -76,6 +79,8 @@ import { HumanEventPublisher } from './services/events/human-events.publisher';
     BibliotecaClient,
     VectorizingJobService,
     RagService,
+    McpChatService,
+    { provide: PROVIDER_MCP_CHAT, useExisting: McpChatService },
     {
       // The non-secret shared-resource naming convention (Kafka topics,
       // Milvus collection, embedding model) textbase-server is the source

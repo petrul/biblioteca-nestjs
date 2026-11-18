@@ -59,6 +59,30 @@ describe('BibliotecaDivSource', () => {
 });
 
 describe('BibliotecaContentResolver', () => {
+  it('bounds concurrent div reads and skips a failed source', async () => {
+    const reader = library();
+    const original = reader.getElemByPath.bind(reader);
+    let active = 0;
+    let peak = 0;
+    reader.getElemByPath = async (path: string) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active--;
+      if (path === '/missing/work') throw new Error('transient server error');
+      return original(path);
+    };
+    const matches = ['creanga/amintiri', CHAPTER, 'eminescu/luceafarul']
+      .map((path) => match(reader, path, 1));
+    matches.push({ id: 'missing', score: 1, scoreKind: 'distance', payload: {
+      sha256: 'missing', url: 'http://server:8080/missing/work/_1',
+    } });
+    const resolved = await new BibliotecaContentResolver(reader, { resolveConcurrency: 2 }).resolveBatch(matches);
+    expect(peak).toBeLessThanOrEqual(2);
+    expect(resolved.at(-1)).toBeNull();
+    expect(resolved.filter(Boolean)).toHaveLength(3);
+  });
+
   it('resolves hits through their div, once per div, titled "Author, Work - Chapter", in the order of the hits', async () => {
     const reader = library();
     const resolver = new BibliotecaContentResolver(reader);

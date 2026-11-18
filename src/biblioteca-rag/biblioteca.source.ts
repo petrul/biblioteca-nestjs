@@ -192,6 +192,8 @@ export interface BibliotecaContentResolverOptions {
   maxScan?: number;
   /** Paragraphs read past the last hit of a div, kept for BibliotecaContextExpander. Default 1. */
   lookahead?: number;
+  /** Maximum number of distinct divs read from biblioteca-server at once. */
+  resolveConcurrency?: number;
 }
 
 /**
@@ -230,9 +232,18 @@ export class BibliotecaContentResolver implements ContentResolver<BibliotecaPara
     for (const it of wanted) if (it) byDiv.set(it.divPath, (byDiv.get(it.divPath) ?? new Set()).add(it.path));
 
     const found = new Map<string, BibliotecaParagraph>();
-    await Promise.all([...byDiv.entries()].map(async ([divPath, paths]) => {
-      for (const paragraph of await this.paragraphsOf(divPath, paths)) found.set(pathOf(paragraph.url)!, paragraph);
-    }));
+    // A library-wide chat can contain many distinct divs.  Do not turn that
+    // pool into an unbounded burst of /api/divs and /paras requests: the
+    // server has to materialize each result and PostgreSQL can run out of
+    // memory before the individual requests have a chance to finish.
+    await eachLimited([...byDiv.entries()], this.options.resolveConcurrency ?? 4, async ([divPath, paths]) => {
+      try {
+        for (const paragraph of await this.paragraphsOf(divPath, paths)) found.set(pathOf(paragraph.url)!, paragraph);
+      } catch {
+        // A stale vector or a transient 404/500 must not make the whole chat
+        // fail.  Other passages can still answer the question.
+      }
+    });
 
     return wanted.map((it) => {
       const paragraph = it && found.get(it.path);
@@ -299,6 +310,18 @@ export class BibliotecaContentResolver implements ContentResolver<BibliotecaPara
     this.works.set(opusPath, title);
     return title || undefined;
   }
+}
+
+async function eachLimited<T>(items: T[], concurrency: number, task: (item: T) => Promise<void>): Promise<void> {
+  const width = Math.max(1, Math.floor(concurrency));
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      await task(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker));
 }
 
 /**
