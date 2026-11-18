@@ -93,6 +93,7 @@ export class McpChatService {
     let usedTool = false;
     let attemptedTool = false;
     let answer = '';
+    let lastAnswerCandidate = '';
     const observed: unknown[] = [];
     let continuationRepairRequested = false;
     let searchRepairRequested = false;
@@ -103,6 +104,7 @@ export class McpChatService {
       const assistant = completion.message || {};
       const calls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
       const content = typeof assistant.content === 'string' ? assistant.content : '';
+      if (content.trim()) lastAnswerCandidate = content.trim();
       this.log.log(`[chat:${trace}] round=${round + 1} qwen tool_calls=${calls.length ? calls.map(call => call?.function?.name || '(unnamed)').join(',') : 'none'} answer_chars=${content.length}`);
       messages.push({ role: 'assistant', content, ...(calls.length ? { tool_calls: calls } : {}) });
 
@@ -172,6 +174,27 @@ export class McpChatService {
         }
       }
     }
+    if (!answer) {
+      // A model can spend the whole tool budget correcting a bad path or
+      // promising one more read.  Do not turn that into a chat outage: ask
+      // once for a final answer from the evidence already collected, with no
+      // tools left to call.  The valid tool results are still in `messages`,
+      // while failed calls are explicitly marked as errors there.
+      this.log.warn(`[chat:${trace}] rounds-exhausted; requesting final synthesis from collected evidence`);
+      try {
+        const final = await this.ollama([
+          ...messages,
+          { role: 'user', content: 'Give the final answer now from the valid evidence already collected. Do not call tools, do not promise to continue, and do not ask whether I want more. Cite the stable Biblioteca paths you can support.' },
+        ], []);
+        const finalContent = typeof final.message?.content === 'string' ? final.message.content.trim() : '';
+        if (finalContent) answer = finalContent;
+      } catch (error: any) {
+        this.log.warn(`[chat:${trace}] final synthesis failed=${oneLine(error?.message || String(error))}`);
+      }
+    }
+    // If the final synthesis itself failed, preserve the model's last useful
+    // text rather than presenting a misleading "server unavailable" error.
+    if (!answer && lastAnswerCandidate) answer = lastAnswerCandidate;
     if (!answer) throw new Error(`Ollama did not finish a grounded answer after ${MAX_ROUNDS} rounds`);
     const finalPassages = passages(observed);
     const finalRefs = [...new Set(finalPassages.map(p => p.url))].slice(0, 8);

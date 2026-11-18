@@ -192,6 +192,40 @@ describe('McpChatService', () => {
     expect(repairedPrompt).toMatch(/citește-o acum/i);
   });
 
+  it('synthesizes a final answer instead of returning 500 when tool repair rounds are exhausted', async () => {
+    process.env.BIBLIOTECA_INTERNAL_API_TOKEN = 'test-token';
+    let ollamaRound = 0;
+    const calls: Array<{ url: string; body: any }> = [];
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ url, body });
+      if (url.endsWith('/mcp')) {
+        if (body.method === 'initialize') return response({ result: {} }, { 'mcp-session-id': 'fallback-session' });
+        if (body.method === 'notifications/initialized') return response({}, { 'mcp-session-id': 'fallback-session' });
+        if (body.method === 'tools/list') return response({ result: { tools: [
+          { name: 'search_lucene', inputSchema: { type: 'object' } },
+          { name: 'read_text', inputSchema: { type: 'object' } },
+        ] } });
+        if (body.method === 'tools/call') return response({ result: { structuredContent: [
+          { type: 'milvus', url: 'https://biblioteca.test/slatineanu/sub_semnul_palosului/poghiazul_cumanilor', content: 'Cumanii atacă mănăstirea.' },
+        ] } });
+      }
+      if (!url.endsWith('/api/chat')) throw new Error(`unexpected URL ${url}`);
+      ollamaRound += 1;
+      if (ollamaRound <= 6) return response({ message: { role: 'assistant', content: ollamaRound === 2 ? 'Voi citi sursa pentru detalii.' : '', tool_calls: [{ function: { name: ollamaRound % 2 ? 'search_lucene' : 'read_text', arguments: { q: 'cumani', path: 'wrong/path' } } }] } });
+      expect(body.tools).toEqual([]);
+      return response({ message: { role: 'assistant', content: 'În textul găsit, cumanii atacă mănăstirea. Sursa: slatineanu/sub_semnul_palosului/poghiazul_cumanilor.' } });
+    }) as typeof fetch;
+
+    const service = new McpChatService({ bibliotecaUrl: 'http://server:8080', ollamaUrl: 'http://ollama' } as any);
+    const result = await service.chat('Despre cumani');
+
+    expect(result.answer).toContain('cumanii atacă mănăstirea');
+    expect(calls.filter(call => call.url.endsWith('/api/chat'))).toHaveLength(7);
+    expect(calls.at(-1)?.body.tools).toEqual([]);
+  });
+
   it('does not allow literal grep across a multi-work scope', async () => {
     process.env.BIBLIOTECA_INTERNAL_API_TOKEN = 'test-token';
     const clientCalls: any[] = [];
