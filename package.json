@@ -1,6 +1,6 @@
 {
   "name": "biblioteca-nestjs",
-  "version": "0.9.18-SNAPSHOT",
+  "version": "0.9.19-SNAPSHOT",
   "releaseName": "Fathomless Fountain",
   "description": "",
   "main": "dist/main.js",
