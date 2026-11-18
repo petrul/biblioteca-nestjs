@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { VectorizerConfiguration, PROVIDER_CONF } from '../configuration';
 import { MemoryConversationStore } from '../ragtime/core';
@@ -10,6 +10,8 @@ export const PROVIDER_MCP_CHAT = Symbol('McpChatService');
 const MODEL = 'qwen3.5:9b';
 const MAX_ROUNDS = 6;
 const MAX_TOOL_RESULT_CHARS = 12_000;
+const CONTINUATION_PROMISE = /\b(?:să\s+(?:citesc|citim|văd|verific)|pot\s+să\s+(?:citesc|văd|verific)|trebuie\s+să\s+(?:caut|citesc|verific)|voi\s+(?:căuta|citi|verifica)|doriți\s+să|would\s+you\s+like\s+me\s+to|shall\s+i\s+(?:read|look)|i\s+(?:can|need|will)\s+to\s+(?:read|look|search))\b/i;
+const EVIDENCE_TOOLS = new Set(['read_text', 'div_by_path', 'div_paragraphs']);
 
 const DEFAULT_TOOLS = new Set([
   'search_authors', 'search_div_heads', 'search_lucene', 'search_grep', 'search_vector', 'search_ann',
@@ -63,18 +65,22 @@ interface OllamaMessage {
 @Injectable()
 export class McpChatService {
   private readonly conversations = new MemoryConversationStore({ maxConversations: 1000, maxTurns: 40 });
+  private readonly log = new Logger(McpChatService.name);
 
   constructor(@Inject(PROVIDER_CONF) private readonly conf: VectorizerConfiguration) {}
 
   async chat(message: string, request: McpChatRequest = {}): Promise<RagChatResponse> {
     const conversationId = request.conversationId || randomUUID();
     const scope = normalizedScope(request.scope);
+    const trace = conversationId.slice(0, 8);
+    this.log.log(`[chat:${trace}] question=${oneLine(message)} scope=${scope.opusPaths?.join(',') || 'library'}`);
     const history = await this.conversations.history(conversationId);
     const client = new McpClient(this.conf.bibliotecaUrl, process.env.BIBLIOTECA_INTERNAL_API_TOKEN || '');
     await client.initialize();
     const advertised = await client.tools();
     const selected = advertised.filter(tool => DEFAULT_TOOLS.has(tool.name));
     if (!selected.length) throw new Error('Biblioteca MCP advertised no chat tools');
+    this.log.log(`[chat:${trace}] MCP tools=${selected.map(tool => tool.name).join(',')}`);
 
     const messages: OllamaMessage[] = [
       { role: 'system', content: systemPrompt(scope) },
@@ -82,19 +88,49 @@ export class McpChatService {
       { role: 'user', content: message },
     ];
     const tools = selected.map(toolDefinition);
+    const selectedNames = new Set(selected.map(tool => tool.name));
+    const calledTools = new Set<string>();
     let usedTool = false;
     let attemptedTool = false;
     let answer = '';
     const observed: unknown[] = [];
+    let continuationRepairRequested = false;
+    let searchRepairRequested = false;
+    let evidenceRepairRequested = false;
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
       const completion = await this.ollama(messages, tools);
       const assistant = completion.message || {};
       const calls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
       const content = typeof assistant.content === 'string' ? assistant.content : '';
+      this.log.log(`[chat:${trace}] round=${round + 1} qwen tool_calls=${calls.length ? calls.map(call => call?.function?.name || '(unnamed)').join(',') : 'none'} answer_chars=${content.length}`);
       messages.push({ role: 'assistant', content, ...(calls.length ? { tool_calls: calls } : {}) });
 
       if (!calls.length) {
+        const hasSemanticSearch = calledTools.has('search_vector');
+        const hasKeywordSearch = calledTools.has('search_lucene');
+        const missingGlobalSearch = !scope.opusPaths?.length && selectedNames.has('search_vector') && selectedNames.has('search_lucene')
+          ? (hasSemanticSearch ? (!hasKeywordSearch ? 'search_lucene' : null) : 'search_vector')
+          : null;
+        if (usedTool && missingGlobalSearch && !searchRepairRequested) {
+          searchRepairRequested = true;
+          this.log.log(`[chat:${trace}] repair=global-complement missing=${missingGlobalSearch}`);
+          messages.push({ role: 'user', content: `Complete the evidence pass before answering: call ${missingGlobalSearch} now as the complementary global search, compare its results with the searches already run, then continue to source reading.` });
+          continue;
+        }
+        if (usedTool && CONTINUATION_PROMISE.test(content) && !continuationRepairRequested) {
+          continuationRepairRequested = true;
+          evidenceRepairRequested = true;
+          this.log.log(`[chat:${trace}] repair=continuation-promise`);
+          messages.push({ role: 'user', content: 'Nu încheia cu o promisiune de continuare. Dacă ai identificat o sursă relevantă, citește-o acum folosind read_text sau div_by_path, apoi răspunde complet în acest tur. Nu întreba dacă doresc să continui.' });
+          continue;
+        }
+        if (usedTool && [...calledTools].some(name => SEARCH_TOOLS.has(name)) && ![...calledTools].some(name => EVIDENCE_TOOLS.has(name)) && !evidenceRepairRequested) {
+          evidenceRepairRequested = true;
+          this.log.log(`[chat:${trace}] repair=search-without-evidence`);
+          messages.push({ role: 'user', content: 'Search results are leads, not evidence. Before answering, call read_text or div_by_path on the most relevant stable path and ground the answer in the returned text.' });
+          continue;
+        }
         if (usedTool || attemptedTool) {
           answer = content.trim();
           break;
@@ -123,16 +159,23 @@ export class McpChatService {
         }
         try {
           const scoped = enforceScope(name, args, scope);
+          this.log.log(`[chat:${trace}] tool=${name} args=${safeJson(scoped)}`);
           const result = await client.call(name, scoped);
           usedTool = true;
+          calledTools.add(name);
           observed.push(result);
+          this.log.log(`[chat:${trace}] tool=${name} result=${summarizeToolResult(result)}`);
           messages.push({ role: 'tool', content: compact(result) });
         } catch (error: any) {
+          this.log.warn(`[chat:${trace}] tool=${name} failed=${oneLine(error?.message || String(error))}`);
           messages.push({ role: 'tool', content: JSON.stringify({ error: error?.message || String(error) }) });
         }
       }
     }
     if (!answer) throw new Error(`Ollama did not finish a grounded answer after ${MAX_ROUNDS} rounds`);
+    const finalPassages = passages(observed);
+    const finalRefs = [...new Set(finalPassages.map(p => p.url))].slice(0, 8);
+    this.log.log(`[chat:${trace}] complete answer_chars=${answer.length} tools=${[...calledTools].join(',') || 'none'} passages=${finalPassages.length} refs=${finalRefs.join(' | ') || 'none'} answer_preview=${oneLine(answer, 500)}`);
     await this.conversations.append(conversationId, [
       { role: 'user', content: message },
       { role: 'assistant', content: answer },
@@ -144,7 +187,7 @@ export class McpChatService {
       scope,
       answer,
       model: MODEL,
-      passages: passages(observed),
+      passages: finalPassages,
     };
   }
 
@@ -196,7 +239,8 @@ function systemPrompt(scope: BibliotecaScope): string {
   return [
     'You are Biblioteca\'s master librarian, answering from its classical, historical and philosophical corpus.',
     active,
-    'Use the supplied Biblioteca MCP tools before making factual claims. Follow this search discipline: for a broad or global question, begin with search_vector for meaning and search_lucene for names/keywords, using both when useful; compare their stable paths and excerpts. Then use div_by_path or read_text to inspect the surrounding chapter, and use div_toc or div_paragraphs when navigation or paragraph-level evidence is needed. Use search_grep only as a final exact-phrase check inside exactly one already identified work, never for global discovery. Use quote_fragment only when you have a verified division path and quote boundaries.',
+    'Use the supplied Biblioteca MCP tools before making factual claims. Follow this search discipline: for a broad or global question, call both search_vector for meaning and search_lucene for names/keywords, compare their stable paths and excerpts, then use div_by_path or read_text to inspect the surrounding chapter. For a question about a named work, pass that work as a scope when possible or constrain both searches to its stable path. Use div_toc or div_paragraphs when navigation or paragraph-level evidence is needed. Use search_grep only as a final exact-phrase check inside exactly one already identified work, never for global discovery. Use quote_fragment only when you have a verified division path and quote boundaries.',
+    'Complete every turn in one response. Never promise to read or search something later, and never end with "shall I continue?" If a search finds a promising source, immediately call read_text or div_by_path in this same turn before answering; if it cannot be opened, say that plainly instead of offering a future continuation.',
     'Do not invent books, passages, authors, or search results. Answer in the language of the question, be concise unless asked for a detailed literary comment, and cite stable author/opus paths when relevant.',
   ].join(' ');
 }
@@ -221,6 +265,25 @@ function enforceScope(name: string, args: Record<string, unknown>, scope: Biblio
 function compact(value: unknown): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
   return text.length > MAX_TOOL_RESULT_CHARS ? `${text.slice(0, MAX_TOOL_RESULT_CHARS)}\n[tool result truncated]` : text;
+}
+
+function oneLine(value: unknown, max = 500): string {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const clipped = text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  return JSON.stringify(clipped);
+}
+
+function safeJson(value: unknown, max = 1000): string {
+  try { return oneLine(JSON.stringify(value), max); } catch { return '"[unserializable]"'; }
+}
+
+function summarizeToolResult(value: unknown): string {
+  const found = passages([value]);
+  if (found.length) {
+    const refs = found.slice(0, 6).map(p => `${p.url} :: ${oneLine(p.text, 180)}`).join(' | ');
+    return `passages=${found.length} ${refs}`;
+  }
+  return `payload=${oneLine(value, 900)}`;
 }
 
 function passages(values: unknown[]): RagPassage[] {

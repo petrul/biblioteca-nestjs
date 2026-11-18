@@ -1,4 +1,5 @@
 /// <reference types="jest" />
+import { Logger } from '@nestjs/common';
 import { McpChatService } from './mcp-chat.service';
 
 function response(body: unknown, headers: Record<string, string> = {}): Response {
@@ -10,6 +11,7 @@ describe('McpChatService', () => {
   const originalToken = process.env.BIBLIOTECA_INTERNAL_API_TOKEN;
 
   afterEach(() => {
+    jest.restoreAllMocks();
     global.fetch = originalFetch;
     if (originalToken === undefined) delete process.env.BIBLIOTECA_INTERNAL_API_TOKEN;
     else process.env.BIBLIOTECA_INTERNAL_API_TOKEN = originalToken;
@@ -17,6 +19,7 @@ describe('McpChatService', () => {
 
   it('discovers Biblioteca tools, executes Qwen tool calls, and keeps a work scope', async () => {
     process.env.BIBLIOTECA_INTERNAL_API_TOKEN = 'test-token';
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     const calls: Array<{ url: string; body: any; headers: Headers }> = [];
     let ollamaRound = 0;
     global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -68,6 +71,11 @@ describe('McpChatService', () => {
     expect(calls.find(call => call.body?.method === 'notifications/initialized')?.body.id).toBeUndefined();
     const finalOllama = calls.filter(call => call.url.endsWith('/api/chat')).at(-1);
     expect(finalOllama?.body.messages.some((message: any) => message.role === 'tool' && message.content.includes('Nică merge la școală.'))).toBe(true);
+    const lines = log.mock.calls.map(([line]) => String(line));
+    expect(lines.some(line => line.includes('question=') && line.includes('Unde merge Nică?'))).toBe(true);
+    expect(lines.some(line => line.includes('tool=search_vector args='))).toBe(true);
+    expect(lines.some(line => line.includes('tool=search_vector result=passages=1'))).toBe(true);
+    expect(lines.some(line => line.includes('complete answer_chars=') && line.includes('refs=https://biblioteca.test/creanga/amintiri/p1'))).toBe(true);
   });
 
   it('does not allow literal grep outside an active work', async () => {
@@ -95,6 +103,93 @@ describe('McpChatService', () => {
     const result = await service.chat('Find the exact word pebbles.');
     expect(result.answer).toContain('could not perform');
     expect(clientCalls.some(call => call.body?.method === 'tools/call')).toBe(false);
+  });
+
+  it('requires complementary global search and source reading before a final answer', async () => {
+    process.env.BIBLIOTECA_INTERNAL_API_TOKEN = 'test-token';
+    const calls: Array<{ url: string; body: any }> = [];
+    let ollamaRound = 0;
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ url, body });
+      if (url.endsWith('/mcp')) {
+        if (body.method === 'initialize') return response({ result: {} }, { 'mcp-session-id': 'search-session' });
+        if (body.method === 'notifications/initialized') return response({}, { 'mcp-session-id': 'search-session' });
+        if (body.method === 'tools/list') return response({ result: { tools: [
+          { name: 'search_vector', inputSchema: { type: 'object' } },
+          { name: 'search_lucene', inputSchema: { type: 'object' } },
+          { name: 'read_text', inputSchema: { type: 'object' } },
+        ] } });
+        if (body.method === 'tools/call') return response({ result: { structuredContent: [
+          { type: 'milvus', url: 'https://biblioteca.test/comnena/alexiada/cartea_a_viii_a', content: 'Cuvinte despre cumani și războiul bizantin.' },
+        ] } });
+      }
+      if (url.endsWith('/api/chat')) {
+        ollamaRound += 1;
+        if (ollamaRound === 1) return response({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'search_vector', arguments: { q: 'cumani în Alexiada' } } }] } });
+        if (ollamaRound === 2) return response({ message: { role: 'assistant', content: 'Am găsit piste semantice.' } });
+        if (ollamaRound === 3) return response({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'search_lucene', arguments: { q: 'cumani Alexiada' } } }] } });
+        if (ollamaRound === 4) return response({ message: { role: 'assistant', content: 'Am găsit rezultate de căutare.' } });
+        if (ollamaRound === 5) return response({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'read_text', arguments: { path: 'comnena/alexiada/cartea_a_viii_a' } } }] } });
+        return response({ message: { role: 'assistant', content: 'În Alexiada, pasajul descrie conflictul cu cumanii și războiul bizantin.' } });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    }) as typeof fetch;
+
+    const service = new McpChatService({ bibliotecaUrl: 'http://server:8080', ollamaUrl: 'http://ollama' } as any);
+    const result = await service.chat('În Alexiada ai găsit ceva despre cumani?');
+    expect(result.answer).toContain('Alexiada');
+    expect(calls.filter(call => call.body?.method === 'tools/call').map(call => call.body.params.name)).toEqual(['search_vector', 'search_lucene', 'read_text']);
+    const repairPrompts = calls.filter(call => call.url.endsWith('/api/chat')).flatMap(call => call.body.messages.filter((message: any) => message.role === 'user').map((message: any) => message.content));
+    expect(repairPrompts.some((prompt: string) => /complementary global search/i.test(prompt))).toBe(true);
+    expect(repairPrompts.some((prompt: string) => /Search results are leads/i.test(prompt))).toBe(true);
+  });
+
+  it('repairs a continuation promise by reading the promising source before answering', async () => {
+    process.env.BIBLIOTECA_INTERNAL_API_TOKEN = 'test-token';
+    const calls: Array<{ url: string; body: any }> = [];
+    let ollamaRound = 0;
+    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push({ url, body });
+      if (url.endsWith('/mcp')) {
+        if (body.method === 'initialize') return response({ result: {} }, { 'mcp-session-id': 'continuation-session' });
+        if (body.method === 'notifications/initialized') return response({}, { 'mcp-session-id': 'continuation-session' });
+        if (body.method === 'tools/list') return response({ result: { tools: [
+          { name: 'search_vector', description: 'semantic search', inputSchema: { type: 'object' } },
+          { name: 'read_text', description: 'read text', inputSchema: { type: 'object' } },
+        ] } });
+        if (body.method === 'tools/call') {
+          const name = body.params.name;
+          const content = name === 'read_text'
+            ? 'Poghiazul cumanilor este descris în detaliu: atacul ajunge la mănăstire, iar apărătorii se retrag.'
+            : 'Un poghiaz al cumanilor atacă o mănăstire.';
+          return response({ result: { structuredContent: [
+            { type: 'milvus', url: 'https://biblioteca.test/stratulat/sub_semnul_palosului/poghiazul_cumanilor', content },
+          ] } });
+        }
+      }
+      if (url.endsWith('/api/chat')) {
+        ollamaRound += 1;
+        if (ollamaRound === 1) return response({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'search_vector', arguments: { q: 'scene cu cumani în război' } } }] } });
+        if (ollamaRound === 2) return response({ message: { role: 'assistant', content: 'Am găsit un text relevant. Să citesc acest fragment pentru detalii?' } });
+        if (ollamaRound === 3) return response({ message: { role: 'assistant', content: '', tool_calls: [{ function: { name: 'read_text', arguments: { path: 'stratulat/sub_semnul_palosului/poghiazul_cumanilor' } } }] } });
+        return response({ message: { role: 'assistant', content: 'În fragment, cumanii atacă mănăstirea, iar apărătorii se retrag.' } });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    }) as typeof fetch;
+
+    const service = new McpChatService({ bibliotecaUrl: 'http://server:8080', ollamaUrl: 'http://ollama' } as any);
+    const result = await service.chat('Scene cu Cumani în război');
+
+    expect(result.answer).toContain('cumanii atacă mănăstirea');
+    expect(result.answer).not.toMatch(/să citesc|doriți să/i);
+    expect(calls.filter(call => call.body?.method === 'tools/call').map(call => call.body.params.name)).toEqual(['search_vector', 'read_text']);
+    const repairedPrompt = calls.filter(call => call.url.endsWith('/api/chat')).at(2)?.body.messages.at(-1)?.content;
+    expect(repairedPrompt).toMatch(/Nu încheia cu o promisiune de continuare/i);
+    expect(repairedPrompt).toMatch(/citește-o acum/i);
   });
 
   it('does not allow literal grep across a multi-work scope', async () => {
