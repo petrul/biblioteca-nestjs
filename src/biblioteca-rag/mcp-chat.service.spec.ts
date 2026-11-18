@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 import { Logger } from '@nestjs/common';
-import { McpChatService } from './mcp-chat.service';
+import { McpChatService, sanitizeCitationMarkers } from './mcp-chat.service';
 
 function response(body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json', ...headers } });
@@ -15,6 +15,11 @@ describe('McpChatService', () => {
     global.fetch = originalFetch;
     if (originalToken === undefined) delete process.env.BIBLIOTECA_INTERNAL_API_TOKEN;
     else process.env.BIBLIOTECA_INTERNAL_API_TOKEN = originalToken;
+  });
+
+  it('removes citations that are outside the passages returned to the reader', () => {
+    expect(sanitizeCitationMarkers('Gothii apar aici [1], iar detaliul neconfirmat este [7].', 1))
+      .toBe('Gothii apar aici [1], iar detaliul neconfirmat este .');
   });
 
   it('discovers Biblioteca tools, executes Qwen tool calls, and keeps a work scope', async () => {
